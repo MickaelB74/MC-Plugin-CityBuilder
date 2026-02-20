@@ -2,6 +2,8 @@ package com.citycore.npc.GUI;
 
 import com.citycore.city.City;
 import com.citycore.city.CityManager;
+import com.citycore.npc.CityNPC;
+import com.citycore.npc.NPCGui;
 import com.citycore.npc.NPCManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -14,7 +16,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.List;
 
-public class MayorGUI {
+public class MayorGUI implements NPCGui {
 
     public static final String GUI_TITLE = ChatColor.GOLD + "Alderic — Maire";
 
@@ -28,6 +30,58 @@ public class MayorGUI {
     public MayorGUI(CityManager cityManager, NPCManager npcManager) {
         this.cityManager = cityManager;
         this.npcManager  = npcManager;
+    }
+
+
+    @Override
+    public String getTitle() {
+        return GUI_TITLE;
+    }
+
+    @Override
+    public void handleClick(Player player, int slot) {
+        switch (slot) {
+            case MayorGUI.SLOT_INFO -> {
+                player.closeInventory();
+                com.citycore.city.City city = cityManager.getCity();
+                if (city == null) return;
+                player.sendMessage("§8§m--------------------");
+                player.sendMessage("§6 " + CityNPC.MAYOR.displayName + " §8— §e" + city.getName());
+                player.sendMessage("§8§m--------------------");
+                player.sendMessage("§eNiveau  : §f" + city.getLevel());
+                player.sendMessage("§eCaisse  : §6" + city.getCoins() + " coins");
+                player.sendMessage("§eChunks  : §f" + city.getClaimedChunks() + " §7/ §f" + city.getMaxChunks());
+                player.sendMessage("§eExpand  : §6" + cityManager.getNextExpandPrice() + " coins §7pour +1 slot");
+                player.sendMessage("§8§m--------------------");
+            }
+
+            case MayorGUI.SLOT_FOLLOW -> {
+                player.closeInventory();
+                String name = CityNPC.MAYOR.displayName;
+                if (npcManager.isFollowing(player)) {
+                    npcManager.stopFollowing(player);
+                    player.sendMessage(name + " §7s'est arrêté de vous suivre.");
+                } else {
+                    npcManager.startFollowing(player);
+                    player.sendMessage(name + " §avous suit désormais.");
+                }
+                this.open(player);
+            }
+
+            case MayorGUI.SLOT_EXPAND -> {
+                player.closeInventory();
+                int price = cityManager.getNextExpandPrice();
+                CityManager.ExpandResult result = cityManager.expandMaxChunks();
+                if (result.success()) {
+                    player.sendMessage("§a✅ Capacité étendue ! Max chunks : §f" + result.newMaxChunks());
+                    player.sendMessage("§7Caisse restante : §6" + result.newBalance() + " coins");
+                } else {
+                    int missing = price - cityManager.getCityCoins();
+                    player.sendMessage("§c❌ Fonds insuffisants. Il manque §f" + missing + " coins§c.");
+                    player.sendMessage("§7💡 §e/city deposit <montant> §7pour alimenter la caisse.");
+                }
+            }
+        }
     }
 
     public void open(Player player) {

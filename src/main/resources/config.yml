@@ -1,0 +1,12 @@
+stonemason:
+  prices:
+    COBBLESTONE: 2
+    STONE: 3
+    GRANITE: 4
+    DIORITE: 4
+    ANDESITE: 4
+    GRAVEL: 2
+    SAND: 2
+    SANDSTONE: 3
+    DEEPSLATE: 5
+    OBSIDIAN: 20

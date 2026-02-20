@@ -1,11 +1,13 @@
 package com.citycore.command;
 
 import com.citycore.city.City;
+import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCManager;
 import com.citycore.util.ChunkParticleTask;
 import com.citycore.city.CityManager;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -206,6 +208,36 @@ public class CityCommand implements CommandExecutor {
                     player.sendMessage("§eChunks  : §f" + city.getClaimedChunks() + " §7/ §f" + city.getMaxChunks());
                     player.sendMessage("§eExpand  : §6" + cityManager.getNextExpandPrice() + " coins §7pour +1 slot");
                     player.sendMessage("§8§m--------------------");
+                }
+
+                case SPAWN -> {
+                    if (!player.isOp()) {
+                        player.sendMessage("§c❌ Commande réservée aux administrateurs.");
+                        return true;
+                    }
+                    if (args.length < 2) {
+                        player.sendMessage("§cUsage : /city spawn <type>");
+                        player.sendMessage("§7Types disponibles : §estonemason");
+                        return true;
+                    }
+
+                    switch (args[1].toLowerCase()) {
+                        case "stonemason" -> {
+                            if (npcManager.getNPC(CityNPC.STONEMASON) != null) {
+                                player.sendMessage("§c❌ Le Tailleur de pierre existe déjà.");
+                                return true;
+                            }
+                            Location loc = player.getLocation().clone();
+                            loc.add(loc.getDirection().normalize().multiply(2));
+                            loc.setY(Math.floor(loc.getY() + 1));
+                            Location npcLoc = loc.clone();
+                            npcLoc.setYaw((player.getLocation().getYaw() + 180) % 360);
+                            npcLoc.setPitch(0);
+                            npcManager.spawnNPC(CityNPC.STONEMASON, npcLoc);
+                            player.sendMessage("§a✅ Brennan le Tailleur de pierre est apparu !");
+                        }
+                        default -> player.sendMessage("§c❌ Type inconnu. Disponibles : §estonemason");
+                    }
                 }
             }
         } catch (Exception e) {

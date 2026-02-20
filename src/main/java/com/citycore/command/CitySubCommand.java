@@ -8,7 +8,8 @@ public enum CitySubCommand {
     EXPAND("expand",  "expand",          "Acheter un slot de chunk"),
     DEPOSIT("deposit","deposit <montant>","Déposer vos coins dans la caisse"),
     INFO("info",      "info",            "Infos de la ville"),
-    MAP("map",        "map",             "Visualiser les chunks claimés");
+    MAP("map",        "map",             "Visualiser les chunks claimés"),
+    SPAWN("spawn", "spawn <type>", "Faire apparaître un NPC villageois");
 
     public final String label;       // utilisé pour le switch et le tab
     public final String usage;       // affiché dans l'aide

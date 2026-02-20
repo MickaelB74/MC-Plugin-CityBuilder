@@ -24,6 +24,39 @@ public class NPCManager {
         this.plugin = plugin;
     }
 
+    /**
+     * À appeler dans onEnable — réattache la logique aux NPCs
+     * déjà spawné par Citizens au redémarrage du serveur.
+     */
+    public void restoreNPCs() {
+        int total = 0;
+        int restored = 0;
+
+        for (NPC npc : CitizensAPI.getNPCRegistry()) {
+            total++;
+            plugin.getLogger().info("NPC trouvé : id=" + npc.getId()
+                    + " name=" + npc.getName()
+                    + " hasMayorTag=" + npc.data().has(CityNPC.MAYOR.tag)
+                    + " hasMasonTag=" + npc.data().has(CityNPC.STONEMASON.tag));
+
+            CityNPC type = getNPCType(npc);
+            if (type == null) {
+                plugin.getLogger().info("  → Pas un NPC CityCore, ignoré.");
+                continue;
+            }
+
+            if (!npc.isSpawned() && npc.getStoredLocation() != null) {
+                npc.spawn(npc.getStoredLocation());
+            }
+
+            plugin.getLogger().info("  → Restauré : " + type.displayName);
+            restored++;
+        }
+
+        plugin.getLogger().info("Bilan : " + total + " NPC(s) Citizens, "
+                + restored + " restauré(s).");
+    }
+
     /* =========================
        SPAWN GÉNÉRIQUE
        ========================= */
@@ -35,7 +68,7 @@ public class NPCManager {
     public NPC spawnNPC(CityNPC type, Location location) {
         NPCRegistry registry = CitizensAPI.getNPCRegistry();
         NPC npc = registry.createNPC(EntityType.PLAYER, type.displayName);
-        npc.data().set(type.tag, true);
+        npc.data().setPersistent(type.tag, true);
 
         // Skin AVANT spawn
         SkinTrait skinTrait = npc.getOrAddTrait(SkinTrait.class);
@@ -150,5 +183,36 @@ public class NPCManager {
 
     public boolean isFollowing(Player player) {
         return followingPlayers.contains(player.getUniqueId());
+    }
+
+    /* =========================
+   MODE SUIVI (stonemason)
+   ========================= */
+
+    private final Set<UUID> followingMasonPlayers = new HashSet<>();
+
+    public void startFollowingMason(Player player) {
+        NPC mason = getNPC(CityNPC.STONEMASON);
+        if (mason == null || !mason.isSpawned()) return;
+
+        mason.getNavigator().getDefaultParameters()
+                .range(50f)
+                .speedModifier(0.8f)
+                .distanceMargin(2.0);
+
+        mason.getNavigator().setTarget(player, false);
+        followingMasonPlayers.add(player.getUniqueId());
+    }
+
+    public void stopFollowingMason(Player player) {
+        NPC mason = getNPC(CityNPC.STONEMASON);
+        if (mason != null && mason.isSpawned()) {
+            mason.getNavigator().cancelNavigation();
+        }
+        followingMasonPlayers.remove(player.getUniqueId());
+    }
+
+    public boolean isFollowingMason(Player player) {
+        return followingMasonPlayers.contains(player.getUniqueId());
     }
 }

@@ -32,11 +32,12 @@ public class CityTabCompleter implements TabCompleter {
 
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
-                case "deposit" -> List.of("100", "500", "1000", "5000");
-                case "create"  -> cityManager.isCityInitialized()
+                case "deposit"  -> List.of("100", "500", "1000", "5000");
+                case "create"   -> cityManager.isCityInitialized()
                         ? new ArrayList<>()
                         : List.of("<nom_de_ville>");
-                default -> new ArrayList<>();
+                case "spawn"    -> List.of("stonemason"); // ← futurs NPCs à ajouter ici
+                default         -> new ArrayList<>();
             };
         }
 
