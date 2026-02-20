@@ -1,0 +1,5 @@
+name: CityCore
+version: 1.0.0
+main: com.citycore.CityCore
+api-version: 1.21
+description: Cooperative medieval city plugin
