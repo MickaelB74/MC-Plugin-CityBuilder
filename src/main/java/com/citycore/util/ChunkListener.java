@@ -2,6 +2,7 @@ package com.citycore.util;
 
 import com.citycore.city.City;
 import com.citycore.city.CityManager;
+import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCManager;
 import org.bukkit.Chunk;
 import org.bukkit.entity.Player;
@@ -40,8 +41,8 @@ public class ChunkListener implements Listener {
         // Sortie de la ville alors qu'Alderic suit le joueur
         if (wasInCity && !isInCity && npcManager.isFollowing(player)) {
             npcManager.stopFollowing(player);
-            player.sendMessage("§6Alderic §7: §o\"Je vous attends là, je dois surveiller la ville...\"");
-            player.sendActionBar("§c🌲 Alderic ne peut pas quitter la ville.");
+            player.sendMessage("§6" + CityNPC.MAYOR.displayName + " §7: §o\"Je vous attends là, je dois surveiller la ville...\"");
+            player.sendActionBar("§c🌲 " + CityNPC.MAYOR.displayName + " ne peut pas quitter la ville.");
         } else if (wasInCity && !isInCity) {
             player.sendActionBar("§c🌲 Quitter le territoire de la ville");
         }

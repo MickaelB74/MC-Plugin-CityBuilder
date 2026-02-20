@@ -22,8 +22,15 @@ public class MayorListener implements Listener {
 
     @EventHandler
     public void onNPCRightClick(NPCRightClickEvent event) {
-        if (!npcManager.isMayor(event.getNPC())) return;
-        mayorGUI.open(event.getClicker());
+        CityNPC type = npcManager.getNPCType(event.getNPC());
+        if (type == null) return;
+
+        switch (type) {
+            case MAYOR -> mayorGUI.open(event.getClicker());
+            // Futurs NPCs :
+            // case BLACKSMITH -> blacksmithGUI.open(event.getClicker());
+            // case MERCHANT   -> merchantGUI.open(event.getClicker());
+        }
     }
 
     @EventHandler
@@ -41,7 +48,7 @@ public class MayorListener implements Listener {
                 com.citycore.city.City city = cityManager.getCity();
                 if (city == null) return;
                 player.sendMessage("§8§m--------------------");
-                player.sendMessage("§6 " + city.getName());
+                player.sendMessage("§6 " + CityNPC.MAYOR.displayName + " §8— §e" + city.getName());
                 player.sendMessage("§8§m--------------------");
                 player.sendMessage("§eNiveau  : §f" + city.getLevel());
                 player.sendMessage("§eCaisse  : §6" + city.getCoins() + " coins");
@@ -52,13 +59,15 @@ public class MayorListener implements Listener {
 
             case MayorGUI.SLOT_FOLLOW -> {
                 player.closeInventory();
+                String name = CityNPC.MAYOR.displayName;
                 if (npcManager.isFollowing(player)) {
                     npcManager.stopFollowing(player);
-                    player.sendMessage("§7Alderic s'est arrêté de vous suivre.");
+                    player.sendMessage(name + " §7s'est arrêté de vous suivre.");
                 } else {
                     npcManager.startFollowing(player);
-                    player.sendMessage("§aAlderic vous suit désormais.");
+                    player.sendMessage(name + " §avous suit désormais.");
                 }
+                mayorGUI.open(player);
             }
 
             case MayorGUI.SLOT_EXPAND -> {

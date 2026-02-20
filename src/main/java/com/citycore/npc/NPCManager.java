@@ -17,14 +17,6 @@ import java.util.UUID;
 
 public class NPCManager {
 
-    private static final String MAYOR_NPC_ID_TAG = "citycore_mayor";
-    private static final String MAYOR_NAME       = "§6Alderic";
-
-    private static final String SKIN_VALUE =
-            "ewogICJ0aW1lc3RhbXAiIDogMTc3MTQ4OTcyNDg1OCwKICAicHJvZmlsZUlkIiA6ICI2NDg4Y2VjMjc4OGQ0MTI2OTk5NWMyMmY4OTdmMzA4OSIsCiAgInByb2ZpbGVOYW1lIiA6ICJBc3BlbjA1MyIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS9kMTUzNTk3ZmE2M2U2MTJhMGQ2YWY2OWE0ZTFiMDFlY2YxM2M4ZGI0Y2E5ZThkYzdkZmZmODQ5YjBjMTAzZTlmIgogICAgfQogIH0KfQ==";
-    private static final String SKIN_SIGNATURE =
-            "A60BzbuZYlRE2SbwCz02jy+hnBG1o2D8QMl8IcfD994ft2CBTWEhAdhWN0Fey78EXKMTTRFmyGQweLDlV/29lPIRwSLhy77gb9fqkYnR1LaLykUAkiBJ0VBHJW7ZAYAAmOJE5ehoo/fwWADNwlVAu8oZzXGJhhf8goCiGnTBuRRXI6rkyMdMGpjkDqxATuew/0mtxNAGLVIORoHNhbBj1p3ihaM9By4L/A39oN/WthMf+rMQNwhLCuMBYXPI+//ShFhDJl/lDTIm7nvsCk/1vVVDEuULosjWqlYPf2r+r3hDAMIE5StyDk9ypxImHnDe3D2cb5DFNBtZKHLYyIq8enxXxotHcMRjZeaHg4KwajswshsMh07yvXO0x46nfF6RFcMEbjL2u7eRW4Y1bJjKVkxTZ9hmM6C9oHHYKvHRAT1cVo6YxGU8/fukthrZvD0BlQAjsDdwBGW/p2ex/dQtweHWDlamWeqhNIUBIdMF9qlWwNX6f24clecUIhEbXxXdDrupXNZuBrBtUkzicbPrC+PVJaKT0qCO9S2fyHW89VznqAK3whv3CVBGvqpq242IucuTHJpwDet1ctXXWw97ebSfvP//Cg1f9nn5mrE81OB5G5BEsS1Y32KRviQ5tfZPnPsU0SRXatoHzNp0RozrtF2B53SA5eII7ViNFpe/mIY=";
-
     private final JavaPlugin plugin;
     private final Set<UUID> followingPlayers = new HashSet<>();
 
@@ -33,91 +25,110 @@ public class NPCManager {
     }
 
     /* =========================
-       SPAWN / FIND / REMOVE
+       SPAWN GÉNÉRIQUE
        ========================= */
 
+    /**
+     * Méthode générique — peut spawner n'importe quel CityNPC.
+     * Exemple futur : spawnNPC(CityNPC.BLACKSMITH, player)
+     */
+    public NPC spawnNPC(CityNPC type, Location location) {
+        NPCRegistry registry = CitizensAPI.getNPCRegistry();
+        NPC npc = registry.createNPC(EntityType.PLAYER, type.displayName);
+        npc.data().set(type.tag, true);
+
+        // Skin AVANT spawn
+        SkinTrait skinTrait = npc.getOrAddTrait(SkinTrait.class);
+        skinTrait.setSkinPersistent(type.skinId, type.skinSignature, type.skinValue);
+
+        // Hologramme
+        HologramTrait hologram = npc.getOrAddTrait(HologramTrait.class);
+        hologram.addLine(type.hologramLine());
+
+        npc.spawn(location);
+
+        // Refresh SkinsRestorer pour les clients crackés
+        Bukkit.getScheduler().runTaskLater(plugin, () ->
+                forceSkinsRestorerRefresh(npc, type), 20L);
+
+        return npc;
+    }
+
+    /* =========================
+       SPAWN MAIRE (helper)
+       ========================= */
+
+    /**
+     * Spawne le maire 2 blocs devant le joueur, face à lui.
+     */
     public NPC spawnMayor(Player player) {
         Location loc = player.getLocation().clone();
         loc.add(loc.getDirection().normalize().multiply(2));
-        loc.setY(Math.floor(loc.getY()));
+        loc.setY(Math.floor(loc.getY() + 1));
 
         Location mayorLoc = loc.clone();
         mayorLoc.setYaw((player.getLocation().getYaw() + 180) % 360);
         mayorLoc.setPitch(0);
 
-        NPCRegistry registry = CitizensAPI.getNPCRegistry();
-        NPC npc = registry.createNPC(EntityType.PLAYER, MAYOR_NAME);
-        npc.data().set(MAYOR_NPC_ID_TAG, true);
+        return spawnNPC(CityNPC.MAYOR, mayorLoc);
+    }
 
-        // Skin via SkinTrait — AVANT spawn
-        SkinTrait skinTrait = npc.getOrAddTrait(SkinTrait.class);
-        skinTrait.setSkinPersistent("alderic", SKIN_SIGNATURE, SKIN_VALUE);
+    /* =========================
+       FIND / CHECK / REMOVE
+       ========================= */
 
-        // Hologramme Citizens natif
-        HologramTrait hologram = npc.getOrAddTrait(HologramTrait.class);
-        hologram.addLine("§7✦ §eMaire de la ville §7✦");
+    public NPC getNPC(CityNPC type) {
+        for (NPC npc : CitizensAPI.getNPCRegistry()) {
+            if (npc.data().has(type.tag)) return npc;
+        }
+        return null;
+    }
 
-        // Spawn APRÈS le skin
-        npc.spawn(mayorLoc);
-
-        // Force SkinsRestorer à appliquer le skin sur le NPC si disponible
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            forceSkinsRestorerRefresh(npc);
-        }, 20L);
-
-        return npc;
+    public boolean isNPCType(NPC npc, CityNPC type) {
+        return npc.data().has(type.tag);
     }
 
     /**
-     * Utilise la commande console SkinsRestorer pour forcer
-     * l'affichage du skin sur les clients crackés.
-     * Ne plante pas si SkinsRestorer est absent.
+     * Retrouve le type d'un NPC Citizens depuis ses données.
+     * Utile dans les listeners pour identifier qui on clique.
      */
-    private void forceSkinsRestorerRefresh(NPC npc) {
-        if (!npc.isSpawned()) return;
-
-        // Vérifie que SkinsRestorer est bien installé
-        if (Bukkit.getPluginManager().getPlugin("SkinsRestorer") == null) {
-            plugin.getLogger().info("SkinsRestorer absent — skin NPC limité aux clients officiels.");
-            return;
+    public CityNPC getNPCType(NPC npc) {
+        for (CityNPC type : CityNPC.values()) {
+            if (npc.data().has(type.tag)) return type;
         }
+        return null;
+    }
+
+    public void removeNPC(CityNPC type) {
+        NPC npc = getNPC(type);
+        if (npc != null) npc.destroy();
+    }
+
+    /* =========================
+       SKINSRESTORER REFRESH
+       ========================= */
+
+    private void forceSkinsRestorerRefresh(NPC npc, CityNPC type) {
+        if (!npc.isSpawned()) return;
+        if (Bukkit.getPluginManager().getPlugin("SkinsRestorer") == null) return;
 
         try {
-            // SkinsRestorer expose une commande console pour set le skin d'un joueur
-            // On cible le NPC par son nom d'entité
-            String npcName = npc.getEntity().getName();
             Bukkit.dispatchCommand(
                     Bukkit.getConsoleSender(),
-                    "sr set " + npcName + " alderic"
+                    "sr set " + npc.getEntity().getName() + " " + type.skinId
             );
-            plugin.getLogger().info("✅ SkinsRestorer refresh forcé pour Alderic.");
+            plugin.getLogger().info("✅ Skin " + type.skinId + " appliqué via SkinsRestorer.");
         } catch (Exception e) {
             plugin.getLogger().warning("⚠ SkinsRestorer refresh échoué : " + e.getMessage());
         }
     }
 
-    public NPC getMayor() {
-        for (NPC npc : CitizensAPI.getNPCRegistry()) {
-            if (npc.data().has(MAYOR_NPC_ID_TAG)) return npc;
-        }
-        return null;
-    }
-
-    public boolean isMayor(NPC npc) {
-        return npc.data().has(MAYOR_NPC_ID_TAG);
-    }
-
-    public void removeMayor() {
-        NPC mayor = getMayor();
-        if (mayor != null) mayor.destroy();
-    }
-
     /* =========================
-       MODE SUIVI
+       MODE SUIVI (maire)
        ========================= */
 
     public void startFollowing(Player player) {
-        NPC mayor = getMayor();
+        NPC mayor = getNPC(CityNPC.MAYOR);
         if (mayor == null || !mayor.isSpawned()) return;
 
         mayor.getNavigator().getDefaultParameters()
@@ -130,7 +141,7 @@ public class NPCManager {
     }
 
     public void stopFollowing(Player player) {
-        NPC mayor = getMayor();
+        NPC mayor = getNPC(CityNPC.MAYOR);
         if (mayor != null && mayor.isSpawned()) {
             mayor.getNavigator().cancelNavigation();
         }
