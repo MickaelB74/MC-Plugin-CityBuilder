@@ -79,6 +79,14 @@ public class DatabaseManager {
             )
         """);
 
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS npc_introductions (
+                player_uuid TEXT NOT NULL,
+                npc_tag TEXT NOT NULL,
+                PRIMARY KEY (player_uuid, npc_tag)
+            )
+        """);
+
         stmt.close();
     }
 

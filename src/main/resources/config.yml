@@ -10,3 +10,27 @@ stonemason:
     SANDSTONE: 3
     DEEPSLATE: 5
     OBSIDIAN: 20
+
+jacksparrow:
+  prices:
+    # Poissons
+    COD: 3
+    SALMON: 4
+    TROPICAL_FISH: 6
+    PUFFERFISH: 8
+    # Ressources marines
+    KELP: 1
+    SEAGRASS: 1
+    SEA_PICKLE: 5
+    NAUTILUS_SHELL: 15
+    HEART_OF_THE_SEA: 100
+    # Craft rhum
+    SUGAR_CANE: 2
+    BAMBOO: 1
+    GLASS_BOTTLE: 2
+    HONEY_BOTTLE: 8
+    # Trésors
+    GOLD_NUGGET: 3
+    GOLD_INGOT: 25
+    PRISMARINE_SHARD: 6
+    PRISMARINE_CRYSTALS: 8

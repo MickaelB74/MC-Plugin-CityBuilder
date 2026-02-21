@@ -58,11 +58,11 @@ public class MayorGUI implements NPCGui {
             case MayorGUI.SLOT_FOLLOW -> {
                 player.closeInventory();
                 String name = CityNPC.MAYOR.displayName;
-                if (npcManager.isFollowing(player)) {
-                    npcManager.stopFollowing(player);
+                if (npcManager.isFollowing(player, CityNPC.MAYOR)) {
+                    npcManager.stopFollowing(player, CityNPC.MAYOR);
                     player.sendMessage(name + " §7s'est arrêté de vous suivre.");
                 } else {
-                    npcManager.startFollowing(player);
+                    npcManager.startFollowing(player, CityNPC.MAYOR);
                     player.sendMessage(name + " §avous suit désormais.");
                 }
                 this.open(player);
@@ -108,7 +108,7 @@ public class MayorGUI implements NPCGui {
         ));
 
         // Bouton SUIVI (toggle)
-        boolean following = npcManager.isFollowing(player);
+        boolean following = npcManager.isFollowing(player, CityNPC.MAYOR);
         inv.setItem(SLOT_FOLLOW, makeItem(
                 following ? Material.REDSTONE : Material.LIME_DYE,
                 following ? "§c⛔ Arrêter de suivre" : "§a👣 Demander de suivre",

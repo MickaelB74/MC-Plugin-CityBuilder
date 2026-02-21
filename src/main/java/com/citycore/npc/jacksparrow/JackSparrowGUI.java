@@ -1,4 +1,4 @@
-package com.citycore.npc.stonemason;
+package com.citycore.npc.jacksparrow;
 
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCManager;
@@ -15,25 +15,24 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class StonemasonGUI {
+public class JackSparrowGUI {
 
-    // Titres — utilisés pour identifier le GUI dans le listener
-    public static final String GUI_TITLE_MAIN = ChatColor.GRAY + CityNPC.STONEMASON.displayName + " — " + CityNPC.STONEMASON.function;
-    public static final String GUI_TITLE_SELL = ChatColor.GRAY + CityNPC.STONEMASON.displayName + " — Vendre des pierres";
-    public static final String GUI_TITLE_BUY  = ChatColor.GRAY + CityNPC.STONEMASON.displayName + " — Acheter des blocs";
+    public static final String GUI_TITLE_MAIN = ChatColor.DARK_AQUA
+            + CityNPC.JACKSPARROW.displayName + " — " + CityNPC.JACKSPARROW.function;
+    public static final String GUI_TITLE_SELL = ChatColor.DARK_AQUA
+            + CityNPC.JACKSPARROW.displayName + " — Vendre";
+    public static final String GUI_TITLE_BUY  = ChatColor.DARK_AQUA
+            + CityNPC.JACKSPARROW.displayName + " — Acheter";
 
-    // Slots du menu principal
     public static final int SLOT_SELL   = 2;
     public static final int SLOT_BUY    = 4;
     public static final int SLOT_FOLLOW = 6;
-
-    // Slot retour dans les sous-menus
     public static final int SLOT_BACK   = 8;
 
-    private final StonemasonConfig config;
+    private final JackSparrowConfig config;
     private final NPCManager npcManager;
 
-    public StonemasonGUI(StonemasonConfig config, NPCManager npcManager) {
+    public JackSparrowGUI(JackSparrowConfig config, NPCManager npcManager) {
         this.config     = config;
         this.npcManager = npcManager;
     }
@@ -45,27 +44,27 @@ public class StonemasonGUI {
     public void open(Player player) {
         Inventory inv = Bukkit.createInventory(null, 9, GUI_TITLE_MAIN);
 
-        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        ItemStack filler = makeItem(Material.CYAN_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < 9; i++) inv.setItem(i, filler);
 
         // Bouton VENDRE
         inv.setItem(SLOT_SELL, makeItem(
-                Material.EMERALD,
-                "§a💰 Vendre des pierres",
+                Material.COD,
+                "§a💰 Vendre des ressources",
                 List.of(
-                        "§7Vendez vos pierres par stacks",
+                        "§7Vendez vos ressources marines",
                         "§7et recevez des coins.",
                         "",
                         "§eCliquez pour voir les prix"
                 )
         ));
 
-        // Bouton ACHETER (placeholder — à compléter plus tard)
+        // Bouton ACHETER (placeholder)
         inv.setItem(SLOT_BUY, makeItem(
-                Material.ORANGE_STAINED_GLASS_PANE,
-                "§6🛒 Acheter des blocs",
+                Material.CYAN_STAINED_GLASS_PANE,
+                "§6🛒 Acheter des ressources",
                 List.of(
-                        "§7Achetez des blocs travaillés",
+                        "§7Achetez des ressources marines",
                         "§7avec vos coins.",
                         "",
                         "§8(Disponible prochainement)"
@@ -73,13 +72,13 @@ public class StonemasonGUI {
         ));
 
         // Bouton SUIVI
-        boolean following = npcManager.isFollowing(player, CityNPC.STONEMASON);
+        boolean following = npcManager.isFollowing(player, CityNPC.JACKSPARROW);
         inv.setItem(SLOT_FOLLOW, makeItem(
                 following ? Material.REDSTONE : Material.LIME_DYE,
                 following ? "§c⛔ Arrêter de suivre" : "§a👣 Demander de suivre",
                 List.of(
-                        following ? "§7Brennan arrêtera de vous suivre."
-                                : "§7Brennan vous suivra.",
+                        following ? "§7Jack arrêtera de vous suivre."
+                                : "§7Jack vous suivra.",
                         "",
                         "§eCliquez pour " + (following ? "arrêter" : "activer")
                 )
@@ -97,16 +96,15 @@ public class StonemasonGUI {
         int size = Math.max(18, (int) Math.ceil((prices.size() + 1) / 9.0) * 9);
         Inventory inv = Bukkit.createInventory(null, size, GUI_TITLE_SELL);
 
-        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        ItemStack filler = makeItem(Material.CYAN_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < size; i++) inv.setItem(i, filler);
 
-        // Boutons de vente
         int slot = 0;
         for (Map.Entry<Material, Integer> entry : prices.entrySet()) {
-            if (slot == SLOT_BACK) slot++; // Réserve le slot retour
+            if (slot == SLOT_BACK) slot++;
 
-            Material mat   = entry.getKey();
-            int price      = entry.getValue();
+            Material mat    = entry.getKey();
+            int price       = entry.getValue();
             int playerCount = countMaterial(player, mat);
             int fullStacks  = playerCount / 64;
             int totalValue  = fullStacks * price;
@@ -125,7 +123,6 @@ public class StonemasonGUI {
             slot++;
         }
 
-        // Bouton retour
         inv.setItem(SLOT_BACK, makeItem(
                 Material.ARROW,
                 "§7← Retour",
@@ -142,16 +139,15 @@ public class StonemasonGUI {
     public void openBuy(Player player) {
         Inventory inv = Bukkit.createInventory(null, 9, GUI_TITLE_BUY);
 
-        ItemStack filler = makeItem(Material.ORANGE_STAINED_GLASS_PANE, " ");
+        ItemStack filler = makeItem(Material.CYAN_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < 9; i++) inv.setItem(i, filler);
 
         inv.setItem(4, makeItem(
                 Material.BARRIER,
-                "§c Pas encore disponible",
+                "§cPas encore disponible",
                 List.of("§7Cette fonctionnalité sera", "§7disponible prochainement.")
         ));
 
-        // Bouton retour
         inv.setItem(SLOT_BACK, makeItem(
                 Material.ARROW,
                 "§7← Retour",

@@ -39,8 +39,8 @@ public class ChunkListener implements Listener {
         }
 
         // Sortie de la ville alors qu'Alderic suit le joueur
-        if (wasInCity && !isInCity && npcManager.isFollowing(player)) {
-            npcManager.stopFollowing(player);
+        if (wasInCity && !isInCity && npcManager.isFollowing(player, CityNPC.MAYOR)) {
+            npcManager.stopFollowing(player, CityNPC.MAYOR);
             player.sendMessage("§6" + CityNPC.MAYOR.displayName + " §7: §o\"Je vous attends là, je dois surveiller la ville...\"");
             player.sendActionBar("§c🌲 " + CityNPC.MAYOR.displayName + " ne peut pas quitter la ville.");
         } else if (wasInCity && !isInCity) {

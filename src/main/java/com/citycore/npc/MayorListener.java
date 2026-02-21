@@ -1,19 +1,26 @@
 package com.citycore.npc;
 
+import com.citycore.util.TypewriterUtil;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class MayorListener implements Listener {
 
     private final NPCManager      npcManager;
     private final NPCGuiRegistry  guiRegistry;
+    private final IntroductionManager introManager;
+    private final JavaPlugin plugin;
 
-    public MayorListener(NPCManager npcManager, NPCGuiRegistry guiRegistry) {
+    public MayorListener(NPCManager npcManager, NPCGuiRegistry guiRegistry, IntroductionManager introManager,
+                         JavaPlugin plugin) {
         this.npcManager  = npcManager;
         this.guiRegistry = guiRegistry;
+        this.introManager  = introManager;
+        this.plugin        = plugin;
     }
 
     @EventHandler
@@ -24,7 +31,18 @@ public class MayorListener implements Listener {
         NPCGui gui = guiRegistry.get(type);
         if (gui == null) return;
 
-        gui.open(event.getClicker());
+        Player player = event.getClicker();
+
+        if (!introManager.hasSeenIntro(player.getUniqueId(), type)) {
+            // Première rencontre — joue l'intro puis ouvre le GUI
+            introManager.markIntroSeen(player.getUniqueId(), type);
+            TypewriterUtil.play(plugin, player, type.introLines, () -> {
+                if (player.isOnline()) gui.open(player);
+            });
+        } else {
+            // Déjà vu — ouvre directement le GUI
+            gui.open(player);
+        }
     }
 
     @EventHandler

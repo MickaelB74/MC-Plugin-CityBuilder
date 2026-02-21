@@ -10,6 +10,8 @@ import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import java.util.HashMap;
+import java.util.Map;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,7 +20,6 @@ import java.util.UUID;
 public class NPCManager {
 
     private final JavaPlugin plugin;
-    private final Set<UUID> followingPlayers = new HashSet<>();
 
     public NPCManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -157,62 +158,38 @@ public class NPCManager {
     }
 
     /* =========================
-       MODE SUIVI (maire)
-       ========================= */
-
-    public void startFollowing(Player player) {
-        NPC mayor = getNPC(CityNPC.MAYOR);
-        if (mayor == null || !mayor.isSpawned()) return;
-
-        mayor.getNavigator().getDefaultParameters()
-                .range(50f)
-                .speedModifier(0.8f)
-                .distanceMargin(2.0);
-
-        mayor.getNavigator().setTarget(player, false);
-        followingPlayers.add(player.getUniqueId());
-    }
-
-    public void stopFollowing(Player player) {
-        NPC mayor = getNPC(CityNPC.MAYOR);
-        if (mayor != null && mayor.isSpawned()) {
-            mayor.getNavigator().cancelNavigation();
-        }
-        followingPlayers.remove(player.getUniqueId());
-    }
-
-    public boolean isFollowing(Player player) {
-        return followingPlayers.contains(player.getUniqueId());
-    }
-
-    /* =========================
-   MODE SUIVI (stonemason)
+   MODE SUIVI (générique)
    ========================= */
 
-    private final Set<UUID> followingMasonPlayers = new HashSet<>();
+    private final Map<CityNPC, Set<UUID>> followingPlayers = new HashMap<>();
 
-    public void startFollowingMason(Player player) {
-        NPC mason = getNPC(CityNPC.STONEMASON);
-        if (mason == null || !mason.isSpawned()) return;
+    public void startFollowing(Player player, CityNPC type) {
+        NPC npc = getNPC(type);
+        if (npc == null || !npc.isSpawned()) return;
 
-        mason.getNavigator().getDefaultParameters()
+        npc.getNavigator().getDefaultParameters()
                 .range(50f)
                 .speedModifier(0.8f)
                 .distanceMargin(2.0);
 
-        mason.getNavigator().setTarget(player, false);
-        followingMasonPlayers.add(player.getUniqueId());
+        npc.getNavigator().setTarget(player, false);
+        followingPlayers
+                .computeIfAbsent(type, k -> new HashSet<>())
+                .add(player.getUniqueId());
     }
 
-    public void stopFollowingMason(Player player) {
-        NPC mason = getNPC(CityNPC.STONEMASON);
-        if (mason != null && mason.isSpawned()) {
-            mason.getNavigator().cancelNavigation();
+    public void stopFollowing(Player player, CityNPC type) {
+        NPC npc = getNPC(type);
+        if (npc != null && npc.isSpawned()) {
+            npc.getNavigator().cancelNavigation();
         }
-        followingMasonPlayers.remove(player.getUniqueId());
+        if (followingPlayers.containsKey(type)) {
+            followingPlayers.get(type).remove(player.getUniqueId());
+        }
     }
 
-    public boolean isFollowingMason(Player player) {
-        return followingMasonPlayers.contains(player.getUniqueId());
+    public boolean isFollowing(Player player, CityNPC type) {
+        return followingPlayers.containsKey(type)
+                && followingPlayers.get(type).contains(player.getUniqueId());
     }
 }

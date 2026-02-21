@@ -36,7 +36,7 @@ public class CityTabCompleter implements TabCompleter {
                 case "create"   -> cityManager.isCityInitialized()
                         ? new ArrayList<>()
                         : List.of("<nom_de_ville>");
-                case "spawn"    -> List.of("stonemason"); // ← futurs NPCs à ajouter ici
+                case "spawn" -> List.of("stonemason", "jacksparrow");
                 default         -> new ArrayList<>();
             };
         }

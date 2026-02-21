@@ -236,7 +236,22 @@ public class CityCommand implements CommandExecutor {
                             npcManager.spawnNPC(CityNPC.STONEMASON, npcLoc);
                             player.sendMessage("§a✅ Brennan le Tailleur de pierre est apparu !");
                         }
-                        default -> player.sendMessage("§c❌ Type inconnu. Disponibles : §estonemason");
+
+                        case "jacksparrow" -> {
+                            if (npcManager.getNPC(CityNPC.JACKSPARROW) != null) {
+                                player.sendMessage("§c❌ Jack Sparrow existe déjà.");
+                                return true;
+                            }
+                            Location loc = player.getLocation().clone();
+                            loc.add(loc.getDirection().normalize().multiply(2));
+                            loc.setY(Math.floor(loc.getY() + 1));
+                            Location npcLoc = loc.clone();
+                            npcLoc.setYaw((player.getLocation().getYaw() + 180) % 360);
+                            npcLoc.setPitch(0);
+                            npcManager.spawnNPC(CityNPC.JACKSPARROW, npcLoc);
+                            player.sendMessage("§a✅ Jack Sparrow est apparu !");
+                        }
+                        default -> player.sendMessage("§c❌ Type inconnu. Disponibles : §estonemason§c, §ejacksparrow");
                     }
                 }
             }
