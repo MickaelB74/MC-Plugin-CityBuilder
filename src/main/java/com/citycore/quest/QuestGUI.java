@@ -48,23 +48,37 @@ public class QuestGUI {
         for (int i = 0; i < 9; i++) inv.setItem(i, filler);
 
         // ── Quête Principale ─────────────────────────────────────
-        QuestDefinition activeMain = questManager.getActiveQuest(uuid, npcType, false);
-        QuestDefinition displayMain = activeMain != null
-                ? activeMain
-                : questConfig.generateMain(npcLevel);
-        inv.setItem(SLOT_MAIN, buildQuestItem(player, displayMain, Material.BOOK,
-                activeMain != null));
+        inv.setItem(SLOT_MAIN, resolveQuestItem(player, uuid, npcLevel, false,
+                Material.BOOK));
 
         // ── Quête Spéciale ───────────────────────────────────────
-        QuestDefinition activeSpecial = questManager.getActiveQuest(uuid, npcType, true);
-        QuestDefinition displaySpecial = activeSpecial != null
-                ? activeSpecial
-                : questConfig.generateSpecial(npcLevel);
-        inv.setItem(SLOT_SPECIAL, buildQuestItem(player, displaySpecial,
-                Material.NETHER_STAR, activeSpecial != null));
+        inv.setItem(SLOT_SPECIAL, resolveQuestItem(player, uuid, npcLevel, true,
+                Material.NETHER_STAR));
 
         inv.setItem(SLOT_BACK, makeItem(Material.ARROW, "§7← Retour", List.of()));
         player.openInventory(inv);
+    }
+
+    private ItemStack resolveQuestItem(Player player, UUID uuid, int npcLevel,
+                                       boolean isSpecial, Material icon) {
+        // 1. Quête active (en cours ou prête à valider)
+        QuestDefinition active = questManager.getActiveQuest(uuid, npcType, isSpecial);
+        if (active != null) {
+            return buildQuestItem(player, active, icon, true);
+        }
+
+        // 2. Quête pending (générée mais pas encore acceptée)
+        QuestDefinition pending = questManager.getPendingQuest(uuid, npcType, isSpecial);
+        if (pending != null) {
+            return buildQuestItem(player, pending, icon, false);
+        }
+
+        // 3. Aucune quête — génère et stocke en pending
+        QuestDefinition generated = isSpecial
+                ? questConfig.generateSpecial(npcLevel)
+                : questConfig.generateMain(npcLevel);
+        questManager.setPendingQuest(uuid, npcType, generated);
+        return buildQuestItem(player, generated, icon, false);
     }
 
     /* =========================
@@ -74,29 +88,33 @@ public class QuestGUI {
     public ItemStack buildQuestItem(Player player, QuestDefinition quest,
                                     Material icon, boolean isActive) {
         UUID uuid = player.getUniqueId();
+        boolean isReady = isActive
+                && questManager.isReadyToValidate(uuid, npcType, quest.isSpecial());
         Map<String, Integer> progress = isActive
                 ? questManager.getProgress(uuid, npcType, quest.isSpecial())
                 : new HashMap<>();
-
-        boolean allDone = isActive && questManager.isAllCompleted(progress, quest);
 
         List<String> lore = new ArrayList<>();
         lore.add("§7" + quest.description());
         lore.add("");
 
-        // Objectifs
+        // ── Objectifs avec progression ───────────────────────────
         for (QuestObjective obj : quest.objectives()) {
             int current  = progress.getOrDefault(obj.id(), 0);
-            boolean done = current >= obj.amount();
+            int required = obj.amount();
+            boolean done = current >= required;
+
             String label = obj.isMaterialObjective()
                     ? formatName(obj.material().name())
                     : "Tuer " + formatName(obj.entity().name());
 
             if (isActive) {
-                lore.add((done ? "§a✔ " : "§7• ") + "§f" + label
-                        + " §7: §f" + current + "§7/§f" + obj.amount());
+                // Barre de progression visuelle
+                String bar = buildProgressBar(current, required);
+                lore.add((done ? "§a✔ " : "§7• ") + "§f" + label);
+                lore.add("  " + bar + " §f" + current + "§7/§f" + required);
             } else {
-                lore.add("§7• §f" + label + " §7: §f0§7/§f" + obj.amount());
+                lore.add("§7• §f" + label + " §7: §f0§7/§f" + required);
             }
         }
 
@@ -104,17 +122,35 @@ public class QuestGUI {
         lore.add("§7Récompense : §6" + quest.reward().coins() + " coins");
         lore.add("");
 
+        // ── Indicateur d'action ──────────────────────────────────
         if (!isActive) {
             lore.add("§a▶ Cliquez pour accepter");
-        } else if (allDone) {
-            lore.add("§a★ Cliquez pour valider et récupérer !");
+        } else if (isReady) {
+            lore.add("§a★ Prêt ! Cliquez pour valider !");
         } else {
-            lore.add("§e⏳ En cours...");
+            lore.add("§e⏳ En cours — fermez votre inventaire");
+            lore.add("§e   pour mettre à jour la progression");
         }
 
         String title = quest.isSpecial()
                 ? "§d✦ Quête Spéciale" : "§9📖 Quête Principale";
-        return makeItem(icon, title, lore);
+
+        // Icône verte si prête, dorée si en cours, normale si pas commencée
+        Material displayIcon = !isActive ? icon
+                : isReady ? Material.EMERALD : Material.CLOCK;
+
+        return makeItem(displayIcon, title, lore);
+    }
+
+    private String buildProgressBar(int current, int required) {
+        int barLength = 8;
+        int filled    = Math.min((int) ((double) current / required * barLength), barLength);
+        StringBuilder bar = new StringBuilder("§7[");
+        for (int i = 0; i < barLength; i++) {
+            bar.append(i < filled ? "§a█" : "§8░");
+        }
+        bar.append("§7]");
+        return bar.toString();
     }
 
     /* =========================

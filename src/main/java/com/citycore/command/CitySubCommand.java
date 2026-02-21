@@ -9,7 +9,8 @@ public enum CitySubCommand {
     DEPOSIT("deposit", "deposit <montant>",               "Déposer des coins dans la caisse"),
     INFO("info",       "info",                            "Afficher les infos de la ville"),
     MAP("map",         "map",                             "Afficher les bordures de chunks"),
-    NPC("npc",         "npc <type> <spawn|levelUp|levelDown>", "Gérer les NPCs");
+    NPC("npc",         "npc <type> <spawn|levelUp|levelDown>", "Gérer les NPCs"),
+    QUESTS("quests", "quests toggle", "Afficher/masquer le HUD des quêtes");
 
     public final String label;
     public final String usage;

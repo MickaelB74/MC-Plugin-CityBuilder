@@ -85,7 +85,7 @@ public class NPCDataManager {
         for (Map.Entry<Integer, Integer> entry : thresholds.entrySet()) {
             if (xp >= entry.getValue()) level = entry.getKey();
         }
-        return Math.min(level, 4);
+        return Math.min(level, 5);
     }
 
     private void initNPCData(CityNPC npc) throws SQLException {
@@ -187,7 +187,7 @@ public class NPCDataManager {
     public void setLevel(CityNPC npc, int level, Map<Integer, Integer> thresholds) {
         try {
             initNPCData(npc);
-            int targetLevel = Math.max(1, Math.min(4, level));
+            int targetLevel = Math.max(1, Math.min(5, level));
             // XP = seuil du niveau cible (ou 0 pour niveau 1)
             int targetXP = targetLevel == 1 ? 0 : thresholds.getOrDefault(targetLevel, 0);
 

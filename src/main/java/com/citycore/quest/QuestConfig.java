@@ -20,6 +20,11 @@ public class QuestConfig {
     private int specialRewardPerLevel;
     private int mainObjectivesCount;
     private int specialObjectivesCount;
+    private int mainXpRewardPerLevel;
+    private int specialXpRewardPerLevel;
+
+    public int getMainXpRewardPerLevel()    { return mainXpRewardPerLevel; }
+    public int getSpecialXpRewardPerLevel() { return specialXpRewardPerLevel; }
 
     public QuestConfig(JavaPlugin plugin, String configKey) {
         this.plugin    = plugin;
@@ -41,18 +46,27 @@ public class QuestConfig {
         var multSection = config.getConfigurationSection(base + ".quantity-multiplier");
         if (multSection != null) {
             for (String key : multSection.getKeys(false)) {
-                multipliers.put(Integer.parseInt(key), multSection.getDouble(key));
+                try {
+                    int level    = Integer.parseInt(key.trim());
+                    double mult  = multSection.getDouble(key);
+                    multipliers.put(level, mult);
+                    plugin.getLogger().info("Multiplier niveau " + level + " = " + mult);
+                } catch (NumberFormatException e) {
+                    plugin.getLogger().warning("Clé multiplier invalide : '" + key + "'");
+                }
             }
         }
 
         // Main
         mainRewardPerLevel  = config.getInt(base + ".main.reward-per-level", 100);
         mainObjectivesCount = config.getInt(base + ".main.objectives-count", 2);
+        mainXpRewardPerLevel    = config.getInt(base + ".main.xp-reward-per-level", 50);
         loadItemPool(config.getMapList(base + ".main.item-pool"), mainItemPool);
 
         // Special
         specialRewardPerLevel  = config.getInt(base + ".special.reward-per-level", 300);
         specialObjectivesCount = config.getInt(base + ".special.objectives-count", 3);
+        specialXpRewardPerLevel = config.getInt(base + ".special.xp-reward-per-level", 50);
         loadItemPool(config.getMapList(base + ".special.item-pool"), specialItemPool);
         loadEntityPool(config.getMapList(base + ".special.entity-pool"), specialEntityPool);
 
@@ -67,7 +81,12 @@ public class QuestConfig {
        ========================= */
 
     public QuestDefinition generateMain(int npcLevel) {
-        double mult = multipliers.getOrDefault(npcLevel, 1.0);
+        double mult = multipliers.getOrDefault(npcLevel, -1.0);
+        if (mult == -1.0) {
+            plugin.getLogger().warning("Aucun multiplier pour niveau " + npcLevel
+                    + " — disponibles : " + multipliers.keySet());
+            mult = 1.0;
+        }
         List<QuestObjective> objectives = pickRandom(mainItemPool,
                 mainObjectivesCount, mult);
         int reward = mainRewardPerLevel * npcLevel;
@@ -82,7 +101,12 @@ public class QuestConfig {
     }
 
     public QuestDefinition generateSpecial(int npcLevel) {
-        double mult = multipliers.getOrDefault(npcLevel, 1.0);
+        double mult = multipliers.getOrDefault(npcLevel, -1.0);
+        if (mult == -1.0) {
+            plugin.getLogger().warning("Aucun multiplier pour niveau " + npcLevel
+                    + " — disponibles : " + multipliers.keySet());
+            mult = 1.0;
+        }
 
         List<QuestPoolEntry> allSpecial = new ArrayList<>();
         allSpecial.addAll(specialItemPool);

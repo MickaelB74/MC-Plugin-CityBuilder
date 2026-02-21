@@ -2,14 +2,20 @@ package com.citycore.quest;
 
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
+import com.citycore.npc.villager.VillagerConfig;
+import com.citycore.npc.villager.VillagerGUI;
 import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 import java.util.Map;
@@ -21,13 +27,89 @@ public class QuestListener implements Listener {
     private final QuestManager    questManager;
     private final NPCDataManager  dataManager;
     private final Economy         economy;
+    private final JavaPlugin      plugin;
+    private final QuestHUD questHUD;
+
+    private final Map<CityNPC, VillagerConfig> villagerConfigs;
 
     public QuestListener(List<QuestGUI> questGUIs, QuestManager questManager,
-                         NPCDataManager dataManager, Economy economy) {
+                         NPCDataManager dataManager, Economy economy,
+                         JavaPlugin plugin, Map<CityNPC, VillagerConfig> villagerConfigs, QuestHUD questHUD) {
         this.questGUIs    = questGUIs;
         this.questManager = questManager;
         this.dataManager  = dataManager;
         this.economy      = economy;
+        this.plugin       = plugin;
+        this.villagerConfigs = villagerConfigs;
+        this.questHUD = questHUD;
+    }
+
+    /* =========================
+       VÉRIFICATION INVENTAIRE
+       Déclenché à chaque fermeture d'inventaire + login
+       ========================= */
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        // 1 tick de délai pour que l'inventaire soit à jour
+        Bukkit.getScheduler().runTaskLater(plugin, () ->
+                checkInventoryProgress(player), 1L);
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Bukkit.getScheduler().runTaskLater(plugin, () ->
+                checkInventoryProgress(event.getPlayer()), 20L);
+    }
+
+    private void checkInventoryProgress(Player player) {
+        for (QuestGUI gui : questGUIs) {
+            CityNPC npc = gui.getNpcType();
+            checkQuestCompletion(player, npc, false);
+            checkQuestCompletion(player, npc, true);
+        }
+    }
+
+    private void checkQuestCompletion(Player player, CityNPC npc, boolean isSpecial) {
+        QuestDefinition active = questManager.getActiveQuest(
+                player.getUniqueId(), npc, isSpecial);
+        if (active == null) return;
+        if (active.type() != QuestType.COLLECT_ITEMS) return;
+        if (questManager.isReadyToValidate(player.getUniqueId(), npc, isSpecial)) return;
+
+        boolean allPresent = true;
+
+        for (QuestObjective obj : active.objectives()) {
+            if (!obj.isMaterialObjective()) continue;
+
+            // Compte les items réels dans l'inventaire
+            int count = 0;
+            for (ItemStack item : player.getInventory().getContents()) {
+                if (item != null && item.getType() == obj.material())
+                    count += item.getAmount();
+            }
+
+            // ✅ Synchronise la progression BDD avec l'inventaire réel
+            int capped = Math.min(count, obj.amount());
+            questManager.setProgress(player.getUniqueId(), npc, isSpecial,
+                    obj.id(), capped);
+
+            if (count < obj.amount()) allPresent = false;
+        }
+
+        if (allPresent) {
+            questManager.markReadyToValidate(player.getUniqueId(), npc, isSpecial);
+            player.sendMessage("§a✅ Vous avez tout ce qu'il faut !");
+            player.sendMessage("§7Retournez voir §e" + npc.displayName
+                    + " §7pour valider votre quête !");
+            player.playSound(player.getLocation(),
+                    org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.5f, 1.5f);
+
+            // Dans checkQuestCompletion après markReadyToValidate
+            questManager.markReadyToValidate(player.getUniqueId(), npc, isSpecial);
+            questHUD.updateHUD(player);
+        }
     }
 
     /* =========================
@@ -41,8 +123,8 @@ public class QuestListener implements Listener {
 
         for (QuestGUI gui : questGUIs) {
             CityNPC npc = gui.getNpcType();
-            tryIncrement(player, npc, gui, entityName, false);
-            tryIncrement(player, npc, gui, entityName, true);
+            tryIncrementAmount(player, npc, entityName, false, 1);
+            tryIncrementAmount(player, npc, entityName, true, 1);
         }
     }
 
@@ -57,8 +139,8 @@ public class QuestListener implements Listener {
 
         for (QuestGUI gui : questGUIs) {
             CityNPC npc = gui.getNpcType();
-            tryIncrement(player, npc, gui, matName, false);
-            tryIncrement(player, npc, gui, matName, true);
+            tryIncrementAmount(player, npc, matName, false, 1);
+            tryIncrementAmount(player, npc, matName, true, 1);
         }
     }
 
@@ -78,7 +160,6 @@ public class QuestListener implements Listener {
 
             int slot = event.getSlot();
 
-            // Retour
             if (slot == QuestGUI.SLOT_BACK) {
                 player.closeInventory();
                 return;
@@ -94,44 +175,84 @@ public class QuestListener implements Listener {
             QuestDefinition active = questManager.getActiveQuest(uuid, npc, isSpecial);
 
             if (active == null) {
-                // ── Accepter ─────────────────────────────────────
-                QuestDefinition generated = isSpecial
-                        ? gui.getQuestConfig().generateSpecial(npcLevel)
-                        : gui.getQuestConfig().generateMain(npcLevel);
-                questManager.startQuest(uuid, npc, generated);
-                player.sendMessage("§a✅ Quête acceptée : §f" + generated.description());
-                gui.open(player);
-
-            } else {
-                // ── Vérifier complétable ──────────────────────────
-                Map<String, Integer> progress = questManager.getProgress(
-                        uuid, npc, isSpecial);
-                boolean allDone = questManager.isAllCompleted(progress, active);
-
-                if (!allDone) {
-                    player.sendMessage("§c❌ Quête en cours — continuez à progresser !");
+                // Récupère la quête pending (jamais régénérée ici)
+                QuestDefinition pending = questManager.getPendingQuest(uuid, npc, isSpecial);
+                if (pending == null) {
+                    // Ne devrait pas arriver — le GUI crée toujours une pending
+                    player.sendMessage("§c❌ Erreur : aucune quête disponible.");
                     return;
                 }
 
-                // Vérifie et retire les items si COLLECT
+                // Accepte la pending → passe en active
+                questManager.acceptPendingQuest(uuid, npc, isSpecial, pending);
+                player.sendMessage("§a✅ Quête acceptée : §f" + pending.description());
+
+                // Après acceptation
+                questManager.acceptPendingQuest(uuid, npc, isSpecial, pending);
+                questHUD.updateHUD(player);
+
+                // Vérifie immédiatement si les items sont déjà en poche
+                checkQuestCompletion(player, npc, isSpecial);
+                gui.open(player);
+
+            } else if (questManager.isReadyToValidate(uuid, npc, isSpecial)) {
                 if (active.type() == QuestType.COLLECT_ITEMS) {
                     if (!hasAllItems(player, active)) {
-                        player.sendMessage(
-                                "§c❌ Il vous manque des items dans l'inventaire !");
+                        questManager.unmarkReadyToValidate(uuid, npc, isSpecial);
+                        player.sendMessage("§c❌ Il vous manque des items !");
+                        player.sendMessage("§7Continuez à collecter et revenez.");
                         gui.open(player);
                         return;
                     }
                     removeQuestItems(player, active);
                 }
 
-                // Récompense
+                // Coins
                 economy.depositPlayer(player, active.reward().coins());
-                questManager.validateAndReset(uuid, npc, isSpecial);
-                player.sendMessage("§a🎉 Quête terminée ! §6+"
-                        + active.reward().coins() + " coins §aajoutés !");
 
-                // Rouvre avec nouvelle quête générée
+                // ✅ XP NPC
+                VillagerConfig vConfig = villagerConfigs.get(npc);
+                if (vConfig != null) {
+                    int xpPerLevel = isSpecial
+                            ? gui.getQuestConfig().getSpecialXpRewardPerLevel()
+                            : gui.getQuestConfig().getMainXpRewardPerLevel();
+                    int xpGained  = xpPerLevel * npcLevel;
+
+                    boolean levelUp = dataManager.addXP(npc, xpGained,
+                            vConfig.getXpThresholds());
+
+                    player.sendMessage("§a🎉 Quête validée ! §6+"
+                            + active.reward().coins() + " coins §7| §b+"
+                            + xpGained + " XP");
+
+                    // Après validation
+                    questManager.validateAndReset(uuid, npc, isSpecial);
+                    questHUD.updateHUD(player);
+
+                    if (levelUp) {
+                        player.sendMessage("§a🎉 §e" + npc.displayName
+                                + " §aest passé niveau §e"
+                                + VillagerGUI.getLevelName(dataManager.getLevel(npc)) + "§a !");
+                    }
+                } else {
+                    player.sendMessage("§a🎉 Quête validée ! §6+"
+                            + active.reward().coins() + " coins§a !");
+                }
+
+                player.playSound(player.getLocation(),
+                        org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                questManager.validateAndReset(uuid, npc, isSpecial);
+
+                // Après validateAndReset — génère immédiatement la prochaine pending
+                QuestDefinition nextQuest = isSpecial
+                        ? gui.getQuestConfig().generateSpecial(npcLevel)
+                        : gui.getQuestConfig().generateMain(npcLevel);
+                questManager.setPendingQuest(uuid, npc, nextQuest);
+
                 gui.open(player);
+            } else {
+                // ── En cours ──────────────────────────────────────
+                player.sendMessage("§c❌ Quête en cours — continuez à progresser !");
             }
             return;
         }
@@ -141,8 +262,8 @@ public class QuestListener implements Listener {
        HELPERS
        ========================= */
 
-    private void tryIncrement(Player player, CityNPC npc, QuestGUI gui,
-                              String keyName, boolean isSpecial) {
+    private void tryIncrementAmount(Player player, CityNPC npc,
+                                    String keyName, boolean isSpecial, int amount) {
         QuestDefinition active = questManager.getActiveQuest(
                 player.getUniqueId(), npc, isSpecial);
         if (active == null) return;
@@ -153,11 +274,13 @@ public class QuestListener implements Listener {
             if (!objKey.equals(keyName)) continue;
 
             boolean allDone = questManager.incrementProgress(
-                    player.getUniqueId(), npc, isSpecial, obj.id(), 1, active);
+                    player.getUniqueId(), npc, isSpecial, obj.id(), amount, active);
 
             if (allDone) {
                 player.sendMessage("§a✅ Objectifs remplis ! Revenez voir "
                         + npc.displayName + " §apour valider !");
+                player.playSound(player.getLocation(),
+                        org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.5f, 1.5f);
             }
         }
     }

@@ -47,26 +47,28 @@ public class CityTabCompleter implements TabCompleter {
                             .map(n -> n.tag.replace("citycore_", ""))
                             .collect(Collectors.toList());
                 }
+                case "quests" -> List.of("toggle");
                 default -> new ArrayList<>();
             };
         }
-
         // ── Niveau 3 ─────────────────────────────────────────────
         if (args.length == 3 && args[0].equalsIgnoreCase("npc")) {
-            // Vérifie que args[1] est un type NPC valide
-            boolean validType = Arrays.stream(CityNPC.values())
-                    .filter(n -> n != CityNPC.MAYOR)
-                    .anyMatch(n -> n.tag.replace("citycore_", "")
-                            .equalsIgnoreCase(args[1]));
+            if (player.isOp()){
+                // Vérifie que args[1] est un type NPC valide
+                boolean validType = Arrays.stream(CityNPC.values())
+                        .filter(n -> n != CityNPC.MAYOR)
+                        .anyMatch(n -> n.tag.replace("citycore_", "")
+                                .equalsIgnoreCase(args[1]));
 
-            if (!validType) return new ArrayList<>();
+                if (!validType) return new ArrayList<>();
 
-            List<String> actions = new ArrayList<>(List.of("spawn"));
-            if (player.isOp()) {
-                actions.add("levelUp");
-                actions.add("levelDown");
+                List<String> actions = new ArrayList<>(List.of("spawn"));
+                if (player.isOp()) {
+                    actions.add("levelUp");
+                    actions.add("levelDown");
+                }
+                return actions;
             }
-            return actions;
         }
 
         return new ArrayList<>();

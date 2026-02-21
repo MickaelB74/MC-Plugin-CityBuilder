@@ -27,12 +27,12 @@ public class VillagerGUI {
     public static String titleShop(CityNPC npc)      { return "§8[" + npc.displayName + "§8] §bBoutique"; }
 
     // Slots menu principal
-    public static final int SLOT_SELL      = 1;
-    public static final int SLOT_INVENTORY = 3;
-    public static final int SLOT_SHOP      = 5;
-    public static final int SLOT_FOLLOW    = 7;
+    public static final int SLOT_SELL      = 5;
+    public static final int SLOT_INVENTORY = 4;
+    public static final int SLOT_SHOP      = 3;
+    public static final int SLOT_FOLLOW    = 8;
+    public static final int SLOT_QUESTS    = 7;
     public static final int SLOT_BACK      = 8;
-    public static final int SLOT_QUESTS    = 6;
 
     private final CityNPC         npcType;
     private final VillagerConfig  config;
@@ -202,7 +202,7 @@ public class VillagerGUI {
 
         // Collecte tous les items de tous les niveaux
         List<ShopEntry> allEntries = new ArrayList<>();
-        for (int lvl = 1; lvl <= 4; lvl++) {
+        for (int lvl = 1; lvl <= 5; lvl++) {
             for (VillagerConfig.ShopItem item : config.getShopItemsForLevel(lvl)) {
                 allEntries.add(new ShopEntry(item, lvl));
             }

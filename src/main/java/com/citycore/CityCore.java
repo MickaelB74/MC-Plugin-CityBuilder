@@ -16,6 +16,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
+import java.util.Map;
 
 public class CityCore extends JavaPlugin {
 
@@ -83,15 +84,25 @@ public class CityCore extends JavaPlugin {
                         jackQuestGUI, this), this);
 
         // ── QuestListener global ─────────────────────────────────
+        Map<CityNPC, VillagerConfig> villagerConfigMap = new java.util.HashMap<>();
+        villagerConfigMap.put(CityNPC.STONEMASON, stonemasonConfig);
+        villagerConfigMap.put(CityNPC.JACKSPARROW, jackConfig);
+
+        // ── HUD Quest ────────────────────────────────────────────
+        QuestHUD questHUD = new QuestHUD(this, questManager, npcDataManager,
+                List.of(stonemasonQuestGUI, jackQuestGUI));
+        questHUD.startUpdating();
+
         getServer().getPluginManager().registerEvents(
                 new QuestListener(
                         List.of(stonemasonQuestGUI, jackQuestGUI),
-                        questManager, npcDataManager, economy), this);
+                        questManager, npcDataManager, economy,
+                        this, villagerConfigMap, questHUD), this);
 
         // ── Commandes ────────────────────────────────────────────
         var cityCmd = getCommand("city");
-        cityCmd.setExecutor(new CityCommand(cityManager, npcManager,
-                this, npcDataManager));
+        cityCmd.setExecutor(new CityCommand(cityManager, npcManager, this,
+                npcDataManager, questHUD));
         cityCmd.setTabCompleter(new CityTabCompleter(cityManager));
 
         // ── Listeners globaux ────────────────────────────────────

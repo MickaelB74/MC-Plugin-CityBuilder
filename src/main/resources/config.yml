@@ -17,6 +17,7 @@ stonemason:
     2: 500
     3: 1500
     4: 3000
+    5: 5000
 
   # Prix de rachat des ressources (coins / stack)
   sell-prices:
@@ -96,10 +97,12 @@ stonemason:
     quantity-multiplier:
       1: 1.0
       2: 1.5
-      3: 2.5
-      4: 4.0
+      3: 2.0
+      4: 2.5
+      5: 3.0
 
     main:
+      xp-reward-per-level: 50
       reward-per-level: 100    # coins × niveau
       objectives-count: 2      # nb d'objectifs générés aléatoirement
       item-pool:
@@ -115,6 +118,7 @@ stonemason:
           base-amount: 32
 
     special:
+      xp-reward-per-level: 50
       reward-per-level: 300
       objectives-count: 3
       item-pool:
@@ -233,10 +237,12 @@ jacksparrow:
     quantity-multiplier:
       1: 1.0
       2: 1.5
-      3: 2.5
-      4: 4.0
+      3: 2.0
+      4: 2.5
+      5: 3.0
 
     main:
+      xp-reward-per-level: 50
       reward-per-level: 100
       objectives-count: 2
       item-pool:
@@ -248,6 +254,7 @@ jacksparrow:
           base-amount: 16
 
     special:
+      xp-reward-per-level: 50
       reward-per-level: 300
       objectives-count: 3
       item-pool:

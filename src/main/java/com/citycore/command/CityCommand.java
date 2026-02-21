@@ -5,6 +5,7 @@ import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
 import com.citycore.npc.villager.VillagerGUI;
+import com.citycore.quest.QuestHUD;
 import com.citycore.util.ChunkParticleTask;
 import com.citycore.city.CityManager;
 import net.milkbowl.vault.economy.Economy;
@@ -27,12 +28,14 @@ public class CityCommand implements CommandExecutor {
     private Economy economy;
     private final NPCManager npcManager;
     private final NPCDataManager npcDataManager;
+    private final QuestHUD questHUD;
 
-    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin, NPCDataManager npcDataManager) {
+    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin, NPCDataManager npcDataManager,QuestHUD questHUD) {
         this.cityManager = cityManager;
         this.npcManager = npcManager;
         this.plugin = plugin;
         this.npcDataManager = npcDataManager;
+        this.questHUD       = questHUD;
         setupEconomy();
     }
 
@@ -215,6 +218,14 @@ public class CityCommand implements CommandExecutor {
                     player.sendMessage("§8§m--------------------");
                 }
 
+                case QUESTS -> {
+                    if (args.length < 2 || !args[1].equalsIgnoreCase("toggle")) {
+                        player.sendMessage("§cUsage : /city quests toggle");
+                        return true;
+                    }
+                    questHUD.toggle(player);
+                }
+
                 case NPC -> {
                     if (args.length < 3) {
                         player.sendMessage("§cUsage : /city npc <type> <spawn|levelUp|levelDown>");
@@ -255,7 +266,7 @@ public class CityCommand implements CommandExecutor {
                         case "levelup" -> {
                             if (!player.isOp()) return false;
                             int currentLevel = npcDataManager.getLevel(target);
-                            if (currentLevel >= 4) {
+                            if (currentLevel >= 5) {
                                 player.sendMessage("§c❌ " + target.displayName + " §cest déjà au niveau maximum.");
                                 return true;
                             }

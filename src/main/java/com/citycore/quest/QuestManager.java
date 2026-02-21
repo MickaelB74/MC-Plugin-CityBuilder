@@ -45,13 +45,35 @@ public class QuestManager {
        LECTURE
        ========================= */
 
+    public QuestDefinition getActiveQuest(UUID playerUUID, CityNPC npc,
+                                          boolean isSpecial) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            SELECT quest_data FROM quest_progress
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+            AND completed != 2
+        """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, isSpecial ? 1 : 0);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) { ps.close(); return null; }
+            QuestDefinition quest = deserializeQuest(rs.getString("quest_data"), isSpecial);
+            ps.close();
+            return quest;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     public boolean hasActiveQuest(UUID playerUUID, CityNPC npc, boolean isSpecial) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
-                SELECT 1 FROM quest_progress
-                WHERE player_uuid = ? AND npc_tag = ?
-                AND is_special = ? AND completed = 0
-            """);
+            SELECT 1 FROM quest_progress
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+            AND completed != 2
+        """);
             ps.setString(1, playerUUID.toString());
             ps.setString(2, npc.tag);
             ps.setInt(3, isSpecial ? 1 : 0);
@@ -65,37 +87,13 @@ public class QuestManager {
         }
     }
 
-    public QuestDefinition getActiveQuest(UUID playerUUID, CityNPC npc,
-                                          boolean isSpecial) {
+    public Map<String, Integer> getProgress(UUID playerUUID, CityNPC npc, boolean isSpecial) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
-                SELECT quest_data FROM quest_progress
-                WHERE player_uuid = ? AND npc_tag = ?
-                AND is_special = ? AND completed = 0
-            """);
-            ps.setString(1, playerUUID.toString());
-            ps.setString(2, npc.tag);
-            ps.setInt(3, isSpecial ? 1 : 0);
-            ResultSet rs = ps.executeQuery();
-            if (!rs.next()) { ps.close(); return null; }
-            QuestDefinition quest = deserializeQuest(
-                    rs.getString("quest_data"), isSpecial);
-            ps.close();
-            return quest;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    public Map<String, Integer> getProgress(UUID playerUUID, CityNPC npc,
-                                            boolean isSpecial) {
-        try {
-            PreparedStatement ps = db.getConnection().prepareStatement("""
-                SELECT progress FROM quest_progress
-                WHERE player_uuid = ? AND npc_tag = ?
-                AND is_special = ? AND completed = 0
-            """);
+            SELECT progress FROM quest_progress
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+        """);
+            // ✅ Supprimé "AND completed = 0" — même raison
             ps.setString(1, playerUUID.toString());
             ps.setString(2, npc.tag);
             ps.setInt(3, isSpecial ? 1 : 0);
@@ -172,6 +170,145 @@ public class QuestManager {
             ps.setString(1, playerUUID.toString());
             ps.setString(2, npc.tag);
             ps.setInt(3, isSpecial ? 1 : 0);
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean isReadyToValidate(UUID playerUUID, CityNPC npc, boolean isSpecial) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            SELECT completed FROM quest_progress
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+        """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, isSpecial ? 1 : 0);
+            ResultSet rs = ps.executeQuery();
+            boolean ready = rs.next() && rs.getInt("completed") == 1;
+            ps.close();
+            return ready;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public void markReadyToValidate(UUID playerUUID, CityNPC npc, boolean isSpecial) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            UPDATE quest_progress SET completed = 1
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+        """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, isSpecial ? 1 : 0);
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Remet completed à 0 si le joueur perd des items après notification.
+     */
+    public void unmarkReadyToValidate(UUID playerUUID, CityNPC npc, boolean isSpecial) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            UPDATE quest_progress SET completed = 0
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+            AND completed = 1
+        """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, isSpecial ? 1 : 0);
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void setProgress(UUID playerUUID, CityNPC npc, boolean isSpecial,
+                            String objectiveId, int value) {
+        Map<String, Integer> progress = getProgress(playerUUID, npc, isSpecial);
+        if (progress.isEmpty()) return;
+
+        progress.put(objectiveId, value);
+
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            UPDATE quest_progress SET progress = ?
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+        """);
+            ps.setString(1, serializeProgress(progress));
+            ps.setString(2, playerUUID.toString());
+            ps.setString(3, npc.tag);
+            ps.setInt(4, isSpecial ? 1 : 0);
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public QuestDefinition getPendingQuest(UUID playerUUID, CityNPC npc,
+                                           boolean isSpecial) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            SELECT quest_data FROM quest_progress
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ? AND completed = 2
+        """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, isSpecial ? 1 : 0);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) { ps.close(); return null; }
+            QuestDefinition quest = deserializeQuest(rs.getString("quest_data"), isSpecial);
+            ps.close();
+            return quest;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public void setPendingQuest(UUID playerUUID, CityNPC npc, QuestDefinition quest) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            INSERT OR REPLACE INTO quest_progress
+            (player_uuid, npc_tag, is_special, quest_data, progress, completed)
+            VALUES (?, ?, ?, ?, '', 2)
+        """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, quest.isSpecial() ? 1 : 0);
+            ps.setString(4, serializeQuest(quest));
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return;
+        }
+    }
+
+    /**
+     * Passe la quête pending en active (completed 2 → 0)
+     */
+    public void acceptPendingQuest(UUID playerUUID, CityNPC npc, boolean isSpecial,
+                                   QuestDefinition quest) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            UPDATE quest_progress SET completed = 0, progress = ?
+            WHERE player_uuid = ? AND npc_tag = ? AND is_special = ? AND completed = 2
+        """);
+            ps.setString(1, buildEmptyProgress(quest));
+            ps.setString(2, playerUUID.toString());
+            ps.setString(3, npc.tag);
+            ps.setInt(4, isSpecial ? 1 : 0);
             ps.executeUpdate();
             ps.close();
         } catch (SQLException e) {
@@ -260,4 +397,5 @@ public class QuestManager {
         }
         return sb.toString();
     }
+
 }

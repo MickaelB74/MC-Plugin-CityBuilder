@@ -61,7 +61,7 @@ public class VillagerConfig {
         }
 
         // ── Shop par niveau ──────────────────────────────────────
-        for (int level = 1; level <= 4; level++) {
+        for (int level = 1; level <=5; level++) {
             List<ShopItem> items = new ArrayList<>();
             List<Map<?, ?>> rawList = config.getMapList(configKey + ".shop." + level);
             for (Map<?, ?> map : rawList) {
