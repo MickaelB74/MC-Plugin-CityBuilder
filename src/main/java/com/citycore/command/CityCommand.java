@@ -2,7 +2,9 @@ package com.citycore.command;
 
 import com.citycore.city.City;
 import com.citycore.npc.CityNPC;
+import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
+import com.citycore.npc.villager.VillagerGUI;
 import com.citycore.util.ChunkParticleTask;
 import com.citycore.city.CityManager;
 import net.milkbowl.vault.economy.Economy;
@@ -16,6 +18,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Arrays;
+import java.util.Map;
 
 public class CityCommand implements CommandExecutor {
 
@@ -23,11 +26,13 @@ public class CityCommand implements CommandExecutor {
     private final JavaPlugin plugin;
     private Economy economy;
     private final NPCManager npcManager;
+    private final NPCDataManager npcDataManager;
 
-    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin) {
+    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin, NPCDataManager npcDataManager) {
         this.cityManager = cityManager;
         this.npcManager = npcManager;
         this.plugin = plugin;
+        this.npcDataManager = npcDataManager;
         setupEconomy();
     }
 
@@ -54,7 +59,7 @@ public class CityCommand implements CommandExecutor {
             return true;
         }
 
-        CitySubCommand sub = CitySubCommand.from(args[0]);
+        CitySubCommand sub = CitySubCommand.fromLabel(args[0]);
         if (sub == null) {
             sendHelp(player);
             return true;
@@ -210,48 +215,75 @@ public class CityCommand implements CommandExecutor {
                     player.sendMessage("§8§m--------------------");
                 }
 
-                case SPAWN -> {
-                    if (!player.isOp()) {
-                        player.sendMessage("§c❌ Commande réservée aux administrateurs.");
-                        return true;
-                    }
-                    if (args.length < 2) {
-                        player.sendMessage("§cUsage : /city spawn <type>");
-                        player.sendMessage("§7Types disponibles : §estonemason");
+                case NPC -> {
+                    if (args.length < 3) {
+                        player.sendMessage("§cUsage : /city npc <type> <spawn|levelUp|levelDown>");
                         return true;
                     }
 
-                    switch (args[1].toLowerCase()) {
-                        case "stonemason" -> {
-                            if (npcManager.getNPC(CityNPC.STONEMASON) != null) {
-                                player.sendMessage("§c❌ Le Tailleur de pierre existe déjà.");
+                    // Résout le type NPC depuis args[1]
+                    CityNPC target = Arrays.stream(CityNPC.values())
+                            .filter(n -> n != CityNPC.MAYOR)
+                            .filter(n -> n.tag.replace("citycore_", "").equalsIgnoreCase(args[1]))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (target == null) {
+                        String available = Arrays.stream(CityNPC.values())
+                                .filter(n -> n != CityNPC.MAYOR)
+                                .map(n -> n.tag.replace("citycore_", ""))
+                                .collect(java.util.stream.Collectors.joining("§7, §e"));
+                        player.sendMessage("§c❌ NPC inconnu. Disponibles : §e" + available);
+                        return true;
+                    }
+
+                    switch (args[2].toLowerCase()) {
+
+                        case "spawn" -> {
+                            if (!player.isOp()) {
+                                player.sendMessage("§c❌ Commande réservée aux administrateurs.");
                                 return true;
                             }
-                            Location loc = player.getLocation().clone();
-                            loc.add(loc.getDirection().normalize().multiply(2));
-                            loc.setY(Math.floor(loc.getY() + 1));
-                            Location npcLoc = loc.clone();
-                            npcLoc.setYaw((player.getLocation().getYaw() + 180) % 360);
-                            npcLoc.setPitch(0);
-                            npcManager.spawnNPC(CityNPC.STONEMASON, npcLoc);
-                            player.sendMessage("§a✅ Brennan le Tailleur de pierre est apparu !");
+                            if (npcManager.getNPC(target) != null) {
+                                player.sendMessage("§c❌ " + target.displayName + " §cexiste déjà.");
+                                return true;
+                            }
+                            npcManager.spawnNPC(target, spawnLocation(player));
+                            player.sendMessage("§a✅ " + target.displayName + " §aest apparu !");
                         }
 
-                        case "jacksparrow" -> {
-                            if (npcManager.getNPC(CityNPC.JACKSPARROW) != null) {
-                                player.sendMessage("§c❌ Jack Sparrow existe déjà.");
+                        case "levelup" -> {
+                            if (!player.isOp()) return false;
+                            int currentLevel = npcDataManager.getLevel(target);
+                            if (currentLevel >= 4) {
+                                player.sendMessage("§c❌ " + target.displayName + " §cest déjà au niveau maximum.");
                                 return true;
                             }
-                            Location loc = player.getLocation().clone();
-                            loc.add(loc.getDirection().normalize().multiply(2));
-                            loc.setY(Math.floor(loc.getY() + 1));
-                            Location npcLoc = loc.clone();
-                            npcLoc.setYaw((player.getLocation().getYaw() + 180) % 360);
-                            npcLoc.setPitch(0);
-                            npcManager.spawnNPC(CityNPC.JACKSPARROW, npcLoc);
-                            player.sendMessage("§a✅ Jack Sparrow est apparu !");
+                            Map<Integer, Integer> thresholds = loadThresholds(target);
+                            int newLevel = currentLevel + 1;
+                            npcDataManager.setLevel(target, newLevel, thresholds);
+                            player.sendMessage("§a✅ §e" + target.displayName
+                                    + " §apassé au niveau §e"
+                                    + VillagerGUI.getLevelName(newLevel) + "§a.");
                         }
-                        default -> player.sendMessage("§c❌ Type inconnu. Disponibles : §estonemason§c, §ejacksparrow");
+
+                        case "leveldown" -> {
+                            if (!player.isOp()) return false;
+                            int currentLevel = npcDataManager.getLevel(target);
+                            if (currentLevel <= 1) {
+                                player.sendMessage("§c❌ " + target.displayName + " §cest déjà au niveau minimum.");
+                                return true;
+                            }
+                            Map<Integer, Integer> thresholds = loadThresholds(target);
+                            int newLevel = currentLevel - 1;
+                            npcDataManager.setLevel(target, newLevel, thresholds);
+                            player.sendMessage("§a✅ §e" + target.displayName
+                                    + " §arepassé au niveau §e"
+                                    + VillagerGUI.getLevelName(newLevel) + "§a.");
+                        }
+
+                        default -> player.sendMessage(
+                                "§c❌ Action inconnue. Disponibles : §fspawn§c, §flevelUp§c, §flevelDown");
                     }
                 }
             }
@@ -271,5 +303,27 @@ public class CityCommand implements CommandExecutor {
             player.sendMessage("§e/city " + cmd.usage + " §7— " + cmd.description);
         }
         player.sendMessage("§8§m--------------------");
+    }
+
+    private Location spawnLocation(Player player) {
+        Location loc = player.getLocation().clone();
+        loc.add(loc.getDirection().normalize().multiply(2));
+        loc.setY(Math.floor(loc.getY() + 1));
+        loc.setYaw((player.getLocation().getYaw() + 180) % 360);
+        loc.setPitch(0);
+        return loc;
+    }
+
+    private Map<Integer, Integer> loadThresholds(CityNPC target) {
+        Map<Integer, Integer> thresholds = new java.util.HashMap<>();
+        String key = target.tag.replace("citycore_", "");
+        var section = plugin.getConfig().getConfigurationSection(
+                key + ".level-thresholds");
+        if (section != null) {
+            for (String k : section.getKeys(false)) {
+                thresholds.put(Integer.parseInt(k), section.getInt(k));
+            }
+        }
+        return thresholds;
     }
 }

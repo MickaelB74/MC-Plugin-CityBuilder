@@ -1,4 +1,4 @@
-package com.citycore.npc.GUI;
+package com.citycore.npc.mayor;
 
 import com.citycore.city.City;
 import com.citycore.city.CityManager;

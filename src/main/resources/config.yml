@@ -1,36 +1,262 @@
-stonemason:
-  prices:
-    COBBLESTONE: 2
-    STONE: 3
-    GRANITE: 4
-    DIORITE: 4
-    ANDESITE: 4
-    GRAVEL: 2
-    SAND: 2
-    SANDSTONE: 3
-    DEEPSLATE: 5
-    OBSIDIAN: 20
+# ============================================================
+#  CityCore - Configuration des NPCs villageois
+# ============================================================
 
+npc-settings:
+  # Pourcentage appliqué au prix de vente pour le rachat ville
+  # 0.5 = -50% (prix de vente * 0.5)
+  city-buyback-ratio: 0.5
+
+# ============================================================
+#  TAILLEUR DE PIERRE - Brennan
+# ============================================================
+stonemason:
+  xp-per-stack: 10       # XP gagné par stack vendu
+  xp-per-coin: 1         # XP gagné par coin de valeur vendue
+  level-thresholds:      # XP total requis pour atteindre chaque niveau
+    2: 500
+    3: 1500
+    4: 3000
+
+  # Prix de rachat des ressources (coins / stack)
+  sell-prices:
+    COBBLESTONE:
+      price: 2
+      quantity: 64      # prix pour 1 stack
+    STONE:
+      price: 3
+      quantity: 64
+    GRANITE:
+      price: 4
+      quantity: 64
+    DIORITE:
+      price: 4
+      quantity: 64
+    ANDESITE:
+      price: 4
+      quantity: 64
+    GRAVEL:
+      price: 2
+      quantity: 64
+    SAND:
+      price: 2
+      quantity: 64
+    SANDSTONE:
+      price: 3
+      quantity: 64
+    DEEPSLATE:
+      price: 5
+      quantity: 64
+    OBSIDIAN:
+      price: 20
+      quantity: 16      # prix pour 16 obsidiennes
+
+  # Boutique d'achat — items disponibles par niveau
+  shop:
+    1:
+      - material: STONE_PICKAXE
+        price: 50
+        quantity: 1
+      - material: STONE_SHOVEL
+        price: 30
+        quantity: 1
+    2:
+      - material: IRON_PICKAXE
+        price: 150
+        quantity: 1
+      - material: IRON_SHOVEL
+        price: 100
+        quantity: 1
+      - material: CHISELED_STONE_BRICKS
+        price: 20
+        quantity: 16
+    3:
+      - material: DIAMOND_PICKAXE
+        price: 500
+        quantity: 1
+      - material: SMOOTH_STONE
+        price: 10
+        quantity: 32
+      - material: POLISHED_GRANITE
+        price: 15
+        quantity: 32
+    4:
+      - material: NETHERITE_PICKAXE
+        price: 2000
+        quantity: 1
+      - material: DEEPSLATE_BRICKS
+        price: 25
+        quantity: 32
+      - material: SCULK
+        price: 50
+        quantity: 16
+
+  quests:
+    # Scaling des quantités par niveau
+    quantity-multiplier:
+      1: 1.0
+      2: 1.5
+      3: 2.5
+      4: 4.0
+
+    main:
+      reward-per-level: 100    # coins × niveau
+      objectives-count: 2      # nb d'objectifs générés aléatoirement
+      item-pool:
+        - material: COBBLESTONE
+          base-amount: 64
+        - material: STONE
+          base-amount: 32
+        - material: GRAVEL
+          base-amount: 64
+        - material: SAND
+          base-amount: 64
+        - material: DEEPSLATE
+          base-amount: 32
+
+    special:
+      reward-per-level: 300
+      objectives-count: 3
+      item-pool:
+        - material: OBSIDIAN
+          base-amount: 16
+        - material: GRANITE
+          base-amount: 64
+        - material: ANDESITE
+          base-amount: 64
+      entity-pool:
+        - entity: CREEPER
+          base-amount: 5
+        - entity: ZOMBIE
+          base-amount: 10
+        - entity: SKELETON
+          base-amount: 8
+
+
+# ============================================================
+#  PIRATE - Jack Sparrow
+# ============================================================
 jacksparrow:
-  prices:
-    # Poissons
-    COD: 3
-    SALMON: 4
-    TROPICAL_FISH: 6
-    PUFFERFISH: 8
-    # Ressources marines
-    KELP: 1
-    SEAGRASS: 1
-    SEA_PICKLE: 5
-    NAUTILUS_SHELL: 15
-    HEART_OF_THE_SEA: 100
-    # Craft rhum
-    SUGAR_CANE: 2
-    BAMBOO: 1
-    GLASS_BOTTLE: 2
-    HONEY_BOTTLE: 8
-    # Trésors
-    GOLD_NUGGET: 3
-    GOLD_INGOT: 25
-    PRISMARINE_SHARD: 6
-    PRISMARINE_CRYSTALS: 8
+  xp-per-stack: 10
+  xp-per-coin: 1
+  level-thresholds:
+    2: 500
+    3: 1500
+    4: 3000
+    5: 5000
+
+  sell-prices:
+    COD:
+      price: 3
+      quantity: 64
+    SALMON:
+      price: 4
+      quantity: 64
+    TROPICAL_FISH:
+      price: 6
+      quantity: 64
+    PUFFERFISH:
+      price: 8
+      quantity: 64
+    KELP:
+      price: 1
+      quantity: 64
+    SEAGRASS:
+      price: 1
+      quantity: 64
+    SEA_PICKLE:
+      price: 5
+      quantity: 16
+    NAUTILUS_SHELL:
+      price: 15
+      quantity: 1
+    HEART_OF_THE_SEA:
+      price: 100
+      quantity: 1
+    SUGAR_CANE:
+      price: 2
+      quantity: 64
+    BAMBOO:
+      price: 1
+      quantity: 64
+    GLASS_BOTTLE:
+      price: 2
+      quantity: 16
+    HONEY_BOTTLE:
+      price: 8
+      quantity: 4
+    GOLD_NUGGET:
+      price: 3
+      quantity: 9
+    GOLD_INGOT:
+      price: 25
+      quantity: 1
+    PRISMARINE_SHARD:
+      price: 6
+      quantity: 16
+    PRISMARINE_CRYSTALS:
+      price: 8
+      quantity: 16
+
+  shop:
+    1:
+      - material: FISHING_ROD
+        price: 40
+        quantity: 1
+      - material: BUCKET
+        price: 30
+        quantity: 1
+    2:
+      - material: WATER_BUCKET
+        price: 60
+        quantity: 1
+      - material: NAUTILUS_SHELL
+        price: 80
+        quantity: 1
+    3:
+      - material: HEART_OF_THE_SEA
+        price: 500
+        quantity: 1
+      - material: CONDUIT
+        price: 800
+        quantity: 1
+    4:
+      - material: TRIDENT
+        price: 2000
+        quantity: 1
+    5:
+      - material: ELYTRA
+        price: 5000
+        quantity: 1
+
+  quests:
+    quantity-multiplier:
+      1: 1.0
+      2: 1.5
+      3: 2.5
+      4: 4.0
+
+    main:
+      reward-per-level: 100
+      objectives-count: 2
+      item-pool:
+        - material: COD
+          base-amount: 64
+        - material: SALMON
+          base-amount: 32
+        - material: TROPICAL_FISH
+          base-amount: 16
+
+    special:
+      reward-per-level: 300
+      objectives-count: 3
+      item-pool:
+        - material: NAUTILUS_SHELL
+          base-amount: 5
+        - material: PRISMARINE_SHARD
+          base-amount: 32
+      entity-pool:
+        - entity: DROWNED
+          base-amount: 10
+        - entity: GUARDIAN
+          base-amount: 5

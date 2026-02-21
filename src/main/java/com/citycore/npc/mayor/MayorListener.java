@@ -1,5 +1,6 @@
-package com.citycore.npc;
+package com.citycore.npc.mayor;
 
+import com.citycore.npc.*;
 import com.citycore.util.TypewriterUtil;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
 import org.bukkit.entity.Player;
@@ -10,8 +11,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class MayorListener implements Listener {
 
-    private final NPCManager      npcManager;
-    private final NPCGuiRegistry  guiRegistry;
+    private final NPCManager npcManager;
+    private final NPCGuiRegistry guiRegistry;
     private final IntroductionManager introManager;
     private final JavaPlugin plugin;
 

@@ -87,6 +87,36 @@ public class DatabaseManager {
             )
         """);
 
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS npc_data (
+                npc_tag TEXT PRIMARY KEY,
+                xp INTEGER NOT NULL DEFAULT 0,
+                level INTEGER NOT NULL DEFAULT 1
+            )
+        """);
+
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS npc_inventory (
+                npc_tag TEXT NOT NULL,
+                material TEXT NOT NULL,
+                amount INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (npc_tag, material)
+            )
+        """);
+
+        // Dans DatabaseManager — modifie la table
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS quest_progress (
+                player_uuid  TEXT NOT NULL,
+                npc_tag      TEXT NOT NULL,
+                is_special   INTEGER NOT NULL DEFAULT 0,
+                quest_data   TEXT NOT NULL,
+                progress     TEXT NOT NULL DEFAULT '',
+                completed    INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (player_uuid, npc_tag, is_special)
+            )
+        """);
+
         stmt.close();
     }
 
