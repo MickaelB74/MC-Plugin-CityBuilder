@@ -53,7 +53,7 @@ public class VillagerListener implements Listener {
 
         if (!introManager.hasSeenIntro(player.getUniqueId(), npcType)) {
             introManager.markIntroSeen(player.getUniqueId(), npcType);
-            TypewriterUtil.play(plugin, player, npcType.introLines, () -> {
+            TypewriterUtil.play(plugin, player, npcType.getDialogue("first_meeting"), () -> {
                 if (player.isOnline()) gui.open(player);
             });
         } else {

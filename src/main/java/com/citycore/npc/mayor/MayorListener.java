@@ -37,7 +37,7 @@ public class MayorListener implements Listener {
         if (!introManager.hasSeenIntro(player.getUniqueId(), type)) {
             // Première rencontre — joue l'intro puis ouvre le GUI
             introManager.markIntroSeen(player.getUniqueId(), type);
-            TypewriterUtil.play(plugin, player, type.introLines, () -> {
+            TypewriterUtil.play(plugin, player, type.getDialogue("first_meeting"), () -> {
                 if (player.isOnline()) gui.open(player);
             });
         } else {

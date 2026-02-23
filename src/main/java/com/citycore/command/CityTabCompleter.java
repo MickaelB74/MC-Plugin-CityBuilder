@@ -1,5 +1,7 @@
 package com.citycore.command;
 
+import com.citycore.building.Building;
+import com.citycore.building.BuildingManager;
 import com.citycore.city.CityManager;
 import com.citycore.npc.CityNPC;
 import org.bukkit.command.Command;
@@ -14,10 +16,13 @@ import java.util.stream.Collectors;
 
 public class CityTabCompleter implements TabCompleter {
 
-    private final CityManager cityManager;
+    private final CityManager     cityManager;
+    private final BuildingManager buildingManager; // ✅ ajouté
 
-    public CityTabCompleter(CityManager cityManager) {
-        this.cityManager = cityManager;
+    public CityTabCompleter(CityManager cityManager,
+                            BuildingManager buildingManager) { // ✅ ajouté
+        this.cityManager     = cityManager;
+        this.buildingManager = buildingManager;
     }
 
     @Override
@@ -25,7 +30,6 @@ public class CityTabCompleter implements TabCompleter {
                                       String alias, String[] args) {
         if (!(sender instanceof Player player)) return new ArrayList<>();
 
-        // ── Niveau 1 : sous-commandes ────────────────────────────
         if (args.length == 1) {
             return Arrays.stream(CitySubCommand.values())
                     .map(c -> c.label)
@@ -33,42 +37,60 @@ public class CityTabCompleter implements TabCompleter {
                     .collect(Collectors.toList());
         }
 
-        // ── Niveau 2 ─────────────────────────────────────────────
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "deposit" -> List.of("100", "500", "1000", "5000");
                 case "create"  -> cityManager.isCityInitialized()
                         ? new ArrayList<>()
                         : List.of("<nom_de_ville>");
-                case "npc"     -> {
-                    // Liste tous les types NPC sauf MAYOR
-                    yield Arrays.stream(CityNPC.values())
-                            .filter(n -> n != CityNPC.MAYOR)
-                            .map(n -> n.tag.replace("citycore_", ""))
+                case "npc"     -> Arrays.stream(CityNPC.values())
+                        .filter(n -> n != CityNPC.MAYOR)
+                        .map(n -> n.tag.replace("citycore_", ""))
+                        .collect(Collectors.toList());
+                case "quests"  -> List.of("toggle");
+                case "build"   -> List.of("new", "show", "remove", "assign");
+                default        -> new ArrayList<>();
+            };
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("npc")) {
+            if (!player.isOp()) return new ArrayList<>();
+            boolean validType = Arrays.stream(CityNPC.values())
+                    .filter(n -> n != CityNPC.MAYOR)
+                    .anyMatch(n -> n.tag.replace("citycore_", "")
+                            .equalsIgnoreCase(args[1]));
+            if (!validType) return new ArrayList<>();
+            return new ArrayList<>(List.of("spawn", "levelUp", "levelDown"));
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("build")) {
+            return switch (args[1].toLowerCase()) {
+                case "new"    -> List.of("<nom>");
+                case "remove" -> {
+                    List<String> names = buildingManager.getAllBuildings()
+                            .stream()
+                            .map(Building::name)
                             .collect(Collectors.toList());
+                    names.add("all");
+                    yield names;
                 }
-                case "quests" -> List.of("toggle");
                 default -> new ArrayList<>();
             };
         }
-        // ── Niveau 3 ─────────────────────────────────────────────
-        if (args.length == 3 && args[0].equalsIgnoreCase("npc")) {
-            if (player.isOp()){
-                // Vérifie que args[1] est un type NPC valide
-                boolean validType = Arrays.stream(CityNPC.values())
-                        .filter(n -> n != CityNPC.MAYOR)
-                        .anyMatch(n -> n.tag.replace("citycore_", "")
-                                .equalsIgnoreCase(args[1]));
 
-                if (!validType) return new ArrayList<>();
+        if (args.length == 3 && args[0].equalsIgnoreCase("build")
+                && args[1].equalsIgnoreCase("assign")) {
+            return buildingManager.getAllBuildings().stream()
+                    .map(Building::name)
+                    .collect(Collectors.toList());
+        }
 
-                List<String> actions = new ArrayList<>(List.of("spawn"));
-                if (player.isOp()) {
-                    actions.add("levelUp");
-                    actions.add("levelDown");
-                }
-                return actions;
-            }
+        if (args.length == 4 && args[0].equalsIgnoreCase("build")
+                && args[1].equalsIgnoreCase("assign")) {
+            return Arrays.stream(CityNPC.values())
+                    .filter(n -> n != CityNPC.MAYOR)
+                    .map(n -> n.tag.replace("citycore_", ""))
+                    .collect(Collectors.toList());
         }
 
         return new ArrayList<>();

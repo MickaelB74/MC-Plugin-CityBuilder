@@ -117,6 +117,19 @@ public class DatabaseManager {
             )
         """);
 
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS buildings (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                name     TEXT NOT NULL,
+                world    TEXT NOT NULL,
+                x1       INTEGER NOT NULL,
+                z1       INTEGER NOT NULL,
+                x2       INTEGER NOT NULL,
+                z2       INTEGER NOT NULL,
+                npc_tag  TEXT
+            )
+        """);
+
         stmt.close();
     }
 

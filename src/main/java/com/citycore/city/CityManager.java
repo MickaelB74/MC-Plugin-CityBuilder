@@ -320,4 +320,17 @@ public class CityManager {
             return null;
         }
     }
+
+    public String getCityName() {
+        try {
+            ResultSet rs = db.getConnection()
+                    .createStatement()
+                    .executeQuery("SELECT name FROM city WHERE id = 1");
+            if (rs.next()) return rs.getString("name");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return "Ville";
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.citycore.command;
 
+import com.citycore.building.*;
 import com.citycore.city.City;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
@@ -15,10 +16,13 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public class CityCommand implements CommandExecutor {
@@ -29,13 +33,21 @@ public class CityCommand implements CommandExecutor {
     private final NPCManager npcManager;
     private final NPCDataManager npcDataManager;
     private final QuestHUD questHUD;
+    private final BuildingManager buildingManager;
+    private final BuildingSession buildingSession;
+    private final BuildingGUI buildingGUI;
+    private final BuildingBorderTask buildingBorderTask;
 
-    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin, NPCDataManager npcDataManager,QuestHUD questHUD) {
+    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin, NPCDataManager npcDataManager,QuestHUD questHUD, BuildingManager buildingManager, BuildingSession buildingSession, BuildingGUI buildingGUI, BuildingBorderTask buildingBorderTask) {
         this.cityManager = cityManager;
         this.npcManager = npcManager;
         this.plugin = plugin;
         this.npcDataManager = npcDataManager;
         this.questHUD       = questHUD;
+        this.buildingManager = buildingManager;
+        this.buildingSession = buildingSession;
+        this.buildingGUI = buildingGUI;
+        this.buildingBorderTask = buildingBorderTask;
         setupEconomy();
     }
 
@@ -295,6 +307,117 @@ public class CityCommand implements CommandExecutor {
 
                         default -> player.sendMessage(
                                 "§c❌ Action inconnue. Disponibles : §fspawn§c, §flevelUp§c, §flevelDown");
+                    }
+                }
+
+                case BUILD -> {
+                    // /city build — GUI
+                    if (args.length == 1) {
+                        buildingGUI.open(player);
+                        return true;
+                    }
+
+                    switch (args[1].toLowerCase()) {
+
+                        case "new" -> {
+                            if (args.length < 3) {
+                                player.sendMessage("§cUsage : /city build new <nom>");
+                                return true;
+                            }
+                            if (!cityManager.isCityInitialized()) {
+                                player.sendMessage("§c❌ Aucune ville n'existe encore.");
+                                return true;
+                            }
+                            String name = args[2];
+                            if (buildingManager.nameExists(name)) {
+                                player.sendMessage("§c❌ Un bâtiment nommé §f" + name
+                                        + " §cexiste déjà.");
+                                return true;
+                            }
+                            buildingSession.setPendingName(player.getUniqueId(), name);
+
+                            ItemStack stick = new ItemStack(BuildingListener.SELECTION_TOOL);
+                            ItemMeta meta   = stick.getItemMeta();
+                            meta.setDisplayName("§e🏗 Sélection bâtiment : §f" + name);
+                            meta.setLore(List.of(
+                                    "§7Clic gauche §f: Coin 1",
+                                    "§7Clic droit §f: Coin 2",
+                                    "§7Les deux coins définis = bâtiment créé"
+                            ));
+                            stick.setItemMeta(meta);
+                            player.getInventory().addItem(stick);
+
+                            player.sendMessage("§a✅ Mode sélection activé pour §e" + name + "§a !");
+                            player.sendMessage("§7§oClic gauche = Coin 1 | Clic droit = Coin 2");
+                        }
+
+                        case "show" -> buildingBorderTask.toggle(player);
+
+                        case "remove" -> {
+                            if (args.length < 3) {
+                                player.sendMessage("§cUsage : /city build remove <nom|all>");
+                                return true;
+                            }
+
+                            if (args[2].equalsIgnoreCase("all")) {
+                                if (!player.isOp()) {
+                                    player.sendMessage("§c❌ Commande réservée aux administrateurs.");
+                                    return true;
+                                }
+                                buildingManager.removeAll();
+                                player.sendMessage("§a✅ Tous les bâtiments ont été supprimés.");
+                                return true;
+                            }
+
+                            String name = args[2];
+                            if (!buildingManager.nameExists(name)) {
+                                player.sendMessage("§c❌ Aucun bâtiment nommé §f" + name + "§c.");
+                                return true;
+                            }
+                            buildingManager.removeByName(name);
+                            player.sendMessage("§a✅ Bâtiment §e" + name + " §asupprimé.");
+                        }
+
+                        case "assign" -> {
+                            // /city build assign <nom_batiment> <npc_type>
+                            if (args.length < 4) {
+                                player.sendMessage(
+                                        "§cUsage : /city build assign <bâtiment> <npc>");
+                                return true;
+                            }
+
+                            String buildingName = args[2];
+                            String npcType      = args[3];
+
+                            // Vérifie que le bâtiment existe
+                            Building target = buildingManager.getAllBuildings().stream()
+                                    .filter(b -> b.name().equalsIgnoreCase(buildingName))
+                                    .findFirst().orElse(null);
+
+                            if (target == null) {
+                                player.sendMessage("§c❌ Bâtiment §f" + buildingName
+                                        + " §cintrouvable.");
+                                return true;
+                            }
+
+                            // Vérifie que le NPC existe
+                            CityNPC npc = Arrays.stream(CityNPC.values())
+                                    .filter(n -> n.tag.replace("citycore_", "")
+                                            .equalsIgnoreCase(npcType))
+                                    .findFirst().orElse(null);
+
+                            if (npc == null) {
+                                player.sendMessage("§c❌ NPC §f" + npcType + " §cintrouvable.");
+                                return true;
+                            }
+
+                            buildingManager.assignNPC(target.id(), npc.tag);
+                            player.sendMessage("§a✅ §e" + npc.displayName
+                                    + " §aassigné au bâtiment §e" + target.name() + "§a !");
+                        }
+
+                        default -> player.sendMessage(
+                                "§cUsage : /city build [new <nom>|show|remove <nom|all>]");
                     }
                 }
             }

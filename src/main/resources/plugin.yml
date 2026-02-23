@@ -4,6 +4,7 @@ main: com.citycore.CityCore
 api-version: 1.21
 description: Cooperative medieval city plugin
 depend: [Vault, Citizens]
+softdepend: [WorldEdit]
 commands:
   city:
     description: Gestion de la ville

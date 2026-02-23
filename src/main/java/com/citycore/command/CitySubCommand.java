@@ -10,7 +10,10 @@ public enum CitySubCommand {
     INFO("info",       "info",                            "Afficher les infos de la ville"),
     MAP("map",         "map",                             "Afficher les bordures de chunks"),
     NPC("npc",         "npc <type> <spawn|levelUp|levelDown>", "Gérer les NPCs"),
-    QUESTS("quests", "quests toggle", "Afficher/masquer le HUD des quêtes");
+    QUESTS("quests", "quests toggle", "Afficher/masquer le HUD des quêtes"),
+    BUILD("build", "build [new <nom>|show|remove <nom|all>]",
+            "Gérer les bâtiments de la ville");
+
 
     public final String label;
     public final String usage;
