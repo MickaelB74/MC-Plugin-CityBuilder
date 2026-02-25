@@ -202,4 +202,63 @@ public class NPCDataManager {
             e.printStackTrace();
         }
     }
+
+    public NPCState getState(CityNPC npc) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "SELECT state FROM npc_data WHERE npc_tag = ?");
+            ps.setString(1, npc.tag);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) { ps.close(); return NPCState.WANDERER; }
+            String raw = rs.getString("state");
+            ps.close();
+            return raw != null ? NPCState.valueOf(raw) : NPCState.WANDERER;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return NPCState.WANDERER;
+        }
+    }
+
+    public void setState(CityNPC npc, NPCState state) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+            INSERT INTO npc_data (npc_tag, state)
+            VALUES (?, ?)
+            ON CONFLICT(npc_tag) DO UPDATE SET state = excluded.state
+        """);
+            ps.setString(1, npc.tag);
+            ps.setString(2, state.name());
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void resetNPC(CityNPC npc) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "DELETE FROM npc_data WHERE npc_tag = ?");
+            ps.setString(1, npc.tag);
+            ps.executeUpdate();
+            ps.close();
+
+            // Reset inventaire NPC
+            PreparedStatement ps2 = db.getConnection().prepareStatement(
+                    "DELETE FROM npc_inventory WHERE npc_tag = ?");
+            ps2.setString(1, npc.tag);
+            ps2.executeUpdate();
+            ps2.close();
+
+            // Reset introductions
+            PreparedStatement ps3 = db.getConnection().prepareStatement(
+                    "DELETE FROM npc_introductions WHERE npc_tag = ?");
+            ps3.setString(1, npc.tag);
+            ps3.executeUpdate();
+            ps3.close();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 }

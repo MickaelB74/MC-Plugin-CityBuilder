@@ -5,10 +5,12 @@ import com.citycore.city.City;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
+import com.citycore.npc.NPCState;
 import com.citycore.npc.villager.VillagerGUI;
 import com.citycore.quest.QuestHUD;
 import com.citycore.util.ChunkParticleTask;
 import com.citycore.city.CityManager;
+import com.citycore.util.TypewriterUtil;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -240,7 +242,7 @@ public class CityCommand implements CommandExecutor {
 
                 case NPC -> {
                     if (args.length < 3) {
-                        player.sendMessage("§cUsage : /city npc <type> <spawn|levelUp|levelDown>");
+                        player.sendMessage("§cUsage : /city npc <type> <action>");
                         return true;
                     }
 
@@ -305,6 +307,34 @@ public class CityCommand implements CommandExecutor {
                                     + VillagerGUI.getLevelName(newLevel) + "§a.");
                         }
 
+                        case "remove" -> {
+                            if (!player.isOp()) {
+                                player.sendMessage("§c❌ Commande réservée aux Op.");
+                                return true;
+                            }
+
+                            // Vérifie que le NPC est spawné
+                            if (!npcManager.isSpawned(target)) {
+                                player.sendMessage("§c❌ §e" + target.displayName
+                                        + " §cn'est pas spawné.");
+                                return true;
+                            }
+
+                            // 1. Supprime le NPC Citizens
+                            npcManager.removeAndReset(target);
+
+                            // 2. Reset toutes les données BDD
+                            npcDataManager.resetNPC(target);
+
+                            // 3. Unassign du bâtiment
+                            buildingManager.unassignNPCByTag(target.tag);
+
+                            player.sendMessage("§a✅ §e" + target.displayName
+                                    + " §asupprimé et remis à zéro !");
+                            player.sendMessage("§7XP, niveau, état, inventaire et assignation "
+                                    + "ont été réinitialisés.");
+                        }
+
                         default -> player.sendMessage(
                                 "§c❌ Action inconnue. Disponibles : §fspawn§c, §flevelUp§c, §flevelDown");
                     }
@@ -342,6 +372,7 @@ public class CityCommand implements CommandExecutor {
                             meta.setLore(List.of(
                                     "§7Clic gauche §f: Coin 1",
                                     "§7Clic droit §f: Coin 2",
+                                    "§7Shift + Clic droit §f: Point NPC §7(optionnel)",
                                     "§7Les deux coins définis = bâtiment créé"
                             ));
                             stick.setItemMeta(meta);
@@ -379,28 +410,30 @@ public class CityCommand implements CommandExecutor {
                         }
 
                         case "assign" -> {
-                            // /city build assign <nom_batiment> <npc_type>
                             if (args.length < 4) {
-                                player.sendMessage(
-                                        "§cUsage : /city build assign <bâtiment> <npc>");
+                                player.sendMessage("§cUsage : /city build assign <bâtiment> <npc>");
                                 return true;
                             }
 
                             String buildingName = args[2];
                             String npcType      = args[3];
 
-                            // Vérifie que le bâtiment existe
                             Building target = buildingManager.getAllBuildings().stream()
                                     .filter(b -> b.name().equalsIgnoreCase(buildingName))
                                     .findFirst().orElse(null);
 
                             if (target == null) {
-                                player.sendMessage("§c❌ Bâtiment §f" + buildingName
-                                        + " §cintrouvable.");
+                                player.sendMessage("§c❌ Bâtiment §f" + buildingName + " §cintrouvable.");
                                 return true;
                             }
 
-                            // Vérifie que le NPC existe
+                            if (buildingManager.buildingHasNPC(target.id())) {
+                                player.sendMessage("§c❌ Ce bâtiment a déjà un NPC assigné.");
+                                player.sendMessage("§7Utilisez §f/city build unassign "
+                                        + target.name() + " §7d'abord.");
+                                return true;
+                            }
+
                             CityNPC npc = Arrays.stream(CityNPC.values())
                                     .filter(n -> n.tag.replace("citycore_", "")
                                             .equalsIgnoreCase(npcType))
@@ -411,9 +444,57 @@ public class CityCommand implements CommandExecutor {
                                 return true;
                             }
 
+                            if (buildingManager.isNPCAlreadyAssigned(npc.tag)) {
+                                player.sendMessage("§c❌ §e" + npc.displayName
+                                        + " §cest déjà assigné à un autre bâtiment.");
+                                return true;
+                            }
+
                             buildingManager.assignNPC(target.id(), npc.tag);
+
+                            // Transition ARRIVED → ASSIGNED
+                            npcDataManager.setState(npc, NPCState.ASSIGNED);
+
+                            // Dialogue building_assign aux joueurs proches
+                            List<String> lines = npc.getDialogue("building_assign");
+                            if (!lines.isEmpty()) {
+                                net.citizensnpcs.api.npc.NPC citizensNPC = npcManager.getNPC(npc);
+                                if (citizensNPC != null && citizensNPC.isSpawned()) {
+                                    citizensNPC.getEntity().getLocation().getWorld()
+                                            .getPlayers().stream()
+                                            .filter(p -> p.getLocation().distance(
+                                                    citizensNPC.getEntity().getLocation()) <= 16)
+                                            .forEach(p -> TypewriterUtil.play(plugin, p, lines, null));
+                                }
+                            }
+
                             player.sendMessage("§a✅ §e" + npc.displayName
                                     + " §aassigné au bâtiment §e" + target.name() + "§a !");
+                        }
+
+                        case "skip" -> {
+                            if (!buildingSession.isNpcPointPhase(player.getUniqueId())) {
+                                player.sendMessage("§c❌ Aucune session de création en cours.");
+                                return true;
+                            }
+
+                            BuildingSession.PendingBuilding pending =
+                                    buildingSession.getPendingBuilding(player.getUniqueId());
+
+                            // Crée le bâtiment sans point NPC
+                            buildingManager.createBuilding(
+                                    pending.name(), pending.world(),
+                                    pending.x1(), pending.z1(),
+                                    pending.x2(), pending.z2(),
+                                    null, null, null
+                            );
+
+                            player.sendMessage("§a✅ Bâtiment §e" + pending.name()
+                                    + " §acréé sans point NPC.");
+                            player.sendMessage("§7§o(Le NPC cherchera une case accessible)");
+
+                            buildingSession.clear(player.getUniqueId());
+                            player.getInventory().setItemInMainHand(null);
                         }
 
                         default -> player.sendMessage(

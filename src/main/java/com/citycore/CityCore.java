@@ -117,7 +117,7 @@ public class CityCore extends JavaPlugin {
         var cityCmd = getCommand("city");
         cityCmd.setExecutor(new CityCommand(cityManager, npcManager, this,
                 npcDataManager, questHUD, buildingManager, buildingSession, buildingGUI, buildingBorderTask));
-        cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager));
+        cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager, npcManager));
 
         // ── Listeners globaux ────────────────────────────────────
         getServer().getPluginManager().registerEvents(
@@ -126,6 +126,8 @@ public class CityCore extends JavaPlugin {
         // ── Restauration NPCs ────────────────────────────────────
         Bukkit.getScheduler().runTaskLater(this, () ->
                 npcManager.restoreNPCs(), 20L);
+
+        new NPCCityArrivalTask(npcManager, npcDataManager, cityManager, this, buildingManager).start();
 
         // ── WorldEdit ────────────────────────────────────
         getServer().getMessenger().registerOutgoingPluginChannel(

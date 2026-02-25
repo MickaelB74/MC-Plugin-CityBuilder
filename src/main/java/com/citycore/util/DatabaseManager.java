@@ -89,9 +89,10 @@ public class DatabaseManager {
 
         stmt.execute("""
             CREATE TABLE IF NOT EXISTS npc_data (
-                npc_tag TEXT PRIMARY KEY,
-                xp INTEGER NOT NULL DEFAULT 0,
-                level INTEGER NOT NULL DEFAULT 1
+                npc_tag  TEXT PRIMARY KEY,
+                xp       INTEGER NOT NULL DEFAULT 0,
+                level    INTEGER NOT NULL DEFAULT 1,
+                state    TEXT NOT NULL DEFAULT 'WANDERER'
             )
         """);
 
@@ -126,7 +127,10 @@ public class DatabaseManager {
                 z1       INTEGER NOT NULL,
                 x2       INTEGER NOT NULL,
                 z2       INTEGER NOT NULL,
-                npc_tag  TEXT
+                npc_tag  TEXT,
+                npc_x    REAL,
+                npc_y    REAL,
+                npc_z    REAL
             )
         """);
 

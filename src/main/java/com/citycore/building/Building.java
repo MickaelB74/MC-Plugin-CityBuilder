@@ -6,8 +6,15 @@ public record Building(
         String world,
         int x1, int z1,
         int x2, int z2,
-        String npcTag   // null si aucun NPC assigné
+        String npcTag,
+        Double npcX,
+        Double npcY,
+        Double npcZ
 ) {
+    public boolean hasNpcPoint() {
+        return npcX != null && npcY != null && npcZ != null;
+    }
+
     public String npcDisplayTag() {
         return npcTag != null ? npcTag.replace("citycore_", "") : "Aucun";
     }

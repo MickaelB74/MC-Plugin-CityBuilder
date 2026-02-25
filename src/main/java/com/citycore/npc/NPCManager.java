@@ -192,4 +192,14 @@ public class NPCManager {
         return followingPlayers.containsKey(type)
                 && followingPlayers.get(type).contains(player.getUniqueId());
     }
+
+    public boolean isSpawned(CityNPC type) {
+        NPC npc = getNPC(type);
+        return npc != null && npc.isSpawned();
+    }
+
+    public void removeAndReset(CityNPC type) {
+        NPC npc = getNPC(type);
+        if (npc != null) npc.destroy();
+    }
 }

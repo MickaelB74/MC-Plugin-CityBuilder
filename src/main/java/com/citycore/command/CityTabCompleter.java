@@ -4,6 +4,7 @@ import com.citycore.building.Building;
 import com.citycore.building.BuildingManager;
 import com.citycore.city.CityManager;
 import com.citycore.npc.CityNPC;
+import com.citycore.npc.NPCManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
@@ -17,12 +18,14 @@ import java.util.stream.Collectors;
 public class CityTabCompleter implements TabCompleter {
 
     private final CityManager     cityManager;
-    private final BuildingManager buildingManager; // ✅ ajouté
+    private final BuildingManager buildingManager;
+    private final NPCManager npcManager;
 
     public CityTabCompleter(CityManager cityManager,
-                            BuildingManager buildingManager) { // ✅ ajouté
+                            BuildingManager buildingManager, NPCManager npcManager) {
         this.cityManager     = cityManager;
         this.buildingManager = buildingManager;
+        this.npcManager      = npcManager;
     }
 
     @Override
@@ -48,7 +51,7 @@ public class CityTabCompleter implements TabCompleter {
                         .map(n -> n.tag.replace("citycore_", ""))
                         .collect(Collectors.toList());
                 case "quests"  -> List.of("toggle");
-                case "build"   -> List.of("new", "show", "remove", "assign");
+                case "build"   -> List.of("new", "show", "remove", "assign", "skip");
                 default        -> new ArrayList<>();
             };
         }
@@ -60,7 +63,7 @@ public class CityTabCompleter implements TabCompleter {
                     .anyMatch(n -> n.tag.replace("citycore_", "")
                             .equalsIgnoreCase(args[1]));
             if (!validType) return new ArrayList<>();
-            return new ArrayList<>(List.of("spawn", "levelUp", "levelDown"));
+            return new ArrayList<>(List.of("spawn", "levelUp", "levelDown", "remove"));
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("build")) {
@@ -74,21 +77,20 @@ public class CityTabCompleter implements TabCompleter {
                     names.add("all");
                     yield names;
                 }
+                case "assign" -> buildingManager.getAllBuildings()
+                        .stream()
+                        .map(Building::name)
+                        .collect(Collectors.toList());
                 default -> new ArrayList<>();
             };
-        }
-
-        if (args.length == 3 && args[0].equalsIgnoreCase("build")
-                && args[1].equalsIgnoreCase("assign")) {
-            return buildingManager.getAllBuildings().stream()
-                    .map(Building::name)
-                    .collect(Collectors.toList());
         }
 
         if (args.length == 4 && args[0].equalsIgnoreCase("build")
                 && args[1].equalsIgnoreCase("assign")) {
             return Arrays.stream(CityNPC.values())
                     .filter(n -> n != CityNPC.MAYOR)
+                    .filter(n -> npcManager.isSpawned(n))
+                    .filter(n -> !buildingManager.isNPCAlreadyAssigned(n.tag))
                     .map(n -> n.tag.replace("citycore_", ""))
                     .collect(Collectors.toList());
         }

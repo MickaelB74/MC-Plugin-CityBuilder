@@ -50,10 +50,7 @@ public class BuildingEnterListener implements Listener {
                         ? cityManager.getCityName()
                         : "Ville";
 
-                player.sendTitle(
-                        "§e" + cityName,
-                        "§f" + building.name(),
-                        10, 40, 20 // fadeIn, stay, fadeOut en ticks
+                player.sendActionBar("§e" + cityName + " : §f" + building.name()
                 );
             }
         } else {

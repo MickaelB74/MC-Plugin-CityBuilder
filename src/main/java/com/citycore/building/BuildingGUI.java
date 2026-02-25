@@ -50,6 +50,12 @@ public class BuildingGUI {
             lore.add("§7Monde : §f" + building.world());
             lore.add("");
             lore.add("§7NPC assigné : " + npcName);
+            if (building.hasNpcPoint()) {
+                lore.add("§d📍 Point NPC : §fX" + (int)(double) building.npcX()
+                        + " §7Z" + (int)(double) building.npcZ());
+            } else {
+                lore.add("§8Aucun point NPC défini");
+            }
 
             inv.setItem(slot++, makeItem(Material.BRICKS,
                     "§e🏛 " + building.name(), lore));

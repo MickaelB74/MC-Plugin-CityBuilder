@@ -1,22 +1,24 @@
 package com.citycore.npc.villager;
 
 import com.citycore.city.CityManager;
-import com.citycore.npc.CityNPC;
-import com.citycore.npc.IntroductionManager;
-import com.citycore.npc.NPCDataManager;
-import com.citycore.npc.NPCManager;
+import com.citycore.npc.*;
 import com.citycore.quest.QuestGUI;
 import com.citycore.util.TypewriterUtil;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
+import net.citizensnpcs.api.npc.NPC;
 import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
 import java.util.Map;
 
 public class VillagerListener implements Listener {
@@ -48,23 +50,79 @@ public class VillagerListener implements Listener {
 
     @EventHandler
     public void onNPCRightClick(NPCRightClickEvent event) {
-        if (!npcManager.isNPCType(event.getNPC(), npcType)) return;
+        CityNPC type = npcManager.getNPCType(event.getNPC());
+        if (type != npcType) return;
+
         Player player = event.getClicker();
+        NPC npc = npcManager.getNPC(type);
+
+        // ✅ Stop la balade si ARRIVED — face au joueur
+        if (dataManager.getState(type) == NPCState.ARRIVED && npc != null) {
+            npc.getNavigator().cancelNavigation();
+            facePlayer(npc, player);
+        }
 
         if (!introManager.hasSeenIntro(player.getUniqueId(), npcType)) {
             introManager.markIntroSeen(player.getUniqueId(), npcType);
-            TypewriterUtil.play(plugin, player, npcType.getDialogue("first_meeting"), () -> {
-                if (player.isOnline()) gui.open(player);
-            });
-        } else {
-            gui.open(player);
+
+            if (dataManager.getState(npcType) == NPCState.WANDERER) {
+                npcManager.startFollowing(player, npcType);
+                player.sendMessage("§a" + npcType.displayName
+                        + " §avous suit vers la ville !");
+            }
+
+            List<String> lines = npcType.getDialogue("first_meeting");
+            if (!lines.isEmpty()) {
+                TypewriterUtil.play(plugin, player, lines,
+                        () -> gui.open(player));
+                return;
+            }
         }
+
+        gui.open(player);
+    }
+
+    /**
+     * Tourne le NPC vers le joueur.
+     */
+    private void facePlayer(NPC npc, Player player) {
+        if (!npc.isSpawned()) return;
+
+        // ✅ Stop complet de la navigation
+        npc.getNavigator().cancelNavigation();
+        npc.getNavigator().setPaused(true);
+
+        Location npcLoc    = npc.getEntity().getLocation().clone();
+        Location playerLoc = player.getLocation();
+        double dx = playerLoc.getX() - npcLoc.getX();
+        double dz = playerLoc.getZ() - npcLoc.getZ();
+        float yaw = (float)(Math.toDegrees(Math.atan2(-dx, dz)));
+        npcLoc.setYaw(yaw);
+        npcLoc.setPitch(0);
+        npc.teleport(npcLoc,
+                org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN);
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         String title = event.getView().getTitle();
+
+        // ── GUI Wanderer ─────────────────────────────────────────
+        if (VillagerGUI.titleWanderer(npcType).equals(title)) {
+            event.setCancelled(true);
+            if (event.getCurrentItem() == null) return;
+            if (event.getSlot() == 8) handleFollowToggle(player);
+            return;
+        }
+
+        // ── GUI Arrived ──────────────────────────────────────────
+        if (VillagerGUI.titleArrived(npcType).equals(title)) {
+            event.setCancelled(true);
+            if (event.getCurrentItem() == null) return;
+            if (event.getSlot() == 8) handleFollowToggle(player);
+            return;
+        }
 
         // ── Menu principal ──────────────────────────────────────
         if (title.startsWith(npcType.displayName + " §8— §7" + npcType.function)) {
@@ -214,6 +272,33 @@ public class VillagerListener implements Listener {
         }
     }
 
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        String title = event.getView().getTitle();
+
+        boolean isOurGUI = VillagerGUI.titleWanderer(npcType).equals(title)
+                || VillagerGUI.titleArrived(npcType).equals(title)
+                || title.startsWith(npcType.displayName + " §8— §7" + npcType.function);
+
+        if (!isOurGUI) return;
+
+        if (dataManager.getState(npcType) == NPCState.ARRIVED) {
+            boolean someoneFollowing = player.getWorld().getPlayers()
+                    .stream().anyMatch(p -> npcManager.isFollowing(p, npcType));
+
+            NPC npc = npcManager.getNPC(npcType);
+            if (npc != null && npc.isSpawned()) {
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    // ✅ Reprend la navigation
+                    npc.getNavigator().setPaused(false);
+                    npc.getNavigator().cancelNavigation();
+                    // La task reprend la balade au prochain cycle
+                }, 2L);
+            }
+        }
+    }
+
     private String formatName(Material mat) {
         StringBuilder sb = new StringBuilder();
         for (String word : mat.name().split("_")) {
@@ -221,5 +306,21 @@ public class VillagerListener implements Listener {
                     .append(word.substring(1).toLowerCase()).append(" ");
         }
         return sb.toString().trim();
+    }
+
+    private void handleFollowToggle(Player player) {
+        if (npcManager.isFollowing(player, npcType)) {
+            npcManager.stopFollowing(player, npcType);
+            player.sendMessage(npcType.displayName + " §7s'est arrêté de vous suivre.");
+            if (dataManager.getState(npcType) == NPCState.ARRIVED) {
+                NPC npc = npcManager.getNPC(npcType);
+                if (npc != null && npc.isSpawned())
+                    npc.getNavigator().cancelNavigation();
+            }
+        } else {
+            npcManager.startFollowing(player, npcType);
+            player.sendMessage(npcType.displayName + " §avous suit désormais.");
+        }
+        gui.open(player);
     }
 }

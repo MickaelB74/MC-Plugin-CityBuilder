@@ -32,8 +32,15 @@ public enum CityNPC {
             Map.of(
                     "first_meeting", List.of(
                             "§7Brennan §f: §o*grogne* Encore un nouveau visage...",
-                            "§7Brennan §f: §oJ'rachète les pierres, les graviers, tout c'qui sort de la terre.",
-                            "§7Brennan §f: §oPas de bavardage, amène tes stacks et j'te file des coins."
+                            "§7Brennan §f: §oJe suis completement perdu, vous pouvez m'aider ?"
+                    ),
+                    "city_arrival", List.of(
+                            "§7Brennan §f: §o*regarde autour de lui* Pas mal, cette ville...",
+                            "§7Brennan §f: §oJ'vais m'installer ici un moment. Si vous avez des pierres, amenez-les."
+                    ),
+                    "building_assign", List.of(
+                            "§7Brennan §f: §oAh, enfin un atelier digne de ce nom !",
+                            "§7Brennan §f: §oVenez me voir ici quand vous voulez vendre vos blocs."
                     )
             )
     ),
@@ -49,6 +56,14 @@ public enum CityNPC {
                     "first_meeting", List.of(
                             "§3Jack §f: §oHHHAAARRRGGGGGG !!! Salut c'est Jack Sparrow ! Le vrai !",
                             "§3Jack §f: §oJ'ai besoin de 50€ en coupon western union... Tu as ca sur toi ?"
+                    ),
+                    "city_arrival", List.of(
+                            "§3Jack §f: §o*hume l'air* Ah, une ville ! Civilisation... relatif.",
+                            "§3Jack §f: §oJ'vais rester dans le coin. Pour les affaires, vous comprenez."
+                    ),
+                    "building_assign", List.of(
+                            "§3Jack §f: §oUn port ! Enfin, presque... ça fera l'affaire.",
+                            "§3Jack §f: §oVenez me voir ici pour tout ce qui vient de la mer."
                     )
             )
     );
