@@ -2,10 +2,7 @@ package com.citycore.command;
 
 import com.citycore.building.*;
 import com.citycore.city.City;
-import com.citycore.npc.CityNPC;
-import com.citycore.npc.NPCDataManager;
-import com.citycore.npc.NPCManager;
-import com.citycore.npc.NPCState;
+import com.citycore.npc.*;
 import com.citycore.npc.villager.VillagerGUI;
 import com.citycore.quest.QuestHUD;
 import com.citycore.util.ChunkParticleTask;
@@ -27,6 +24,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static org.bukkit.Bukkit.getServer;
+
 public class CityCommand implements CommandExecutor {
 
     private final CityManager cityManager;
@@ -39,8 +38,9 @@ public class CityCommand implements CommandExecutor {
     private final BuildingSession buildingSession;
     private final BuildingGUI buildingGUI;
     private final BuildingBorderTask buildingBorderTask;
+    private final NPCNotificationManager notificationManager;
 
-    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin, NPCDataManager npcDataManager,QuestHUD questHUD, BuildingManager buildingManager, BuildingSession buildingSession, BuildingGUI buildingGUI, BuildingBorderTask buildingBorderTask) {
+    public CityCommand(CityManager cityManager, NPCManager npcManager, JavaPlugin plugin, NPCDataManager npcDataManager,QuestHUD questHUD, BuildingManager buildingManager, BuildingSession buildingSession, BuildingGUI buildingGUI, BuildingBorderTask buildingBorderTask, NPCNotificationManager notificationManager) {
         this.cityManager = cityManager;
         this.npcManager = npcManager;
         this.plugin = plugin;
@@ -50,6 +50,7 @@ public class CityCommand implements CommandExecutor {
         this.buildingSession = buildingSession;
         this.buildingGUI = buildingGUI;
         this.buildingBorderTask = buildingBorderTask;
+        this.notificationManager = notificationManager;
         setupEconomy();
     }
 
@@ -274,6 +275,8 @@ public class CityCommand implements CommandExecutor {
                                 return true;
                             }
                             npcManager.spawnNPC(target, spawnLocation(player));
+                            notificationManager.notifyAll(target,
+                                    getServer(), npcManager);
                             player.sendMessage("§a✅ " + target.displayName + " §aest apparu !");
                         }
 
@@ -452,6 +455,9 @@ public class CityCommand implements CommandExecutor {
 
                             buildingManager.assignNPC(target.id(), npc.tag);
 
+                            notificationManager.notifyAll(npc,
+                                    getServer(), npcManager);
+
                             // Transition ARRIVED → ASSIGNED
                             npcDataManager.setState(npc, NPCState.ASSIGNED);
 
@@ -486,7 +492,7 @@ public class CityCommand implements CommandExecutor {
                                     pending.name(), pending.world(),
                                     pending.x1(), pending.z1(),
                                     pending.x2(), pending.z2(),
-                                    null, null, null
+                                    null, null, null, null
                             );
 
                             player.sendMessage("§a✅ Bâtiment §e" + pending.name()

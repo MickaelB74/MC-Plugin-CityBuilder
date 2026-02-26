@@ -1,5 +1,7 @@
 package com.citycore.npc.villager;
 
+import com.citycore.building.Building;
+import com.citycore.building.BuildingManager;
 import com.citycore.city.CityManager;
 import com.citycore.npc.*;
 import com.citycore.quest.QuestGUI;
@@ -32,11 +34,13 @@ public class VillagerListener implements Listener {
     private final IntroductionManager introManager;
     private final JavaPlugin          plugin;
     private final QuestGUI            questGUI;
+    private final NPCNotificationManager notificationManager;
+    private final BuildingManager buildingManager;
 
     public VillagerListener(CityNPC npcType, VillagerGUI gui, NPCManager npcManager,
                             NPCDataManager dataManager, Economy economy,
                             CityManager cityManager, IntroductionManager introManager,
-                            QuestGUI questGUI, JavaPlugin plugin) {
+                            QuestGUI questGUI, JavaPlugin plugin, NPCNotificationManager notificationManager, BuildingManager buildingManager) {
         this.npcType      = npcType;
         this.gui          = gui;
         this.npcManager   = npcManager;
@@ -46,6 +50,8 @@ public class VillagerListener implements Listener {
         this.introManager = introManager;
         this.plugin       = plugin;
         this.questGUI     = questGUI;
+        this.notificationManager = notificationManager;
+        this.buildingManager = buildingManager;
     }
 
     @EventHandler
@@ -55,6 +61,9 @@ public class VillagerListener implements Listener {
 
         Player player = event.getClicker();
         NPC npc = npcManager.getNPC(type);
+
+        notificationManager.clearNotification(player.getUniqueId(), type,
+                plugin.getServer(), npcManager);
 
         // ✅ Stop la balade si ARRIVED — face au joueur
         if (dataManager.getState(type) == NPCState.ARRIVED && npc != null) {
@@ -80,6 +89,13 @@ public class VillagerListener implements Listener {
         }
 
         gui.open(player);
+    }
+
+    @EventHandler
+    public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
+        // Rafraîchit le hologramme pour ce joueur
+        notificationManager.refreshOnLogin(event.getPlayer().getUniqueId(),
+                npcType, npcManager, plugin.getServer());
     }
 
     /**
@@ -120,8 +136,71 @@ public class VillagerListener implements Listener {
         if (VillagerGUI.titleArrived(npcType).equals(title)) {
             event.setCancelled(true);
             if (event.getCurrentItem() == null) return;
-            if (event.getSlot() == 8) handleFollowToggle(player);
+
+            switch (event.getSlot()) {
+                case 4 -> { // Bouton recherche
+                    List<Building> available = buildingManager.getAllBuildings()
+                            .stream()
+                            .filter(b -> b.npcTag() == null)
+                            .collect(java.util.stream.Collectors.toList());
+                    gui.openBuildingSearch(player, available);
+                }
+                case 8 -> { // Toggle marche
+                    boolean current = npcManager.isWandering(npcType);
+                    npcManager.setWandering(npcType, !current);
+                    player.sendMessage(!current
+                            ? "§a🚶 " + npcType.displayName + " §ase balade."
+                            : "§7🚶 " + npcType.displayName + " §7s'est arrêté.");
+                    gui.open(player);
+                }
+            }
             return;
+        }
+
+        // ── GUI BuildingSearch ───────────────────────────────────
+        if (VillagerGUI.titleBuildingSearch(npcType).equals(title)) {
+            event.setCancelled(true);
+            if (event.getCurrentItem() == null) return;
+
+            // Bouton retour — dernier slot
+            if (event.getSlot() == event.getView().getTopInventory().getSize() - 1) {
+                gui.open(player);
+                return;
+            }
+
+            if (event.getCurrentItem().getType() == Material.BARRIER) return;
+            if (event.getCurrentItem().getType() == Material.GREEN_STAINED_GLASS_PANE) return;
+
+            // Récupère le nom du bâtiment depuis le displayName
+            String rawName = event.getCurrentItem().getItemMeta().getDisplayName();
+            String buildingName = rawName.replace("§e🏛 ", "").trim();
+
+            Building target = buildingManager.getAllBuildings().stream()
+                    .filter(b -> b.name().equals(buildingName))
+                    .findFirst().orElse(null);
+
+            if (target == null) return;
+            if (target.npcTag() != null) {
+                player.sendMessage("§c❌ Ce bâtiment a déjà un NPC assigné.");
+                return;
+            }
+
+            // ✅ Assigne directement le NPC au bâtiment
+            buildingManager.assignNPC(target.id(), npcType.tag);
+            dataManager.setState(npcType, NPCState.ASSIGNED);
+
+            // Dialogue building_assign
+            List<String> lines = npcType.getDialogue("building_assign");
+            if (!lines.isEmpty()) {
+                TypewriterUtil.play(plugin, player, lines, null);
+            }
+
+            notificationManager.notifyAll(npcType, plugin.getServer(), npcManager);
+
+            player.closeInventory();
+            player.sendMessage("§a✅ §e"
+                    + npcType.displayName.replaceAll("§.", "")
+                    + " §aassigné au bâtiment §e" + target.name() + "§a !");
         }
 
         // ── Menu principal ──────────────────────────────────────

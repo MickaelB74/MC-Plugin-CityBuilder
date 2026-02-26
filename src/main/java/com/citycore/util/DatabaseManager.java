@@ -130,7 +130,17 @@ public class DatabaseManager {
                 npc_tag  TEXT,
                 npc_x    REAL,
                 npc_y    REAL,
-                npc_z    REAL
+                npc_z    REAL,
+                npc_yaw  REAL
+            )
+        """);
+
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS npc_notifications (
+                player_uuid TEXT NOT NULL,
+                npc_tag     TEXT NOT NULL,
+                has_notif   INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (player_uuid, npc_tag)
             )
         """);
 

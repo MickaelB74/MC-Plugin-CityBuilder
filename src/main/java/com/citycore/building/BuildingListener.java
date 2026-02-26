@@ -67,6 +67,7 @@ public class BuildingListener implements Listener {
                     loc.getBlockX(), loc.getBlockZ()) + 1;
             Location npcPt = new Location(loc.getWorld(),
                     loc.getBlockX() + 0.5, npcY, loc.getBlockZ() + 0.5);
+            float npcYaw = player.getLocation().getYaw();
 
             // Crée le bâtiment avec le point NPC
             buildingManager.createBuilding(
@@ -74,7 +75,8 @@ public class BuildingListener implements Listener {
                     pending.world(),
                     pending.x1(), pending.z1(),
                     pending.x2(), pending.z2(),
-                    npcPt.getX(), npcPt.getY(), npcPt.getZ()
+                    npcPt.getX(), npcPt.getY(), npcPt.getZ(),
+                    npcYaw
             );
 
             player.sendMessage("§a✅ Bâtiment §e" + pending.name() + " §acréé !");

@@ -5,27 +5,34 @@ import com.citycore.building.BuildingManager;
 import com.citycore.city.CityManager;
 import com.citycore.util.TypewriterUtil;
 import net.citizensnpcs.api.npc.NPC;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 public class NPCCityArrivalTask {
 
     private final NPCManager      npcManager;
+    private final NPCNotificationManager notificationManager;
     private final NPCDataManager  dataManager;
     private final CityManager     cityManager;
     private final JavaPlugin      plugin;
     private final BuildingManager buildingManager;
     private final Random          random = new Random();
 
+    private final Set<CityNPC> blockedNPCs = new HashSet<>();
+
     public NPCCityArrivalTask(NPCManager npcManager, NPCDataManager dataManager,
-                              CityManager cityManager, JavaPlugin plugin, BuildingManager buildingManager) {
+                              CityManager cityManager, JavaPlugin plugin, BuildingManager buildingManager, NPCNotificationManager notificationManager) {
         this.npcManager      = npcManager;
+        this.notificationManager = notificationManager;
         this.dataManager     = dataManager;
         this.cityManager     = cityManager;
         this.plugin          = plugin;
@@ -64,6 +71,9 @@ public class NPCCityArrivalTask {
 
         // ✅ Transition WANDERER → ARRIVED
         dataManager.setState(type, NPCState.ARRIVED);
+        npcManager.setWandering(type, true);
+        notificationManager.notifyAll(type,
+                plugin.getServer(), npcManager);
         plugin.getLogger().info(type.displayName + " est arrivé dans la ville !");
 
         // ✅ Stop le suivi automatiquement
@@ -92,12 +102,9 @@ public class NPCCityArrivalTask {
        ========================= */
 
     private void handleArrived(CityNPC type, NPC npc) {
-        // Si un joueur le fait suivre → ne pas interférer
-        boolean someoneFollowing = npc.getEntity().getWorld().getPlayers()
-                .stream().anyMatch(p -> npcManager.isFollowing(p, type));
-        if (someoneFollowing) return;
+        if (!npcManager.isWandering(type)) return;
 
-        // Si le NPC navigue déjà → ne pas interrompre trop tôt
+        if (npc.getNavigator().isPaused()) return;
         if (npc.getNavigator().isNavigating()) return;
 
         Location npcLoc = npc.getEntity().getLocation();
@@ -118,7 +125,7 @@ public class NPCCityArrivalTask {
             if (randomTarget != null) {
                 npc.getNavigator().getDefaultParameters()
                         .speedModifier(0.4f)
-                        .range(100f);
+                        .range(300f);
                 npc.getNavigator().setTarget(randomTarget);
             }
         }
@@ -130,39 +137,89 @@ public class NPCCityArrivalTask {
 
     private void handleAssigned(CityNPC type, NPC npc) {
         if (npc.getNavigator().isPaused()) return;
-        if (npc.getNavigator().isNavigating()) return;
 
         Building building = buildingManager.getAssignedBuilding(type.tag);
         if (building == null) return;
 
         World world     = npc.getEntity().getWorld();
         Location npcLoc = npc.getEntity().getLocation();
-
         Location target;
 
         if (building.hasNpcPoint()) {
-            // ✅ Point NPC défini — vérifie s'il est accessible
             Location defined = new Location(world,
                     building.npcX(), building.npcY(), building.npcZ());
-
             if (isAccessible(world, defined)) {
                 target = defined;
+                if (blockedNPCs.remove(type))
+                    notificationManager.setBlocked(type, npcManager, false);
             } else {
-                // Point bloqué → cherche le plus proche accessible
                 target = findClosestAccessible(world, building, defined);
+                if (blockedNPCs.add(type))
+                    notificationManager.setBlocked(type, npcManager, true);
             }
         } else {
-            // Pas de point → cherche une case accessible
             target = findAccessibleLocation(world, building, npcLoc);
         }
 
         if (target == null) return;
-        if (npcLoc.distanceSquared(target) < 4) return; // Déjà sur place
+
+        if (npcLoc.distanceSquared(target) < 0.1) return;
+
+        // ✅ Téléportation avant le check isNavigating
+        if (npcLoc.distanceSquared(target) < 1) {
+            float yaw = getFacingYaw(building);
+            target.setYaw(yaw);
+            target.setPitch(0);
+
+            npc.getNavigator().cancelNavigation();
+            npc.getEntity().teleport(target);
+
+            // Force le yaw après
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!npc.isSpawned()) return;
+                Location finalLoc = npc.getEntity().getLocation().clone();
+                finalLoc.setYaw(yaw);
+                finalLoc.setPitch(0);
+                npc.getEntity().teleport(finalLoc);
+            }, 5L);
+            return;
+        }
+
+        // ✅ Check isNavigating seulement pour éviter de spammer setTarget
+        if (npc.getNavigator().isNavigating()) return;
 
         npc.getNavigator().getDefaultParameters()
                 .speedModifier(0.5f)
-                .range(200f);
+                .range(200f)
+                .distanceMargin(0.1f);
+
+        npc.getNavigator().getLocalParameters()
+                .addSingleUseCallback(cancelReason -> {
+                    if (cancelReason != null) return; // Navigation annulée — pas arrivé
+                    if (!npc.isSpawned()) return;
+
+                    float yaw = getFacingYaw(building);
+                    Location finalLoc = npc.getEntity().getLocation().clone();
+                    finalLoc.setYaw(yaw);
+                    finalLoc.setPitch(0);
+
+                    // Petit délai pour laisser Citizens finir
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        npc.getEntity().teleport(finalLoc);
+                    }, 2L);
+                });
+
         npc.getNavigator().setTarget(target);
+    }
+
+    private float getFacingYaw(Building building) {
+        if (building.npcYaw() == null) return 0f;
+        float yaw = ((building.npcYaw() % 360) + 360) % 360;
+        if (yaw > 180) yaw -= 360;
+        if (yaw >= -45 && yaw < 45)   return 0f;    // Sud
+        if (yaw >= 45 && yaw < 135)   return 90f;   // Ouest
+        if (yaw >= 135 || yaw < -135) return 180f;  // Nord
+        return -90f;                                  // Est
     }
 
     private boolean isAccessible(World world, Location loc) {

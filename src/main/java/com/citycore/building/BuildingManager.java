@@ -18,11 +18,13 @@ public class BuildingManager {
 
     public void createBuilding(String name, String world,
                                int x1, int z1, int x2, int z2,
-                               Double npcX, Double npcY, Double npcZ) {
+                               Double npcX, Double npcY, Double npcZ,
+                               Float npcYaw) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
-            INSERT INTO buildings (name, world, x1, z1, x2, z2, npc_x, npc_y, npc_z)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO buildings (name, world, x1, z1, x2, z2,
+                                   npc_x, npc_y, npc_z, npc_yaw)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """);
             ps.setString(1, name);
             ps.setString(2, world);
@@ -34,10 +36,12 @@ public class BuildingManager {
                 ps.setDouble(7, npcX);
                 ps.setDouble(8, npcY);
                 ps.setDouble(9, npcZ);
+                ps.setFloat(10, npcYaw != null ? npcYaw : 0f);
             } else {
                 ps.setNull(7, java.sql.Types.REAL);
                 ps.setNull(8, java.sql.Types.REAL);
                 ps.setNull(9, java.sql.Types.REAL);
+                ps.setNull(10, java.sql.Types.REAL);
             }
             ps.executeUpdate();
             ps.close();
@@ -50,6 +54,8 @@ public class BuildingManager {
         double npcX = rs.getDouble("npc_x");
         double npcY = rs.getDouble("npc_y");
         double npcZ = rs.getDouble("npc_z");
+        float npcYaw = rs.getFloat("npc_yaw");
+        boolean hasPoint = !rs.wasNull();
         return new Building(
                 rs.getInt("id"),
                 rs.getString("name"),
@@ -57,9 +63,10 @@ public class BuildingManager {
                 rs.getInt("x1"), rs.getInt("z1"),
                 rs.getInt("x2"), rs.getInt("z2"),
                 rs.getString("npc_tag"),
-                rs.wasNull() ? null : npcX,
-                rs.wasNull() ? null : npcY,
-                rs.wasNull() ? null : npcZ
+                hasPoint ? npcX : null,
+                hasPoint ? npcY : null,
+                hasPoint ? npcZ : null,
+                hasPoint ? npcYaw : null
         );
     }
 

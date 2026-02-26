@@ -1,5 +1,6 @@
 package com.citycore.npc.villager;
 
+import com.citycore.building.Building;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
@@ -118,17 +119,80 @@ public class VillagerGUI {
                                 + npcType.tag.replace("citycore_", "")
                 )));
 
-        // Bouton suivi
-        boolean following = npcManager.isFollowing(player, npcType);
+        // ✅ Bouton recherche bâtiment
+        inv.setItem(4, makeItem(Material.SPYGLASS,
+                "§e🔍 Chercher un bâtiment",
+                List.of(
+                        "§7Liste les bâtiments disponibles",
+                        "",
+                        "§eCliquez pour voir"
+                )));
+
+        // Toggle marche aléatoire
+        boolean wandering = npcManager.isWandering(npcType);
         inv.setItem(8, makeItem(
-                following ? Material.REDSTONE : Material.LIME_DYE,
-                following ? "§c⛔ Arrêter de suivre" : "§a👣 Inviter à suivre",
-                List.of(following
-                        ? "§7Cliquez pour arrêter"
-                        : "§7Cliquez pour que " + npcType.displayName.replaceAll("§.", "")
-                        + " §7vous suive jusqu'à la ville.")
+                wandering ? Material.LIME_DYE : Material.GRAY_DYE,
+                wandering ? "§a🚶 Marche aléatoire active" : "§7🚶 Marche aléatoire inactive",
+                List.of(
+                        wandering ? "§7Cliquez pour arrêter" : "§7Cliquez pour activer",
+                        "",
+                        "§8Le NPC se balade dans la ville"
+                )
         ));
 
+        player.openInventory(inv);
+    }
+
+    // ✅ Sous-menu bâtiments disponibles
+    public static String titleBuildingSearch(CityNPC npc) {
+        return "§8[" + npc.displayName + "§8] §eBâtiments";
+    }
+
+    public void openBuildingSearch(Player player,
+                                   List<Building> availableBuildings) {
+        int size = Math.max(9, (int) Math.ceil(
+                (availableBuildings.size() + 1) / 9.0) * 9);
+        size = Math.min(size, 54);
+
+        Inventory inv = Bukkit.createInventory(null, size,
+                titleBuildingSearch(npcType));
+        fillFiller(inv, size, Material.GREEN_STAINED_GLASS_PANE);
+
+        if (availableBuildings.isEmpty()) {
+            inv.setItem(4, makeItem(Material.BARRIER,
+                    "§cAucun bâtiment disponible",
+                    List.of(
+                            "§7Tous les bâtiments ont déjà",
+                            "§7un NPC assigné.",
+                            "",
+                            "§8Créez un nouveau bâtiment avec",
+                            "§8/city build new <nom>"
+                    )));
+        } else {
+            int slot = 0;
+            for (Building building : availableBuildings) {
+                if (slot == size - 1) break; // Réserve le dernier slot pour retour
+                inv.setItem(slot++, makeItem(Material.BRICKS,
+                        "§e🏛 " + building.name(),
+                        List.of(
+                                "§7Zone : §fX(" + building.x1() + "§7→§f"
+                                        + building.x2() + "§7) Z(§f"
+                                        + building.z1() + "§7→§f"
+                                        + building.z2() + "§7)",
+                                "§7Monde : §f" + building.world(),
+                                "",
+                                building.hasNpcPoint()
+                                        ? "§a✔ Point NPC défini"
+                                        : "§c✘ Aucun point NPC",
+                                "",
+                                "§eCliquez pour assigner §f"
+                                        + npcType.displayName.replaceAll("§.", "")
+                        )));
+            }
+        }
+
+        inv.setItem(size - 1, makeItem(Material.ARROW,
+                "§7← Retour", List.of()));
         player.openInventory(inv);
     }
 

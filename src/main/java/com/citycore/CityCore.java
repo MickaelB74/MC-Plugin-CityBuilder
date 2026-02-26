@@ -16,6 +16,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +27,7 @@ public class CityCore extends JavaPlugin {
     private CityManager     cityManager;
     private NPCManager      npcManager;
     private Economy         economy;
+    private NPCNotificationManager notificationManager;
 
     @Override
     public void onEnable() {
@@ -34,6 +37,7 @@ public class CityCore extends JavaPlugin {
 
         cityManager = new CityManager(databaseManager);
         npcManager  = new NPCManager(this);
+        notificationManager = new NPCNotificationManager(databaseManager);
 
         // ── Vault ────────────────────────────────────────────────
         economy = setupEconomy();
@@ -69,54 +73,44 @@ public class CityCore extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new MayorListener(npcManager, guiRegistry, introManager, this), this);
 
-        // ── Tailleur de pierre ───────────────────────────────────
-        VillagerConfig stonemasonConfig = new VillagerConfig(this, "stonemason");
-        VillagerGUI    stonemasonGUI    = new VillagerGUI(CityNPC.STONEMASON,
-                stonemasonConfig, npcDataManager, npcManager);
+        // ── NPCs génériques ───────────────────────────────────────
+        Map<CityNPC, VillagerConfig> villagerConfigMap = new HashMap<>();
+        List<QuestGUI> questGUIs = new ArrayList<>();
 
-        QuestConfig stonemasonQuestConfig = new QuestConfig(this, "stonemason");
-        QuestGUI    stonemasonQuestGUI    = new QuestGUI(CityNPC.STONEMASON,
-                stonemasonQuestConfig, questManager, npcDataManager);
+        for (CityNPC npcType : CityNPC.values()) {
+            if (npcType == CityNPC.MAYOR) continue; // MAYOR a son propre listener
 
-        getServer().getPluginManager().registerEvents(
-                new VillagerListener(CityNPC.STONEMASON, stonemasonGUI, npcManager,
-                        npcDataManager, economy, cityManager, introManager,
-                        stonemasonQuestGUI, this), this);
+            VillagerConfig config = new VillagerConfig(this, npcType.skinId);
+            VillagerGUI    gui    = new VillagerGUI(npcType, config,
+                    npcDataManager, npcManager);
 
-        // ── Jack Sparrow ─────────────────────────────────────────
-        VillagerConfig jackConfig = new VillagerConfig(this, "jacksparrow");
-        VillagerGUI    jackGUI    = new VillagerGUI(CityNPC.JACKSPARROW,
-                jackConfig, npcDataManager, npcManager);
+            QuestConfig questConfig = new QuestConfig(this, npcType.skinId);
+            QuestGUI    questGUI    = new QuestGUI(npcType, questConfig,
+                    questManager, npcDataManager);
 
-        QuestConfig jackQuestConfig = new QuestConfig(this, "jacksparrow");
-        QuestGUI    jackQuestGUI    = new QuestGUI(CityNPC.JACKSPARROW,
-                jackQuestConfig, questManager, npcDataManager);
+            questGUIs.add(questGUI);
+            villagerConfigMap.put(npcType, config);
 
-        getServer().getPluginManager().registerEvents(
-                new VillagerListener(CityNPC.JACKSPARROW, jackGUI, npcManager,
-                        npcDataManager, economy, cityManager, introManager,
-                        jackQuestGUI, this), this);
+            getServer().getPluginManager().registerEvents(
+                    new VillagerListener(npcType, gui, npcManager,
+                            npcDataManager, economy, cityManager, introManager,
+                            questGUI, this, notificationManager, buildingManager), this);
+        }
 
-        // ── QuestListener global ─────────────────────────────────
-        Map<CityNPC, VillagerConfig> villagerConfigMap = new java.util.HashMap<>();
-        villagerConfigMap.put(CityNPC.STONEMASON, stonemasonConfig);
-        villagerConfigMap.put(CityNPC.JACKSPARROW, jackConfig);
-
-        // ── HUD Quest ────────────────────────────────────────────
-        QuestHUD questHUD = new QuestHUD(this, questManager, npcDataManager,
-                List.of(stonemasonQuestGUI, jackQuestGUI));
+        // ── HUD Quest ─────────────────────────────────────────────
+        QuestHUD questHUD = new QuestHUD(this, questManager,
+                npcDataManager, questGUIs);
         questHUD.startUpdating();
 
         getServer().getPluginManager().registerEvents(
-                new QuestListener(
-                        List.of(stonemasonQuestGUI, jackQuestGUI),
-                        questManager, npcDataManager, economy,
-                        this, villagerConfigMap, questHUD), this);
+                new QuestListener(questGUIs, questManager, npcDataManager,
+                        economy, this, villagerConfigMap, questHUD,
+                        npcManager, notificationManager), this);
 
         // ── Commandes ────────────────────────────────────────────
         var cityCmd = getCommand("city");
         cityCmd.setExecutor(new CityCommand(cityManager, npcManager, this,
-                npcDataManager, questHUD, buildingManager, buildingSession, buildingGUI, buildingBorderTask));
+                npcDataManager, questHUD, buildingManager, buildingSession, buildingGUI, buildingBorderTask, notificationManager));
         cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager, npcManager));
 
         // ── Listeners globaux ────────────────────────────────────
@@ -127,7 +121,7 @@ public class CityCore extends JavaPlugin {
         Bukkit.getScheduler().runTaskLater(this, () ->
                 npcManager.restoreNPCs(), 20L);
 
-        new NPCCityArrivalTask(npcManager, npcDataManager, cityManager, this, buildingManager).start();
+        new NPCCityArrivalTask(npcManager, npcDataManager, cityManager, this, buildingManager, notificationManager).start();
 
         // ── WorldEdit ────────────────────────────────────
         getServer().getMessenger().registerOutgoingPluginChannel(

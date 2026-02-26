@@ -20,6 +20,7 @@ import java.util.UUID;
 public class NPCManager {
 
     private final JavaPlugin plugin;
+    private final Set<CityNPC> wanderingNPCs = new HashSet<>();
 
     public NPCManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -201,5 +202,22 @@ public class NPCManager {
     public void removeAndReset(CityNPC type) {
         NPC npc = getNPC(type);
         if (npc != null) npc.destroy();
+    }
+
+    public boolean isWandering(CityNPC type) {
+        return wanderingNPCs.contains(type);
+    }
+
+    public void setWandering(CityNPC type, boolean wandering) {
+        if (wandering) {
+            wanderingNPCs.add(type);
+        } else {
+            wanderingNPCs.remove(type);
+            // Stop la navigation en cours
+            NPC npc = getNPC(type);
+            if (npc != null && npc.isSpawned()) {
+                npc.getNavigator().cancelNavigation();
+            }
+        }
     }
 }

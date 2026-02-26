@@ -2,6 +2,8 @@ package com.citycore.quest;
 
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
+import com.citycore.npc.NPCManager;
+import com.citycore.npc.NPCNotificationManager;
 import com.citycore.npc.villager.VillagerConfig;
 import com.citycore.npc.villager.VillagerGUI;
 import net.milkbowl.vault.economy.Economy;
@@ -29,12 +31,14 @@ public class QuestListener implements Listener {
     private final Economy         economy;
     private final JavaPlugin      plugin;
     private final QuestHUD questHUD;
+    private final NPCManager npcManager;
+    private final NPCNotificationManager notificationManager;
 
     private final Map<CityNPC, VillagerConfig> villagerConfigs;
 
     public QuestListener(List<QuestGUI> questGUIs, QuestManager questManager,
                          NPCDataManager dataManager, Economy economy,
-                         JavaPlugin plugin, Map<CityNPC, VillagerConfig> villagerConfigs, QuestHUD questHUD) {
+                         JavaPlugin plugin, Map<CityNPC, VillagerConfig> villagerConfigs, QuestHUD questHUD, NPCManager npcManager, NPCNotificationManager notificationManager) {
         this.questGUIs    = questGUIs;
         this.questManager = questManager;
         this.dataManager  = dataManager;
@@ -42,6 +46,8 @@ public class QuestListener implements Listener {
         this.plugin       = plugin;
         this.villagerConfigs = villagerConfigs;
         this.questHUD = questHUD;
+        this.npcManager      = npcManager;
+        this.notificationManager = notificationManager;
     }
 
     /* =========================
@@ -100,6 +106,8 @@ public class QuestListener implements Listener {
 
         if (allPresent) {
             questManager.markReadyToValidate(player.getUniqueId(), npc, isSpecial);
+            notificationManager.notifyAll(npc,
+                    plugin.getServer(), npcManager);
             player.sendMessage("§a✅ Vous avez tout ce qu'il faut !");
             player.sendMessage("§7Retournez voir §e" + npc.displayName
                     + " §7pour valider votre quête !");

@@ -9,7 +9,8 @@ public record Building(
         String npcTag,
         Double npcX,
         Double npcY,
-        Double npcZ
+        Double npcZ,
+        Float npcYaw
 ) {
     public boolean hasNpcPoint() {
         return npcX != null && npcY != null && npcZ != null;
