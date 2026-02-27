@@ -13,12 +13,15 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
@@ -307,28 +310,26 @@ public class VillagerListener implements Listener {
             Material mat = event.getCurrentItem().getType();
             if (mat == Material.ORANGE_STAINED_GLASS_PANE || mat == Material.BARRIER) return;
 
-            int buybackPrice = gui.getConfig().getCityBuybackPrice(mat);
-            int stock        = dataManager.getInventoryAmount(npcType, mat);
+            int stock = dataManager.getInventoryAmount(npcType, mat);
 
             if (stock < 64) {
                 player.sendMessage("§c❌ Stock insuffisant (moins d'un stack).");
                 return;
             }
 
-            // Débite la caisse de la ville
-            if (!cityManager.canAfford(buybackPrice)) {
-                player.sendMessage("§c❌ La caisse de la ville n'a pas assez de coins.");
-                player.sendMessage("§7Nécessaire : §6" + buybackPrice + " coins");
-                return;
-            }
-
-            cityManager.removeCityCoins(buybackPrice);
             dataManager.removeFromInventory(npcType, mat, 64);
 
-            // Donne le stack au joueur
-            player.getInventory().addItem(new ItemStack(mat, 64));
-            player.sendMessage("§a✅ Racheté 1 stack de §f" + formatName(mat) + "§a !");
-            player.sendMessage("§7Caisse ville : §6-" + buybackPrice + " coins");
+            ItemStack retrieved = new ItemStack(mat, 64);
+            ItemMeta meta = retrieved.getItemMeta();
+            // Tag via PersistentDataContainer (API Bukkit standard, pas besoin de NMS)
+            meta.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "buyback"),
+                    PersistentDataType.BYTE,
+                    (byte) 1
+            );
+            retrieved.setItemMeta(meta);
+            player.getInventory().addItem(retrieved);
+            player.sendMessage("§a✅ Récupéré 1 stack de §f" + formatName(mat) + "§a !");
 
             gui.openInventory(player);
             return;
@@ -360,16 +361,20 @@ public class VillagerListener implements Listener {
 
             if (item == null) return;
 
-            if (!economy.has(player, item.price())) {
+            boolean hasJob   = npcType == playerDataManager.getJob(player.getUniqueId());
+            int finalPrice   = hasJob
+                    ? gui.getConfig().applyJobDiscount(item.price())
+                    : item.price();
+
+            if (!economy.has(player, finalPrice)) {
                 player.sendMessage("§c❌ Fonds insuffisants. Nécessaire : §f"
-                        + item.price() + " coins");
+                        + finalPrice + " coins");
                 return;
             }
-
-            economy.withdrawPlayer(player, item.price());
+            economy.withdrawPlayer(player, finalPrice);
             player.getInventory().addItem(new ItemStack(mat, item.quantity()));
 
-            int xpGained = item.price() * gui.getConfig().getXpPerCoin();
+            int xpGained = finalPrice * gui.getConfig().getXpPerCoin(); // XP basé sur le prix payé
             boolean levelUp = dataManager.addXP(npcType, xpGained,
                     gui.getConfig().getXpThresholds());
 

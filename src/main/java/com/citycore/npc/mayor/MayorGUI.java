@@ -22,10 +22,9 @@ import java.util.List;
 
 public class MayorGUI implements NPCGui {
 
-    public static final String GUI_TITLE = ChatColor.GOLD + "Alderic — Maire";
+    public static final String GUI_TITLE = ChatColor.GOLD + CityNPC.MAYOR.displayName + " — Maire";
 
     public static final int SLOT_INFO      = 0;
-    public static final int SLOT_QUESTS    = 1;
     public static final int SLOT_BUILDINGS = 2;
     public static final int SLOT_ECONOMY   = 4;
     public static final int SLOT_EXPAND    = 6;
@@ -59,23 +58,7 @@ public class MayorGUI implements NPCGui {
     @Override
     public void handleClick(Player player, int slot) {
         switch (slot) {
-            case SLOT_INFO -> {
-                player.closeInventory();
-                City city = cityManager.getCity();
-                if (city == null) return;
-                player.sendMessage("§8§m--------------------");
-                player.sendMessage("§6 " + CityNPC.MAYOR.displayName
-                        + " §8— §e" + city.getName());
-                player.sendMessage("§8§m--------------------");
-                player.sendMessage("§eNiveau  : §f" + city.getLevel());
-                player.sendMessage("§eCaisse  : §6" + city.getCoins() + " coins");
-                player.sendMessage("§eChunks  : §f" + city.getClaimedChunks()
-                        + " §7/ §f" + city.getMaxChunks());
-                player.sendMessage("§eExpand  : §6" + cityManager.getNextExpandPrice()
-                        + " coins §7pour +1 slot");
-                player.sendMessage("§8§m--------------------");
-            }
-            case SLOT_QUESTS    -> questGUI.open(player);
+            case SLOT_INFO -> questGUI.open(player);
             case SLOT_BUILDINGS -> buildingGUI.open(player);
             case SLOT_ECONOMY   -> economyGUI.open(player);
             case SLOT_EXPAND -> {
@@ -131,19 +114,21 @@ public class MayorGUI implements NPCGui {
                         "", "§eCliquez pour afficher"
                 )));
 
-        // ── QUÊTES ───────────────────────────────────────────────
-        inv.setItem(SLOT_QUESTS, makeItem(
-                tierComplete ? Material.NETHER_STAR : Material.WRITABLE_BOOK,
-                tierComplete ? "§a📜 Quêtes §l[PRÊT]" : "§e📜 Quêtes de la ville",
+        // ── INFO + QUÊTES (fusionné) ─────────────────────────────
+        inv.setItem(SLOT_INFO, makeItem(
+                tierComplete ? Material.NETHER_STAR : Material.BOOK,
+                tierComplete ? "§6📖 Infos de la ville §l[PRÊT]" : "§6📖 Infos de la ville",
                 List.of(
-                        "§7Palier actuel : " + tier.tierName,
-                        "§7Niveau ville  : §f" + tier.level,
+                        "§7Niveau  : §f" + city.getLevel(),
+                        "§7Palier  : " + tier.tierName,
+                        "§7Taille  : §f" + city.getClaimedChunks()
+                                + " §7/ §f" + city.getMaxChunks(),
                         "",
                         tierComplete
                                 ? "§a✔ Toutes les quêtes complètes !"
-                                : "§7Consultez la progression.",
+                                : "§7Quêtes du palier disponibles.",
                         "",
-                        "§eCliquez pour ouvrir"
+                        "§eCliquez pour ouvrir les quêtes"
                 )));
 
         // ── BÂTIMENTS ────────────────────────────────────────────
@@ -179,8 +164,8 @@ public class MayorGUI implements NPCGui {
                 following ? Material.REDSTONE : Material.LIME_DYE,
                 following ? "§c⛔ Arrêter de suivre" : "§a👣 Demander de suivre",
                 List.of(
-                        following ? "§7Alderic arrêtera de vous suivre."
-                                : "§7Alderic vous suivra à ~2 blocs.",
+                        following ? "§7" + CityNPC.MAYOR.displayName + " arrêtera de vous suivre."
+                                : "§7" + CityNPC.MAYOR.displayName + " vous suivra",
                         "", "§eCliquez pour "
                                 + (following ? "arrêter" : "activer")
                 )));

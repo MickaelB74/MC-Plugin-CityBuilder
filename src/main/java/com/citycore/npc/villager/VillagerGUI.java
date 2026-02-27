@@ -8,11 +8,14 @@ import com.citycore.npc.NPCState;
 import com.citycore.player.PlayerDataManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,14 +52,16 @@ public class VillagerGUI {
     private final NPCDataManager dataManager;
     private final NPCManager     npcManager;
     private final PlayerDataManager playerDataManager;
+    private final JavaPlugin plugin;
 
     public VillagerGUI(CityNPC npcType, VillagerConfig config,
-                       NPCDataManager dataManager, NPCManager npcManager, PlayerDataManager playerDataManager) {
+                       NPCDataManager dataManager, NPCManager npcManager, PlayerDataManager playerDataManager, JavaPlugin javaPlugin) {
         this.npcType     = npcType;
         this.config      = config;
         this.dataManager = dataManager;
         this.npcManager  = npcManager;
         this.playerDataManager = playerDataManager;
+        this.plugin = javaPlugin;
     }
 
     /* =========================
@@ -275,14 +280,37 @@ public class VillagerGUI {
             lore.add("§7Vos stocks : §f" + playerCount
                     + " §7(" + fullSets + "x" + sp.quantity() + ")");
             lore.add("§7Valeur totale : §6" + total + " coins");
+            boolean hasJob = npcType == playerDataManager.getJob(player.getUniqueId());
+            if (hasJob) {
+                int bonus = (int) Math.round(fullSets * sp.quantity() * config.getJobInventoryMultiplier());
+                lore.add("§a💼 Bonus job : §f+"
+                        + (bonus - fullSets * sp.quantity()) + " items stockés");
+            }
             lore.add("");
             lore.add(fullSets > 0 ? "§eCliquez pour vendre" : "§cPas assez d'items");
+
+            int taggedCount = countTaggedMaterial(player, mat); // méthode miroir qui compte les tagués
+            if (taggedCount > 0) {
+                lore.add("§c⚠ " + taggedCount + " item(s) récupérés §cnon revendables");
+            }
 
             inv.setItem(slot++, makeItem(mat, "§f" + formatName(mat), lore));
         }
 
         inv.setItem(SLOT_BACK, makeItem(Material.ARROW, "§7← Retour", List.of()));
         player.openInventory(inv);
+    }
+
+    private int countTaggedMaterial(Player player, Material mat) {
+        NamespacedKey key = new NamespacedKey(plugin, "buyback");
+        int count = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != mat) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null && meta.getPersistentDataContainer()
+                    .has(key, PersistentDataType.BYTE)) count += item.getAmount();
+        }
+        return count;
     }
 
     /* =========================
@@ -300,7 +328,6 @@ public class VillagerGUI {
             if (slot == SLOT_BACK) slot++;
             Material mat     = entry.getKey();
             int amount       = entry.getValue();
-            int buybackPrice = config.getCityBuybackPrice(mat);
             int stackCount   = amount / 64;
             int remainder    = amount % 64;
 
@@ -308,12 +335,10 @@ public class VillagerGUI {
             lore.add("§7Stock : §f" + amount + " §7(" + stackCount + " stacks"
                     + (remainder > 0 ? " + " + remainder : "") + ")");
             lore.add("");
-            lore.add("§7Rachat ville : §6" + buybackPrice + " coins§7/stack");
-            lore.add("§7(§c-" + (int)((1 - config.getCityBuybackRatio()) * 100)
-                    + "% §7du prix vente)");
+            lore.add("§aRachat : §fGratuit");
             lore.add("");
             lore.add(stackCount > 0
-                    ? "§eCliquez pour racheter (1 stack)"
+                    ? "§eCliquez pour récupérer (1 stack)"
                     : "§cStock insuffisant");
 
             inv.setItem(slot++, makeItem(mat, "§f" + formatName(mat), lore));
@@ -360,7 +385,15 @@ public class VillagerGUI {
             lore.add("");
 
             if (unlocked) {
-                lore.add("§7Prix : §6" + item.price() + " coins");
+                boolean hasJob = npcType == playerDataManager.getJob(player.getUniqueId());
+                int finalPrice = hasJob ? config.applyJobDiscount(item.price()) : item.price();
+
+                if (hasJob && finalPrice < item.price()) {
+                    lore.add("§7Prix : §4§m" + item.price() + "§r §6" + finalPrice + " coins");
+                    lore.add("§a💼 Réduction employé : §f-" + config.getJobShopDiscount() + "%");
+                } else {
+                    lore.add("§7Prix : §6" + finalPrice + " coins");
+                }
                 lore.add("§7Quantité : §fx" + item.quantity());
                 lore.add("");
                 lore.add("§eCliquez pour acheter");
@@ -404,6 +437,7 @@ public class VillagerGUI {
         int fullSets   = totalCount / sp.quantity();
         if (fullSets == 0) return -1;
 
+        // Retire les items du joueur (inchangé)
         int toRemove = fullSets * sp.quantity();
         for (ItemStack item : player.getInventory().getContents()) {
             if (item == null || item.getType() != mat || toRemove <= 0) continue;
@@ -412,8 +446,16 @@ public class VillagerGUI {
             toRemove -= take;
         }
 
-        int earned = fullSets * sp.price();
-        dataManager.addToInventory(npcType, mat, fullSets * sp.quantity());
+        int earned        = fullSets * sp.price();
+        int itemsSold     = fullSets * sp.quantity();
+
+        // Bonus job : le NPC reçoit plus d'items si le joueur travaille pour lui
+        boolean hasJob = npcType == playerDataManager.getJob(player.getUniqueId());
+        int itemsToStock = hasJob
+                ? (int) Math.round(itemsSold * config.getJobInventoryMultiplier())
+                : itemsSold;
+
+        dataManager.addToInventory(npcType, mat, itemsToStock);
         return earned;
     }
 
@@ -463,9 +505,14 @@ public class VillagerGUI {
     }
 
     private int countMaterial(Player player, Material mat) {
+        NamespacedKey key = new NamespacedKey(plugin, "buyback");
         int count = 0;
         for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && item.getType() == mat) count += item.getAmount();
+            if (item == null || item.getType() != mat) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null && meta.getPersistentDataContainer()
+                    .has(key, PersistentDataType.BYTE)) continue; // item racheté, ignoré
+            count += item.getAmount();
         }
         return count;
     }

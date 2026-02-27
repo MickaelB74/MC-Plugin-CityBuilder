@@ -1,11 +1,28 @@
 # ============================================================
+#  Configuration de l'expansion de la ville (slots de chunks)
+# ============================================================
+city-expand:
+  # Prix de base pour le premier slot acheté (hors slots offerts)
+  base-price: 200
+  # Multiplicateur appliqué à chaque slot supplémentaire
+  # ex: 1.5 → slot 1 = 200, slot 2 = 300, slot 3 = 450...
+  multiplier: 1.5
+  # Prix maximum plafonné (le multiplicateur n'agit plus au-delà)
+  max-price: 5000
+  # Nombre de slots offerts lors de la première rencontre avec le maire
+  free-chunks: 8
+
+# ============================================================
 #  CityCore - Configuration des NPCs villageois
 # ============================================================
 
 npc-settings:
-  # Pourcentage appliqué au prix de vente pour le rachat ville
-  # 0.5 = -50% (prix de vente * 0.5)
-  city-buyback-ratio: 0.5
+  # Multiplicateur d'items donnés au NPC quand le joueur a le job correspondant
+  # ex: 1.5 → le NPC reçoit 50% d'items en plus (le joueur en vend autant, le NPC en stocke plus)
+  job-inventory-multiplier: 1.5
+  # Réduction en % sur les achats en boutique pour le joueur qui travaille pour ce NPC
+  # ex: 20 → -20% sur le prix affiché (arrondi à l'entier inférieur, minimum 1 coin)
+  job-shop-discount: 20
 
 # ============================================================
 #  TAILLEUR DE PIERRE - Brennan

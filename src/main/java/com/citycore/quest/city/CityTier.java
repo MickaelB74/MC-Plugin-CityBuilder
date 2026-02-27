@@ -16,34 +16,18 @@ public enum CityTier {
             CityQuest.standard(
                     "t1_claim_chunks",
                     "§7Étendre le territoire",
-                    "Claimez §f3 chunks §7pour agrandir votre village.",
+                    "Claimez §f8 chunks §7pour definir les limites de votre village.",
                     Material.GRASS_BLOCK,
                     CityQuestType.CLAIM_CHUNKS,
-                    3
+                    8
             ),
             CityQuest.standard(
                     "t1_build_building",
                     "§7Premier bâtiment",
-                    "Construisez §f1 bâtiment §7dans la ville.",
+                    "Construisez §fl'hotel de ville §7pour §6" + CityNPC.MAYOR.displayName,
                     Material.BRICKS,
                     CityQuestType.BUILD_BUILDINGS,
                     1
-            ),
-            CityQuest.standard(
-                    "t1_deposit_coins",
-                    "§7Fonds de départ",
-                    "Déposez §f200 coins §7dans la caisse de la ville.",
-                    Material.GOLD_NUGGET,
-                    CityQuestType.DEPOSIT_COINS,
-                    200
-            ),
-            CityQuest.findNpc(
-                    "t2_find_npc",
-                    "§aPremier habitant",
-                    "Trouvez §e" + CityNPC.STONEMASON.displayName + " §7et ramenez-le en ville.",
-                    Material.COMPASS,
-                    CityNPC.STONEMASON,
-                    300
             )
     )),
 
@@ -71,6 +55,14 @@ public enum CityTier {
                     Material.GOLD_INGOT,
                     CityQuestType.DEPOSIT_COINS,
                     1000
+            ),
+            CityQuest.findNpc(
+                    "t2_find_npc",
+                    "§aPremier habitant",
+                    "Trouvez §e" + CityNPC.STONEMASON.displayName + " §7et ramenez-le en ville.",
+                    Material.COMPASS,
+                    CityNPC.STONEMASON,
+                    300
             )
     )),
 

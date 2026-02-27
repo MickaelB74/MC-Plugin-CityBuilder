@@ -74,6 +74,7 @@ public class NPCCityArrivalTask {
 
         // ✅ Transition WANDERER → ARRIVED
         dataManager.setState(type, NPCState.ARRIVED);
+        cityManager.addResident();
         findNpcQuestManager.onNpcArrived(type);
         npcManager.setWandering(type, true);
         notificationManager.notifyAll(type,

@@ -173,7 +173,7 @@ public class NPCManager {
 
         npc.getNavigator().getDefaultParameters()
                 .range(50f)
-                .speedModifier(0.8f)
+                .speedModifier(1f)
                 .distanceMargin(2.0);
 
         npc.getNavigator().setTarget(player, false);

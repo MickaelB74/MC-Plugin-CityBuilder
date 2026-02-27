@@ -58,7 +58,7 @@ public class CityCore extends JavaPlugin {
         ChatInputManager.init(this);
 
         // ── Managers de base ─────────────────────────────────────
-        cityManager         = new CityManager(databaseManager);
+        cityManager         = new CityManager(databaseManager, this);
         npcManager          = new NPCManager(this);
         notificationManager = new NPCNotificationManager(databaseManager);
         playerDataManager   = new PlayerDataManager(databaseManager);
@@ -104,7 +104,7 @@ public class CityCore extends JavaPlugin {
         guiRegistry.register(CityNPC.MAYOR, mayorGUI);
 
         getServer().getPluginManager().registerEvents(
-                new MayorListener(npcManager, guiRegistry, introManager, this), this);
+                new MayorListener(npcManager, guiRegistry, introManager, cityManager, this), this);
 
         // ── NPCs génériques ───────────────────────────────────────
         Map<CityNPC, VillagerConfig> villagerConfigMap = new HashMap<>();
@@ -115,7 +115,7 @@ public class CityCore extends JavaPlugin {
 
             VillagerConfig config     = new VillagerConfig(this, npcType.skinId);
             VillagerGUI    gui        = new VillagerGUI(npcType, config,
-                    npcDataManager, npcManager, playerDataManager);
+                    npcDataManager, npcManager, playerDataManager, this);
             QuestConfig    questConfig = new QuestConfig(this, npcType.skinId);
             QuestGUI       questGUI   = new QuestGUI(npcType, questConfig,
                     questManager, npcDataManager);

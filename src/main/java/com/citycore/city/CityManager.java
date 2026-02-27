@@ -2,6 +2,7 @@ package com.citycore.city;
 
 import com.citycore.util.DatabaseManager;
 import org.bukkit.Chunk;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,11 +13,16 @@ import java.util.List;
 public class CityManager {
 
     private final DatabaseManager db;
+    private final JavaPlugin plugin;
 
-    private static final int EXPAND_BASE_PRICE = 200;
+    private static final int    DEFAULT_BASE_PRICE   = 200;
+    private static final double DEFAULT_MULTIPLIER   = 1.5;
+    private static final int    DEFAULT_MAX_PRICE    = 5000;
+    private static final int    DEFAULT_FREE_CHUNKS  = 8;
 
-    public CityManager(DatabaseManager db) {
-        this.db = db;
+    public CityManager(DatabaseManager db, JavaPlugin plugin) {
+        this.db     = db;
+        this.plugin = plugin;
     }
 
     /* =========================
@@ -156,7 +162,22 @@ public class CityManager {
        ========================= */
 
     public int getNextExpandPrice() {
-        return EXPAND_BASE_PRICE * getMaxChunks();
+        var cfg          = plugin.getConfig();
+        int  basePrice   = cfg.getInt("city-expand.base-price",  DEFAULT_BASE_PRICE);
+        double mult      = cfg.getDouble("city-expand.multiplier", DEFAULT_MULTIPLIER);
+        int  maxPrice    = cfg.getInt("city-expand.max-price",   DEFAULT_MAX_PRICE);
+        int  freeChunks  = cfg.getInt("city-expand.free-chunks", DEFAULT_FREE_CHUNKS);
+
+        // Nombre de slots déjà achetés (hors slots gratuits)
+        int paidSlots = Math.max(0, getMaxChunks() - freeChunks);
+
+        // Prix = basePrice * multiplier^paidSlots, plafonné à maxPrice
+        double price = basePrice * Math.pow(mult, paidSlots);
+        return Math.min(maxPrice, (int) Math.round(price));
+    }
+
+    public int getFreeChunks() {
+        return plugin.getConfig().getInt("city-expand.free-chunks", DEFAULT_FREE_CHUNKS);
     }
 
     public ExpandResult expandMaxChunks() {
@@ -344,5 +365,17 @@ public class CityManager {
             e.printStackTrace();
         }
         return "Ville";
+    }
+
+    public void addMaxChunks(int amount) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET max_chunks = max_chunks + ? WHERE id = 1");
+            ps.setInt(1, amount);
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }

@@ -72,7 +72,7 @@ public class CityCoreHUD {
                 .append(Component.newline())
                 .append(Component.text("Niveau : ", NamedTextColor.GRAY))
                 .append(Component.text(playerLevel, NamedTextColor.YELLOW))
-                .append(Component.text(" §8(" + playerXP + "/" + xpRequired + " XP)", NamedTextColor.DARK_GRAY))
+                .append(Component.text(" §b(" + playerXP + "/" + xpRequired + " XP)", NamedTextColor.DARK_GRAY))
                 .append(Component.text("   Argent : ", NamedTextColor.GRAY))
                 .append(Component.text(coins + " 🪙", NamedTextColor.GOLD))
                 .append(Component.text("   Métier : ", NamedTextColor.GRAY))

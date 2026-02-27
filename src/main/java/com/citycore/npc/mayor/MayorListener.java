@@ -1,5 +1,6 @@
 package com.citycore.npc.mayor;
 
+import com.citycore.city.CityManager;
 import com.citycore.npc.*;
 import com.citycore.quest.city.CityTier;
 import com.citycore.util.TypewriterUtil;
@@ -16,12 +17,14 @@ public class MayorListener implements Listener {
     private final NPCGuiRegistry      guiRegistry;
     private final IntroductionManager introManager;
     private final JavaPlugin          plugin;
+    private final CityManager cityManager;
 
     public MayorListener(NPCManager npcManager, NPCGuiRegistry guiRegistry,
-                         IntroductionManager introManager, JavaPlugin plugin) {
+                         IntroductionManager introManager, CityManager cityManager, JavaPlugin plugin) {
         this.npcManager   = npcManager;
         this.guiRegistry  = guiRegistry;
         this.introManager = introManager;
+        this.cityManager  = cityManager;
         this.plugin       = plugin;
     }
 
@@ -37,8 +40,19 @@ public class MayorListener implements Listener {
 
         if (!introManager.hasSeenIntro(player.getUniqueId(), type)) {
             introManager.markIntroSeen(player.getUniqueId(), type);
-            TypewriterUtil.play(plugin, player, type.getDialogue("first_meeting"),
-                    () -> { if (player.isOnline()) gui.open(player); });
+            TypewriterUtil.play(plugin, player, type.getDialogue("first_meeting"), () -> {
+                if (!player.isOnline()) return;
+
+                // ── Récompenses première rencontre (MAYOR uniquement) ──
+                if (type == CityNPC.MAYOR) {
+                    cityManager.addMaxChunks(cityManager.getFreeChunks());
+                    cityManager.addCityCoins(100);
+                    player.sendMessage("§6" + CityNPC.MAYOR.displayName + " §f: §o« Voici de quoi commencer... »");
+                    player.sendMessage("§a✅ La ville a gagné §f+8 slots de chunk §aet §6+100 coins§a.");
+                }
+
+                gui.open(player);
+            });
         } else {
             gui.open(player);
         }

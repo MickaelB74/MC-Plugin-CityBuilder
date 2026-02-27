@@ -16,7 +16,8 @@ public class VillagerConfig {
     private final Map<Integer, List<ShopItem>>     shopItems    = new LinkedHashMap<>();
     private int    xpPerStack;
     private int    xpPerCoin;
-    private double cityBuybackRatio;
+    private double jobInventoryMultiplier;
+    private int jobShopDiscount;
 
     public VillagerConfig(JavaPlugin plugin, String configKey) {
         this.plugin    = plugin;
@@ -32,7 +33,8 @@ public class VillagerConfig {
         plugin.saveDefaultConfig();
         var config = plugin.getConfig();
 
-        cityBuybackRatio = config.getDouble("npc-settings.city-buyback-ratio", 0.5);
+        jobInventoryMultiplier = config.getDouble("npc-settings.job-inventory-multiplier", 1.0);
+        jobShopDiscount = config.getInt("npc-settings.job-shop-discount", 0);
         xpPerStack       = config.getInt(configKey + ".xp-per-stack", 10);
         xpPerCoin        = config.getInt(configKey + ".xp-per-coin", 1);
 
@@ -94,13 +96,8 @@ public class VillagerConfig {
     public boolean                      isSellable(Material mat)     { return sellPrices.containsKey(mat); }
     public int                          getXpPerStack()              { return xpPerStack; }
     public int                          getXpPerCoin()               { return xpPerCoin; }
-    public double                       getCityBuybackRatio()        { return cityBuybackRatio; }
-
-    public int getCityBuybackPrice(Material mat) {
-        SellPrice sp = sellPrices.get(mat);
-        if (sp == null) return 0;
-        return (int) Math.max(1, sp.price() * cityBuybackRatio);
-    }
+    public double                       getJobInventoryMultiplier()  { return jobInventoryMultiplier; }
+    public int                          getJobShopDiscount()         { return jobShopDiscount; }
 
     // ── Records ──────────────────────────────────────────────────
 
@@ -109,4 +106,11 @@ public class VillagerConfig {
 
     /** Item de la boutique */
     public record ShopItem(Material material, int price, int quantity) {}
+
+
+    // ── Méthode utilitaire ───────────────────────────────────────
+    public int applyJobDiscount(int price) {
+        if (jobShopDiscount <= 0) return price;
+        return Math.max(1, (int) Math.floor(price * (1.0 - jobShopDiscount / 100.0)));
+    }
 }

@@ -333,6 +333,7 @@ public class CityCommand implements CommandExecutor {
                             npcManager.removeAndReset(target);
                             npcDataManager.resetNPC(target);
                             buildingManager.unassignNPCByTag(target.tag);
+                            cityManager.removeResident();
                             player.sendMessage("§a✅ §e" + target.displayName
                                     + " §asupprimé et remis à zéro !");
                         }
