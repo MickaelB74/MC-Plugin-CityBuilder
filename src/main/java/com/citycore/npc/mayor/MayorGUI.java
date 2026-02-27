@@ -1,10 +1,14 @@
 package com.citycore.npc.mayor;
 
+import com.citycore.building.BuildingManager;
 import com.citycore.city.City;
 import com.citycore.city.CityManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCGui;
 import com.citycore.npc.NPCManager;
+import com.citycore.quest.city.CityQuestManager;
+import com.citycore.quest.city.CityTier;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -20,66 +24,87 @@ public class MayorGUI implements NPCGui {
 
     public static final String GUI_TITLE = ChatColor.GOLD + "Alderic — Maire";
 
-    public static final int SLOT_INFO    = 2;
-    public static final int SLOT_FOLLOW  = 4;
-    public static final int SLOT_EXPAND  = 6;
+    public static final int SLOT_INFO      = 0;
+    public static final int SLOT_QUESTS    = 1;
+    public static final int SLOT_BUILDINGS = 2;
+    public static final int SLOT_ECONOMY   = 4;
+    public static final int SLOT_EXPAND    = 6;
+    public static final int SLOT_FOLLOW    = 8;
 
-    private final CityManager cityManager;
-    private final NPCManager npcManager;
+    private final CityManager      cityManager;
+    private final NPCManager       npcManager;
+    private final MayorBuildingGUI buildingGUI;
+    private final MayorEconomyGUI  economyGUI;
+    private final MayorQuestGUI    questGUI;
+    private final CityQuestManager cityQuestManager;
 
-    public MayorGUI(CityManager cityManager, NPCManager npcManager) {
-        this.cityManager = cityManager;
-        this.npcManager  = npcManager;
+    public MayorGUI(CityManager cityManager, NPCManager npcManager,
+                    BuildingManager buildingManager, Economy economy,
+                    MayorQuestGUI questGUI, CityQuestManager cityQuestManager) {
+        this.cityManager      = cityManager;
+        this.npcManager       = npcManager;
+        this.buildingGUI      = new MayorBuildingGUI(buildingManager);
+        this.economyGUI       = new MayorEconomyGUI(cityManager, economy, cityQuestManager);
+        this.questGUI         = questGUI;
+        this.cityQuestManager = cityQuestManager;
     }
 
+    public MayorBuildingGUI getBuildingGUI()    { return buildingGUI; }
+    public MayorEconomyGUI  getEconomyGUI()     { return economyGUI; }
+    public MayorQuestGUI    getQuestGUI()        { return questGUI; }
+    public CityQuestManager getCityQuestManager(){ return cityQuestManager; }
 
-    @Override
-    public String getTitle() {
-        return GUI_TITLE;
-    }
+    @Override public String getTitle() { return GUI_TITLE; }
 
     @Override
     public void handleClick(Player player, int slot) {
         switch (slot) {
-            case MayorGUI.SLOT_INFO -> {
+            case SLOT_INFO -> {
                 player.closeInventory();
-                com.citycore.city.City city = cityManager.getCity();
+                City city = cityManager.getCity();
                 if (city == null) return;
                 player.sendMessage("§8§m--------------------");
-                player.sendMessage("§6 " + CityNPC.MAYOR.displayName + " §8— §e" + city.getName());
+                player.sendMessage("§6 " + CityNPC.MAYOR.displayName
+                        + " §8— §e" + city.getName());
                 player.sendMessage("§8§m--------------------");
                 player.sendMessage("§eNiveau  : §f" + city.getLevel());
                 player.sendMessage("§eCaisse  : §6" + city.getCoins() + " coins");
-                player.sendMessage("§eChunks  : §f" + city.getClaimedChunks() + " §7/ §f" + city.getMaxChunks());
-                player.sendMessage("§eExpand  : §6" + cityManager.getNextExpandPrice() + " coins §7pour +1 slot");
+                player.sendMessage("§eChunks  : §f" + city.getClaimedChunks()
+                        + " §7/ §f" + city.getMaxChunks());
+                player.sendMessage("§eExpand  : §6" + cityManager.getNextExpandPrice()
+                        + " coins §7pour +1 slot");
                 player.sendMessage("§8§m--------------------");
             }
-
-            case MayorGUI.SLOT_FOLLOW -> {
-                player.closeInventory();
-                String name = CityNPC.MAYOR.displayName;
-                if (npcManager.isFollowing(player, CityNPC.MAYOR)) {
-                    npcManager.stopFollowing(player, CityNPC.MAYOR);
-                    player.sendMessage(name + " §7s'est arrêté de vous suivre.");
-                } else {
-                    npcManager.startFollowing(player, CityNPC.MAYOR);
-                    player.sendMessage(name + " §avous suit désormais.");
-                }
-                this.open(player);
-            }
-
-            case MayorGUI.SLOT_EXPAND -> {
-                player.closeInventory();
+            case SLOT_QUESTS    -> questGUI.open(player);
+            case SLOT_BUILDINGS -> buildingGUI.open(player);
+            case SLOT_ECONOMY   -> economyGUI.open(player);
+            case SLOT_EXPAND -> {
                 int price = cityManager.getNextExpandPrice();
                 CityManager.ExpandResult result = cityManager.expandMaxChunks();
                 if (result.success()) {
-                    player.sendMessage("§a✅ Capacité étendue ! Max chunks : §f" + result.newMaxChunks());
-                    player.sendMessage("§7Caisse restante : §6" + result.newBalance() + " coins");
+                    player.sendMessage("§a✅ Capacité étendue ! Max : §f"
+                            + result.newMaxChunks());
+                    player.sendMessage("§7Caisse restante : §6"
+                            + result.newBalance() + " coins");
                 } else {
                     int missing = price - cityManager.getCityCoins();
-                    player.sendMessage("§c❌ Fonds insuffisants. Il manque §f" + missing + " coins§c.");
-                    player.sendMessage("§7💡 §e/city deposit <montant> §7pour alimenter la caisse.");
+                    player.sendMessage("§c❌ Fonds insuffisants. Il manque §f"
+                            + missing + " coins§c.");
+                    player.sendMessage("§7💡 §e/city deposit <montant>");
                 }
+                open(player);
+            }
+            case SLOT_FOLLOW -> {
+                if (npcManager.isFollowing(player, CityNPC.MAYOR)) {
+                    npcManager.stopFollowing(player, CityNPC.MAYOR);
+                    player.sendMessage(CityNPC.MAYOR.displayName
+                            + " §7s'est arrêté de vous suivre.");
+                } else {
+                    npcManager.startFollowing(player, CityNPC.MAYOR);
+                    player.sendMessage(CityNPC.MAYOR.displayName
+                            + " §avous suit désormais.");
+                }
+                open(player);
             }
         }
     }
@@ -88,63 +113,84 @@ public class MayorGUI implements NPCGui {
         City city = cityManager.getCity();
         if (city == null) return;
 
+        CityTier tier         = CityTier.fromLevel(cityQuestManager.getCityLevel());
+        boolean  tierComplete = cityQuestManager.isTierComplete(tier);
+
         Inventory inv = Bukkit.createInventory(null, 9, GUI_TITLE);
 
-        // Déco
         ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < 9; i++) inv.setItem(i, filler);
 
-        // Bouton INFO
-        inv.setItem(SLOT_INFO, makeItem(
-                Material.BOOK,
-                "§6📖 Informations",
+        // ── INFO ─────────────────────────────────────────────────
+        inv.setItem(SLOT_INFO, makeItem(Material.BOOK, "§6📖 Informations",
                 List.of(
-                        "§7Niveau  : §f" + city.getLevel(),
-                        "§7Caisse  : §6" + city.getCoins() + " coins",
-                        "§7Chunks  : §f" + city.getClaimedChunks() + " §7/ §f" + city.getMaxChunks(),
-                        "",
-                        "§eCliquez pour afficher"
-                )
-        ));
+                        "§7Niveau : §f" + city.getLevel(),
+                        "§7Caisse : §6" + city.getCoins() + " coins",
+                        "§7Chunks : §f" + city.getClaimedChunks()
+                                + " §7/ §f" + city.getMaxChunks(),
+                        "", "§eCliquez pour afficher"
+                )));
 
-        // Bouton SUIVI (toggle)
+        // ── QUÊTES ───────────────────────────────────────────────
+        inv.setItem(SLOT_QUESTS, makeItem(
+                tierComplete ? Material.NETHER_STAR : Material.WRITABLE_BOOK,
+                tierComplete ? "§a📜 Quêtes §l[PRÊT]" : "§e📜 Quêtes de la ville",
+                List.of(
+                        "§7Palier actuel : " + tier.tierName,
+                        "§7Niveau ville  : §f" + tier.level,
+                        "",
+                        tierComplete
+                                ? "§a✔ Toutes les quêtes complètes !"
+                                : "§7Consultez la progression.",
+                        "",
+                        "§eCliquez pour ouvrir"
+                )));
+
+        // ── BÂTIMENTS ────────────────────────────────────────────
+        inv.setItem(SLOT_BUILDINGS, makeItem(Material.BRICKS, "§a🏗 Bâtiments",
+                List.of("§7Gérez les bâtiments de la ville.",
+                        "", "§eCliquez pour ouvrir")));
+
+        // ── ÉCONOMIE ─────────────────────────────────────────────
+        inv.setItem(SLOT_ECONOMY, makeItem(Material.GOLD_INGOT, "§6💰 Économie",
+                List.of(
+                        "§7Caisse : §6" + cityManager.getCityCoins() + " coins",
+                        "", "§eCliquez pour déposer"
+                )));
+
+        // ── EXPAND ───────────────────────────────────────────────
+        int     price     = cityManager.getNextExpandPrice();
+        int     balance   = cityManager.getCityCoins();
+        boolean canAfford = cityManager.canAfford(price);
+        inv.setItem(SLOT_EXPAND, makeItem(
+                canAfford ? Material.EMERALD : Material.BARRIER,
+                "§6🗺 Agrandir la ville",
+                List.of(
+                        "§7Ajoute §f+1 slot §7de chunk",
+                        "", "§7Prix   : §6" + price + " coins",
+                        "§7Caisse : §6" + balance + " coins",
+                        "", canAfford ? "§aCliquez pour acheter"
+                                : "§cFonds insuffisants"
+                )));
+
+        // ── FOLLOW ───────────────────────────────────────────────
         boolean following = npcManager.isFollowing(player, CityNPC.MAYOR);
         inv.setItem(SLOT_FOLLOW, makeItem(
                 following ? Material.REDSTONE : Material.LIME_DYE,
                 following ? "§c⛔ Arrêter de suivre" : "§a👣 Demander de suivre",
                 List.of(
-                        following
-                                ? "§7Alderic arrêtera de vous suivre."
+                        following ? "§7Alderic arrêtera de vous suivre."
                                 : "§7Alderic vous suivra à ~2 blocs.",
-                        "",
-                        "§eCliquez pour " + (following ? "arrêter" : "activer")
-                )
-        ));
-
-        // Bouton EXPAND
-        int price    = cityManager.getNextExpandPrice();
-        int balance  = cityManager.getCityCoins();
-        boolean canAfford = cityManager.canAfford(price);
-
-        inv.setItem(SLOT_EXPAND, makeItem(
-                canAfford ? Material.EMERALD : Material.BARRIER,
-                "§6🏗 Agrandir la ville",
-                List.of(
-                        "§7Ajoute §f+1 slot §7de chunk",
-                        "",
-                        "§7Prix   : §6" + price + " coins",
-                        "§7Caisse : §6" + balance + " coins",
-                        "",
-                        canAfford ? "§aCliquez pour acheter" : "§cFonds insuffisants"
-                )
-        ));
+                        "", "§eCliquez pour "
+                                + (following ? "arrêter" : "activer")
+                )));
 
         player.openInventory(inv);
     }
 
     private ItemStack makeItem(Material mat, String name, List<String> lore) {
         ItemStack item = new ItemStack(mat);
-        ItemMeta meta  = item.getItemMeta();
+        ItemMeta  meta = item.getItemMeta();
         meta.setDisplayName(name);
         meta.setLore(lore);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);

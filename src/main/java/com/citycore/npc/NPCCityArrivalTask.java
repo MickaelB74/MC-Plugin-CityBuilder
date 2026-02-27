@@ -3,6 +3,7 @@ package com.citycore.npc;
 import com.citycore.building.Building;
 import com.citycore.building.BuildingManager;
 import com.citycore.city.CityManager;
+import com.citycore.quest.city.FindNpcQuestManager;
 import com.citycore.util.TypewriterUtil;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Bukkit;
@@ -25,18 +26,20 @@ public class NPCCityArrivalTask {
     private final CityManager     cityManager;
     private final JavaPlugin      plugin;
     private final BuildingManager buildingManager;
+    private final FindNpcQuestManager findNpcQuestManager;
     private final Random          random = new Random();
 
     private final Set<CityNPC> blockedNPCs = new HashSet<>();
 
     public NPCCityArrivalTask(NPCManager npcManager, NPCDataManager dataManager,
-                              CityManager cityManager, JavaPlugin plugin, BuildingManager buildingManager, NPCNotificationManager notificationManager) {
+                              CityManager cityManager, JavaPlugin plugin, BuildingManager buildingManager, NPCNotificationManager notificationManager, FindNpcQuestManager findNpcQuestManager) {
         this.npcManager      = npcManager;
         this.notificationManager = notificationManager;
         this.dataManager     = dataManager;
         this.cityManager     = cityManager;
         this.plugin          = plugin;
         this.buildingManager = buildingManager;
+        this.findNpcQuestManager = findNpcQuestManager;
     }
 
     public void start() {
@@ -71,6 +74,7 @@ public class NPCCityArrivalTask {
 
         // ✅ Transition WANDERER → ARRIVED
         dataManager.setState(type, NPCState.ARRIVED);
+        findNpcQuestManager.onNpcArrived(type);
         npcManager.setWandering(type, true);
         notificationManager.notifyAll(type,
                 plugin.getServer(), npcManager);

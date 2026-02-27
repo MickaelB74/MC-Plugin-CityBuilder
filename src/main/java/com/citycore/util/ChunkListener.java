@@ -1,23 +1,37 @@
 package com.citycore.util;
 
+import com.citycore.CityCoreHUD;
 import com.citycore.city.City;
 import com.citycore.city.CityManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCManager;
+import com.citycore.quest.city.FindNpcQuestManager;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class ChunkListener implements Listener {
 
     private final CityManager cityManager;
-    private final NPCManager npcManager;
+    private final NPCManager  npcManager;
+    private final CityCoreHUD cityHUD;
+    private final JavaPlugin  plugin;
+    private final FindNpcQuestManager findNpcQuestManager;
 
-    public ChunkListener(CityManager cityManager, NPCManager npcManager) {
+
+    public ChunkListener(CityManager cityManager, NPCManager npcManager,
+                         CityCoreHUD cityHUD, JavaPlugin plugin, FindNpcQuestManager findNpcQuestManager) {
         this.cityManager = cityManager;
-        this.npcManager = npcManager;
+        this.npcManager  = npcManager;
+        this.cityHUD     = cityHUD;
+        this.plugin      = plugin;
+        this.findNpcQuestManager = findNpcQuestManager;
     }
 
     @EventHandler
@@ -46,5 +60,18 @@ public class ChunkListener implements Listener {
         } else if (wasInCity && !isInCity) {
             player.sendActionBar("§c🌲 Quitter le territoire de la ville");
         }
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent e) {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            cityHUD.updatePlayer(e.getPlayer());
+            findNpcQuestManager.onPlayerJoin(e.getPlayer()); // ✅
+        }, 20L);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        cityHUD.clearPlayer(e.getPlayer());
     }
 }

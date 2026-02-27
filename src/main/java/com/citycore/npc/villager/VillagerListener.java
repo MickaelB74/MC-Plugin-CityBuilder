@@ -4,6 +4,7 @@ import com.citycore.building.Building;
 import com.citycore.building.BuildingManager;
 import com.citycore.city.CityManager;
 import com.citycore.npc.*;
+import com.citycore.player.PlayerDataManager;
 import com.citycore.quest.QuestGUI;
 import com.citycore.util.TypewriterUtil;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
@@ -36,11 +37,12 @@ public class VillagerListener implements Listener {
     private final QuestGUI            questGUI;
     private final NPCNotificationManager notificationManager;
     private final BuildingManager buildingManager;
+    private final PlayerDataManager playerDataManager;
 
     public VillagerListener(CityNPC npcType, VillagerGUI gui, NPCManager npcManager,
                             NPCDataManager dataManager, Economy economy,
                             CityManager cityManager, IntroductionManager introManager,
-                            QuestGUI questGUI, JavaPlugin plugin, NPCNotificationManager notificationManager, BuildingManager buildingManager) {
+                            QuestGUI questGUI, JavaPlugin plugin, NPCNotificationManager notificationManager, BuildingManager buildingManager, PlayerDataManager playerDataManager) {
         this.npcType      = npcType;
         this.gui          = gui;
         this.npcManager   = npcManager;
@@ -52,6 +54,7 @@ public class VillagerListener implements Listener {
         this.questGUI     = questGUI;
         this.notificationManager = notificationManager;
         this.buildingManager = buildingManager;
+        this.playerDataManager = playerDataManager;
     }
 
     @EventHandler
@@ -223,6 +226,26 @@ public class VillagerListener implements Listener {
                     gui.open(player);
                 }
                 case VillagerGUI.SLOT_QUESTS -> questGUI.open(player);
+                case VillagerGUI.SLOT_JOB -> {
+                    CityNPC currentJob = playerDataManager.getJob(player.getUniqueId());
+
+                    if (npcType == currentJob) {
+                        // Quitter le job
+                        playerDataManager.clearJob(player.getUniqueId());
+                        player.sendMessage("§7Vous avez quitté votre job chez §e"
+                                + npcType.displayName + "§7.");
+                    } else if (currentJob != null) {
+                        // Déjà un job ailleurs
+                        player.sendMessage("§c❌ Vous travaillez déjà pour §e"
+                                + currentJob.displayName + "§c.");
+                    } else {
+                        // Accepte le job
+                        playerDataManager.setJob(player.getUniqueId(), npcType);
+                        player.sendMessage("§a✅ Vous travaillez maintenant pour §e"
+                                + npcType.displayName + "§a !");
+                    }
+                    gui.open(player);
+                }
             }
             return;
         }
@@ -252,6 +275,18 @@ public class VillagerListener implements Listener {
 
                 boolean levelUp = dataManager.addXP(npcType, xpGained,
                         gui.getConfig().getXpThresholds());
+
+                // ✅ XP joueur — même montant que le NPC
+                int playerLevelsGained = playerDataManager.addXP(
+                        player.getUniqueId(), xpGained);
+
+                if (playerLevelsGained > 0) {
+                    player.sendMessage("§a🎉 §eVous §aêtes passé niveau §e"
+                            + playerDataManager.getLevel(player.getUniqueId()) + "§a !");
+                    player.sendTitle("§6⬆ Niveau "
+                                    + playerDataManager.getLevel(player.getUniqueId()),
+                            "§7" + xpGained + " XP accumulés", 10, 40, 10);
+                }
 
                 player.sendMessage("§a✅ Vendu ! §6+" + earned + " coins §7(§b+" + xpGained + " XP§7)");
                 if (levelUp) {
@@ -337,6 +372,15 @@ public class VillagerListener implements Listener {
             int xpGained = item.price() * gui.getConfig().getXpPerCoin();
             boolean levelUp = dataManager.addXP(npcType, xpGained,
                     gui.getConfig().getXpThresholds());
+
+            // ✅ XP joueur
+            int playerLevelsGained = playerDataManager.addXP(
+                    player.getUniqueId(), xpGained);
+
+            if (playerLevelsGained > 0) {
+                player.sendMessage("§a🎉 §eVous §aêtes passé niveau §e"
+                        + playerDataManager.getLevel(player.getUniqueId()) + "§a !");
+            }
 
             player.sendMessage("§a✅ Acheté §f" + item.quantity() + "x "
                     + formatName(mat) + " §apour §6" + item.price()

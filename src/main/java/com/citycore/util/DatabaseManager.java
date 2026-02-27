@@ -20,9 +20,7 @@ public class DatabaseManager {
     public void openDatabase() {
         try {
             File dataFolder = plugin.getDataFolder();
-            if (!dataFolder.exists()) {
-                dataFolder.mkdirs();
-            }
+            if (!dataFolder.exists()) dataFolder.mkdirs();
 
             File dbFile = new File(dataFolder, "database.db");
             connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
@@ -41,18 +39,21 @@ public class DatabaseManager {
 
         stmt.execute("""
             CREATE TABLE IF NOT EXISTS city (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL DEFAULT 'Ma Ville',
-                level INTEGER NOT NULL,
-                coins INTEGER NOT NULL,
-                max_chunks INTEGER NOT NULL DEFAULT 1
+                id          INTEGER PRIMARY KEY,
+                name        TEXT    NOT NULL DEFAULT 'Ma Ville',
+                level       INTEGER NOT NULL,
+                coins       INTEGER NOT NULL,
+                max_chunks  INTEGER NOT NULL DEFAULT 1,
+                residents   INTEGER NOT NULL DEFAULT 0
             )
         """);
 
         stmt.execute("""
             CREATE TABLE IF NOT EXISTS players (
-                uuid TEXT PRIMARY KEY,
-                coins INTEGER NOT NULL DEFAULT 0
+                uuid    TEXT PRIMARY KEY,
+                xp      INTEGER NOT NULL DEFAULT 0,
+                level   INTEGER NOT NULL DEFAULT 1,
+                job     TEXT
             )
         """);
 
@@ -105,7 +106,6 @@ public class DatabaseManager {
             )
         """);
 
-        // Dans DatabaseManager — modifie la table
         stmt.execute("""
             CREATE TABLE IF NOT EXISTS quest_progress (
                 player_uuid  TEXT NOT NULL,
@@ -144,6 +144,27 @@ public class DatabaseManager {
             )
         """);
 
+        // Dans initializeTables()
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS city_quest_progress (
+                quest_id     TEXT    PRIMARY KEY,
+                current_val  INTEGER NOT NULL DEFAULT 0,
+                completed    INTEGER NOT NULL DEFAULT 0
+            )
+        """);
+
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS city_level (
+                id    INTEGER PRIMARY KEY DEFAULT 1,
+                level INTEGER NOT NULL DEFAULT 1
+            )
+        """);
+
+        // Init du niveau si vide
+        stmt.execute("""
+            INSERT OR IGNORE INTO city_level (id, level) VALUES (1, 1)
+        """);
+
         stmt.close();
     }
 
@@ -153,9 +174,7 @@ public class DatabaseManager {
 
     public void closeDatabase() {
         try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-            }
+            if (connection != null && !connection.isClosed()) connection.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }

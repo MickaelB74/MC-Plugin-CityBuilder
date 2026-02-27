@@ -6,6 +6,7 @@ import net.citizensnpcs.api.npc.NPCRegistry;
 import net.citizensnpcs.trait.HologramTrait;
 import net.citizensnpcs.trait.SkinTrait;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -113,8 +114,10 @@ public class NPCManager {
        ========================= */
 
     public NPC getNPC(CityNPC type) {
+        String target = ChatColor.stripColor(type.displayName);
         for (NPC npc : CitizensAPI.getNPCRegistry()) {
-            if (npc.data().has(type.tag)) return npc;
+            String npcStripped = ChatColor.stripColor(npc.getName());
+            if (npc.data().has(type.tag) || npcStripped.equals(target)) return npc;
         }
         return null;
     }

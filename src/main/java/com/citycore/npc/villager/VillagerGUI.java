@@ -5,6 +5,7 @@ import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
 import com.citycore.npc.NPCState;
+import com.citycore.player.PlayerDataManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -41,18 +42,21 @@ public class VillagerGUI {
     public static final int SLOT_FOLLOW    = 8;
     public static final int SLOT_QUESTS    = 7;
     public static final int SLOT_BACK      = 8;
+    public static final int SLOT_JOB       = 1;
 
     private final CityNPC        npcType;
     private final VillagerConfig config;
     private final NPCDataManager dataManager;
     private final NPCManager     npcManager;
+    private final PlayerDataManager playerDataManager;
 
     public VillagerGUI(CityNPC npcType, VillagerConfig config,
-                       NPCDataManager dataManager, NPCManager npcManager) {
+                       NPCDataManager dataManager, NPCManager npcManager, PlayerDataManager playerDataManager) {
         this.npcType     = npcType;
         this.config      = config;
         this.dataManager = dataManager;
         this.npcManager  = npcManager;
+        this.playerDataManager = playerDataManager;
     }
 
     /* =========================
@@ -209,7 +213,7 @@ public class VillagerGUI {
         fillFiller(inv, 9, Material.GRAY_STAINED_GLASS_PANE);
 
         // Tête avec niveau
-        ItemStack head = new ItemStack(Material.VILLAGER_SPAWN_EGG);
+        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         ItemMeta headMeta = head.getItemMeta();
         headMeta.setDisplayName(npcType.displayName + " §8— §7" + npcType.function);
         headMeta.setLore(List.of(
@@ -220,7 +224,7 @@ public class VillagerGUI {
         headMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
         head.setItemMeta(headMeta);
         inv.setItem(0, head);
-
+        inv.setItem(SLOT_JOB, makeJobButton(player));
         inv.setItem(SLOT_SELL, makeItem(Material.EMERALD, "§a💰 Vendre",
                 List.of("§7Vendez vos ressources", "§7et recevez des coins.")));
         inv.setItem(SLOT_INVENTORY, makeItem(Material.CHEST, "§6📦 Inventaire",
@@ -491,6 +495,40 @@ public class VillagerGUI {
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
         item.setItemMeta(meta);
         return item;
+    }
+
+    private ItemStack makeJobButton(Player player) {
+        CityNPC currentJob = playerDataManager.getJob(player.getUniqueId());
+        boolean hasThisJob = npcType == currentJob;
+
+        if (hasThisJob) {
+            return makeItem(Material.BARRIER,
+                    "§c❌ Quitter le job",
+                    List.of(
+                            "§7Vous travaillez actuellement",
+                            "§7pour §e" + npcType.displayName + "§7.",
+                            "",
+                            "§cCliquez pour quitter."
+                    ));
+        } else if (currentJob != null) {
+            return makeItem(Material.GRAY_DYE,
+                    "§8Job indisponible",
+                    List.of(
+                            "§7Vous travaillez déjà pour",
+                            "§e" + currentJob.displayName + "§7.",
+                            "",
+                            "§8Quittez d'abord votre job actuel."
+                    ));
+        } else {
+            return makeItem(Material.CRAFTING_TABLE,
+                    "§a💼 Travailler pour " + npcType.displayName,
+                    List.of(
+                            "§7Rejoignez l'atelier de",
+                            "§e" + npcType.displayName + "§7.",
+                            "",
+                            "§eCliquez pour accepter."
+                    ));
+        }
     }
 
     private ItemStack makeItem(Material mat, String name) {

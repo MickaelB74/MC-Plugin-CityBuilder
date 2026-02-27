@@ -39,8 +39,8 @@ public class CityManager {
     public void initializeCity(String name) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
-                INSERT INTO city (id, name, level, coins, max_chunks)
-                VALUES (1, ?, 1, 0, 1)
+                INSERT INTO city (id, name, level, coins, max_chunks, residents)
+                VALUES (1, ?, 1, 0, 1, 0)
             """);
             ps.setString(1, name);
             ps.executeUpdate();
@@ -54,9 +54,6 @@ public class CityManager {
        ÉCONOMIE VILLE
        ========================= */
 
-    /**
-     * Retourne le solde actuel de la ville.
-     */
     public int getCityCoins() {
         try {
             ResultSet rs = db.getConnection()
@@ -69,17 +66,11 @@ public class CityManager {
         return 0;
     }
 
-    /**
-     * Ajoute des coins à la caisse de la ville.
-     * Utilisé par : quêtes complétées, dépôts joueurs, récompenses événements...
-     * @return le nouveau solde, ou -1 en cas d'erreur
-     */
     public int addCityCoins(int amount) {
         if (amount <= 0) return getCityCoins();
         try {
-            PreparedStatement ps = db.getConnection().prepareStatement("""
-                UPDATE city SET coins = coins + ? WHERE id = 1
-            """);
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET coins = coins + ? WHERE id = 1");
             ps.setInt(1, amount);
             ps.executeUpdate();
             ps.close();
@@ -90,19 +81,12 @@ public class CityManager {
         }
     }
 
-    /**
-     * Retire des coins de la caisse de la ville.
-     * Vérifie que le solde est suffisant avant de débiter.
-     * Utilisé par : expansion de chunks, achats NPC, améliorations...
-     * @return true si le débit a réussi, false si solde insuffisant ou erreur
-     */
     public boolean removeCityCoins(int amount) {
         if (amount <= 0) return true;
         if (getCityCoins() < amount) return false;
         try {
-            PreparedStatement ps = db.getConnection().prepareStatement("""
-                UPDATE city SET coins = coins - ? WHERE id = 1
-            """);
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET coins = coins - ? WHERE id = 1");
             ps.setInt(1, amount);
             ps.executeUpdate();
             ps.close();
@@ -113,40 +97,75 @@ public class CityManager {
         }
     }
 
-    /**
-     * Vérifie si la ville peut se payer un montant donné.
-     */
     public boolean canAfford(int amount) {
         return getCityCoins() >= amount;
+    }
+
+    /* =========================
+       HABITANTS
+       ========================= */
+
+    public int getResidentCount() {
+        try {
+            ResultSet rs = db.getConnection()
+                    .createStatement()
+                    .executeQuery("SELECT residents FROM city WHERE id = 1");
+            if (rs.next()) return rs.getInt("residents");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public void addResident() {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET residents = residents + 1 WHERE id = 1");
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void removeResident() {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET residents = MAX(0, residents - 1) WHERE id = 1");
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void setResidentCount(int count) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET residents = ? WHERE id = 1");
+            ps.setInt(1, Math.max(0, count));
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     /* =========================
        EXPANSION
        ========================= */
 
-    /**
-     * Prix progressif : 200 × max_chunks_actuel
-     * Slot 2 → 200, Slot 3 → 400, Slot 4 → 600...
-     */
     public int getNextExpandPrice() {
         return EXPAND_BASE_PRICE * getMaxChunks();
     }
 
-    /**
-     * Tente d'acheter un slot de chunk supplémentaire.
-     * Débite automatiquement les coins de la ville.
-     * @return ExpandResult avec le statut et les détails
-     */
     public ExpandResult expandMaxChunks() {
-        int price = getNextExpandPrice();
+        int price   = getNextExpandPrice();
         int balance = getCityCoins();
 
-        if (balance < price) {
-            return new ExpandResult(false, price, balance, 0);
-        }
+        if (balance < price) return new ExpandResult(false, price, balance, 0);
 
         try {
-            // Transaction : débit + expansion atomique
             db.getConnection().setAutoCommit(false);
 
             PreparedStatement debit = db.getConnection().prepareStatement(
@@ -173,9 +192,6 @@ public class CityManager {
         }
     }
 
-    /**
-     * Résultat d'une tentative d'expansion.
-     */
     public record ExpandResult(boolean success, int price, int newBalance, int newMaxChunks) {}
 
     /* =========================
@@ -185,8 +201,7 @@ public class CityManager {
     public void claimChunk(Chunk chunk) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
-                INSERT OR IGNORE INTO claimed_chunks (world, x, z)
-                VALUES (?, ?, ?)
+                INSERT OR IGNORE INTO claimed_chunks (world, x, z) VALUES (?, ?, ?)
             """);
             ps.setString(1, chunk.getWorld().getName());
             ps.setInt(2, chunk.getX());
@@ -200,9 +215,8 @@ public class CityManager {
 
     public void unclaimChunk(Chunk chunk) {
         try {
-            PreparedStatement ps = db.getConnection().prepareStatement("""
-            DELETE FROM claimed_chunks WHERE world = ? AND x = ? AND z = ?
-        """);
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "DELETE FROM claimed_chunks WHERE world = ? AND x = ? AND z = ?");
             ps.setString(1, chunk.getWorld().getName());
             ps.setInt(2, chunk.getX());
             ps.setInt(3, chunk.getZ());
@@ -234,9 +248,7 @@ public class CityManager {
         String world = chunk.getWorld().getName();
         int x = chunk.getX();
         int z = chunk.getZ();
-
         int[][] neighbors = {{x+1,z},{x-1,z},{x,z+1},{x,z-1}};
-
         try {
             PreparedStatement ps = db.getConnection().prepareStatement(
                     "SELECT 1 FROM claimed_chunks WHERE world = ? AND x = ? AND z = ?");
@@ -306,14 +318,15 @@ public class CityManager {
         try {
             ResultSet rs = db.getConnection()
                     .createStatement()
-                    .executeQuery("SELECT name, level, coins, max_chunks FROM city WHERE id = 1");
+                    .executeQuery("SELECT name, level, coins, max_chunks, residents FROM city WHERE id = 1");
             if (!rs.next()) return null;
             return new City(
                     rs.getString("name"),
                     rs.getInt("level"),
                     rs.getInt("coins"),
                     getClaimedChunkCount(),
-                    rs.getInt("max_chunks")
+                    rs.getInt("max_chunks"),
+                    rs.getInt("residents")
             );
         } catch (SQLException e) {
             e.printStackTrace();
@@ -332,5 +345,4 @@ public class CityManager {
         }
         return "Ville";
     }
-
 }

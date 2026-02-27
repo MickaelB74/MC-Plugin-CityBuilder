@@ -10,7 +10,7 @@ npc-settings:
 # ============================================================
 #  TAILLEUR DE PIERRE - Brennan
 # ============================================================
-stonemason:
+brennan:
   xp-per-stack: 10       # XP gagné par stack vendu
   xp-per-coin: 1         # XP gagné par coin de valeur vendue
   level-thresholds:      # XP total requis pour atteindre chaque niveau

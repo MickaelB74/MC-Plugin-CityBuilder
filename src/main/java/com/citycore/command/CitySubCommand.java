@@ -12,7 +12,9 @@ public enum CitySubCommand {
     NPC("npc",         "npc <type> <spawn|levelUp|levelDown>", "Gérer les NPCs"),
     QUESTS("quests", "quests toggle", "Afficher/masquer le HUD des quêtes"),
     BUILD("build", "build [new <nom>|show|remove <nom|all>]",
-            "Gérer les bâtiments de la ville");
+            "Gérer les bâtiments de la ville"),
+    JOB("job", "job <joueur> <npc|clear>", "Gérer le job d'un joueur (op)"),
+    PLAYER("player", "player <joueur> <levelUp|levelDown|setLevel>", "Gérer le niveau d'un joueur (op)");
 
 
     public final String label;
