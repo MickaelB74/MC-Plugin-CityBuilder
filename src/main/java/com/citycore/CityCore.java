@@ -1,6 +1,7 @@
 package com.citycore;
 
 import com.citycore.building.*;
+import com.citycore.chunk.ClaimProtectionListener;
 import com.citycore.city.CityManager;
 import com.citycore.command.CityCommand;
 import com.citycore.command.CityTabCompleter;
@@ -77,7 +78,7 @@ public class CityCore extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new BuildingListener(buildingSession, buildingManager, cityManager), this);
         getServer().getPluginManager().registerEvents(
-                new BuildingGUIListener(buildingManager), this);
+                new BuildingGUIListener(buildingManager, this), this);
         getServer().getPluginManager().registerEvents(
                 new BuildingEnterListener(buildingManager, cityManager), this);
 
@@ -99,7 +100,7 @@ public class CityCore extends JavaPlugin {
         // ── Maire ────────────────────────────────────────────────
         MayorQuestGUI  mayorQuestGUI = new MayorQuestGUI(cityQuestManager, findNpcQuestManager);
         MayorGUI       mayorGUI      = new MayorGUI(cityManager, npcManager,
-                buildingManager, economy, mayorQuestGUI, cityQuestManager);
+                buildingManager, economy, mayorQuestGUI, cityQuestManager, this);
         NPCGuiRegistry guiRegistry   = new NPCGuiRegistry();
         guiRegistry.register(CityNPC.MAYOR, mayorGUI);
 
@@ -138,6 +139,9 @@ public class CityCore extends JavaPlugin {
                 new QuestListener(questGUIs, questManager, npcDataManager,
                         economy, this, villagerConfigMap, questHUD,
                         npcManager, notificationManager), this);
+
+        // ── Chunks ────────────────────────────────────────────
+        getServer().getPluginManager().registerEvents(new ClaimProtectionListener(cityManager), this);
 
         // ── Commandes ────────────────────────────────────────────
         var cityCmd = getCommand("city");

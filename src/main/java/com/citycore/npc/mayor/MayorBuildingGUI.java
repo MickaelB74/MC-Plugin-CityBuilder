@@ -3,6 +3,7 @@ package com.citycore.npc.mayor;
 import com.citycore.building.Building;
 import com.citycore.building.BuildingManager;
 import com.citycore.npc.CityNPC;
+import com.citycore.building.BuildingParticleTask;
 import com.citycore.util.ChatInputManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -12,6 +13,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
@@ -27,9 +29,11 @@ public class MayorBuildingGUI {
     private static final int CONTENT_ROWS = 3;
 
     private final BuildingManager buildingManager;
+    private final JavaPlugin      plugin;
 
-    public MayorBuildingGUI(BuildingManager buildingManager) {
+    public MayorBuildingGUI(BuildingManager buildingManager, JavaPlugin plugin) {
         this.buildingManager = buildingManager;
+        this.plugin          = plugin;
     }
 
     // ── Menu principal : liste des bâtiments ─────────────────────────────────
@@ -52,7 +56,9 @@ public class MayorBuildingGUI {
                             "§7Monde : §f" + b.world(),
                             "§7Zone  : §f" + b.x1() + "," + b.z1()
                                     + " §7→ §f" + b.x2() + "," + b.z2(),
-                            "§7NPC   : " + npcDisplayName(b)
+                            "§7NPC   : " + npcDisplayName(b),
+                            "",
+                            "§eCliquez pour voir les bordures"
                     )
             ));
         }
@@ -124,6 +130,22 @@ public class MayorBuildingGUI {
      * @return true si géré, false = retour menu maire
      */
     public boolean handleMainClick(Player player, int slot) {
+        // ── Clic sur un bâtiment de la liste (slots 0 à 26) ──────
+        if (slot < 27) {
+            List<Building> buildings = buildingManager.getAllBuildings();
+            if (slot < buildings.size()) {
+                Building b = buildings.get(slot);
+                // Ferme au tick suivant pour éviter le bug Bukkit
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    player.closeInventory();
+                    new BuildingParticleTask(plugin, player, b).runForSeconds(5);
+                    player.sendMessage("§b🏛 §7Bordures de §f" + b.name()
+                            + " §7affichées pendant §f5 secondes§7.");
+                });
+            }
+            return true;
+        }
+
         if (slot == 27 + SLOT_ADD) {
             ChatInputManager.prompt(
                     player,
@@ -174,22 +196,17 @@ public class MayorBuildingGUI {
         return true;
     }
 
-    // ── Utilitaire NPC ────────────────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /**
-     * Retourne le displayName coloré du NPC assigné, ou "§7Aucun".
-     */
     private String npcDisplayName(Building b) {
         if (b.npcTag() == null) return "§7Aucun";
         CityNPC npc = CityNPC.fromTag(b.npcTag());
-        return npc != null ? npc.displayName : "§7" + b.npcDisplayTag();
+        return npc != null ? npc.displayName : b.npcDisplayTag();
     }
-
-    // ── Item factory ─────────────────────────────────────────────────────────
 
     private ItemStack makeItem(Material mat, String name, List<String> lore) {
         ItemStack item = new ItemStack(mat);
-        ItemMeta meta  = item.getItemMeta();
+        ItemMeta  meta = item.getItemMeta();
         meta.setDisplayName(name);
         meta.setLore(lore);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);

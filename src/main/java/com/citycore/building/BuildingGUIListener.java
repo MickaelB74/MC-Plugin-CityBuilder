@@ -1,29 +1,37 @@
 package com.citycore.building;
 
-import com.citycore.npc.CityNPC;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class BuildingGUIListener implements Listener {
 
     private final BuildingManager buildingManager;
+    private final JavaPlugin      plugin;
 
-    public BuildingGUIListener(BuildingManager buildingManager) {
+    public BuildingGUIListener(BuildingManager buildingManager, JavaPlugin plugin) {
         this.buildingManager = buildingManager;
+        this.plugin          = plugin;
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        plugin.getLogger().info("GUI title reçu : [" + event.getView().getTitle() + "]");
+        plugin.getLogger().info("GUI title attendu : [" + BuildingGUI.TITLE + "]");
+
         if (!BuildingGUI.TITLE.equals(event.getView().getTitle())) return;
 
         event.setCancelled(true);
+
         if (event.getCurrentItem() == null) return;
-        if (event.getCurrentItem().getType() == Material.GRAY_STAINED_GLASS_PANE) return;
-        if (event.getCurrentItem().getType() == Material.BARRIER) return;
+        if (event.getCurrentItem().getType() != Material.BRICKS) return;
+        if (!event.getCurrentItem().hasItemMeta()) return;
+        if (event.getCurrentItem().getItemMeta().getDisplayName() == null) return;
 
         String rawName = event.getCurrentItem().getItemMeta().getDisplayName();
         String name    = rawName.replace("§e🏛 ", "").trim();
@@ -32,21 +40,13 @@ public class BuildingGUIListener implements Listener {
                 .filter(b -> b.name().equals(name))
                 .findFirst()
                 .ifPresent(building -> {
-                    String npcName = "§7Aucun";
-                    if (building.npcTag() != null) {
-                        CityNPC npc = CityNPC.fromTag(building.npcTag());
-                        npcName = npc != null ? npc.displayName : building.npcDisplayTag();
-                    }
-
-                    player.sendMessage("§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
-                    player.sendMessage("§e🏛 " + building.name());
-                    player.sendMessage("§7Monde : §f" + building.world());
-                    player.sendMessage("§7Zone X : §f" + building.x1()
-                            + " §7→ §f" + building.x2());
-                    player.sendMessage("§7Zone Z : §f" + building.z1()
-                            + " §7→ §f" + building.z2());
-                    player.sendMessage("§7NPC assigné : " + npcName);
-                    player.sendMessage("§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
+                    // Ferme le GUI au prochain tick (obligatoire depuis un InventoryClickEvent)
+                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                        player.closeInventory();
+                        new BuildingParticleTask(plugin, player, building).runForSeconds(5);
+                        player.sendMessage("§b🏛 §7Bordures de §f" + building.name()
+                                + " §7affichées pendant §f5 secondes§7.");
+                    });
                 });
     }
 }

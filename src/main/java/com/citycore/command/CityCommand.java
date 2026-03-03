@@ -1,13 +1,12 @@
 package com.citycore.command;
 
-import com.citycore.CityCoreHUD;
 import com.citycore.building.*;
 import com.citycore.city.City;
 import com.citycore.npc.*;
 import com.citycore.npc.villager.VillagerGUI;
 import com.citycore.player.PlayerDataManager;
 import com.citycore.quest.QuestHUD;
-import com.citycore.util.ChunkParticleTask;
+import com.citycore.chunk.ChunkParticleTask;
 import com.citycore.city.CityManager;
 import com.citycore.util.TypewriterUtil;
 import net.milkbowl.vault.economy.Economy;

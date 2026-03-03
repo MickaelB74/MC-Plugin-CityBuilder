@@ -17,6 +17,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
@@ -39,10 +40,10 @@ public class MayorGUI implements NPCGui {
 
     public MayorGUI(CityManager cityManager, NPCManager npcManager,
                     BuildingManager buildingManager, Economy economy,
-                    MayorQuestGUI questGUI, CityQuestManager cityQuestManager) {
+                    MayorQuestGUI questGUI, CityQuestManager cityQuestManager, JavaPlugin plugin) {
         this.cityManager      = cityManager;
         this.npcManager       = npcManager;
-        this.buildingGUI      = new MayorBuildingGUI(buildingManager);
+        this.buildingGUI      = new MayorBuildingGUI(buildingManager, plugin);
         this.economyGUI       = new MayorEconomyGUI(cityManager, economy, cityQuestManager);
         this.questGUI         = questGUI;
         this.cityQuestManager = cityQuestManager;
