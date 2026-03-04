@@ -4,6 +4,7 @@ import com.citycore.city.City;
 import com.citycore.city.CityManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.player.PlayerDataManager;
+import com.citycore.quest.city.CityQuestManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.milkbowl.vault.economy.Economy;
@@ -14,17 +15,20 @@ import org.bukkit.scheduler.BukkitTask;
 
 public class CityCoreHUD {
 
-    private final JavaPlugin  plugin;
-    private final CityManager cityManager;
-    private final Economy     economy;
-    private final PlayerDataManager playerDataManager;
+    private final JavaPlugin         plugin;
+    private final CityManager        cityManager;
+    private final Economy            economy;
+    private final PlayerDataManager  playerDataManager;
+    private final CityQuestManager   cityQuestManager; // ← AJOUT
     private BukkitTask task;
 
-    public CityCoreHUD(JavaPlugin plugin, CityManager cityManager, Economy economy, PlayerDataManager playerDataManager) {
-        this.plugin      = plugin;
-        this.cityManager = cityManager;
-        this.economy     = economy;
+    public CityCoreHUD(JavaPlugin plugin, CityManager cityManager, Economy economy,
+                       PlayerDataManager playerDataManager, CityQuestManager cityQuestManager) {
+        this.plugin            = plugin;
+        this.cityManager       = cityManager;
+        this.economy           = economy;
         this.playerDataManager = playerDataManager;
+        this.cityQuestManager  = cityQuestManager; // ← AJOUT
     }
 
     public void start() {
@@ -52,10 +56,12 @@ public class CityCoreHUD {
 
         // ── Données ville ────────────────────────────────────────
         City   city      = cityManager.isCityInitialized() ? cityManager.getCity() : null;
-        String cityLevel = city != null ? String.valueOf(city.getLevel())          : "—";
+        // CORRECTION : le niveau de la ville provient de city_level (CityQuestManager),
+        // pas de la table city — c'est lui qui est mis à jour lors du level-up via le GUI maire.
+        String cityLevel = String.valueOf(cityQuestManager.getCityLevel());
         String cityCoins = city != null ? String.valueOf(city.getCoins())          : "—";
         String cityPop   = city != null ? String.valueOf(city.getResidentCount())  : "—";
-        String citySize   = city != null ? city.getClaimedChunks() + "/" + city.getMaxChunks()  : "—";
+        String citySize  = city != null ? city.getClaimedChunks() + "/" + city.getMaxChunks() : "—";
 
         Component header = Component.text()
                 .append(Component.newline())

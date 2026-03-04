@@ -42,6 +42,7 @@ public class CityCommand implements CommandExecutor {
     private final BuildingBorderTask     buildingBorderTask;
     private final NPCNotificationManager notificationManager;
     private final PlayerDataManager      playerDataManager;
+    private final CityQuestSelectionGUI  questSelectionGUI;
 
     public CityCommand(CityManager cityManager, NPCManager npcManager,
                        JavaPlugin plugin, NPCDataManager npcDataManager,
@@ -49,7 +50,7 @@ public class CityCommand implements CommandExecutor {
                        BuildingSession buildingSession, BuildingGUI buildingGUI,
                        BuildingBorderTask buildingBorderTask,
                        NPCNotificationManager notificationManager,
-                       PlayerDataManager playerDataManager) {
+                       PlayerDataManager playerDataManager, CityQuestSelectionGUI questSelectionGUI) {
         this.cityManager         = cityManager;
         this.npcManager          = npcManager;
         this.plugin              = plugin;
@@ -61,6 +62,7 @@ public class CityCommand implements CommandExecutor {
         this.buildingBorderTask  = buildingBorderTask;
         this.notificationManager = notificationManager;
         this.playerDataManager   = playerDataManager;
+        this.questSelectionGUI   = questSelectionGUI;
         setupEconomy();
     }
 
@@ -250,11 +252,7 @@ public class CityCommand implements CommandExecutor {
 
                 // ── /city quests ─────────────────────────────────
                 case QUESTS -> {
-                    if (args.length < 2 || !args[1].equalsIgnoreCase("toggle")) {
-                        player.sendMessage("§cUsage : /city quests toggle");
-                        return true;
-                    }
-                    questHUD.toggle(player);
+                    questSelectionGUI.open(player);
                 }
 
                 // ── /city npc ────────────────────────────────────

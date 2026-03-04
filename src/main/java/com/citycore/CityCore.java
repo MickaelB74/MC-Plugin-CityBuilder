@@ -4,6 +4,8 @@ import com.citycore.building.*;
 import com.citycore.chunk.ClaimProtectionListener;
 import com.citycore.city.CityManager;
 import com.citycore.command.CityCommand;
+import com.citycore.command.CityQuestSelectionGUI;
+import com.citycore.command.CityQuestSelectionListener;
 import com.citycore.command.CityTabCompleter;
 import com.citycore.npc.*;
 import com.citycore.npc.mayor.MayorGUI;
@@ -93,8 +95,9 @@ public class CityCore extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new FindNpcQuestListener(findNpcQuestManager), this);
 
-        // ── HUD ──────────────────────────────────────────────────
-        cityHUD = new CityCoreHUD(this, cityManager, economy, playerDataManager);
+        // ── HUD ─────────────────────────────────────────────────
+        // MODIFIÉ : on passe cityQuestManager pour lire le vrai niveau de la ville
+        cityHUD = new CityCoreHUD(this, cityManager, economy, playerDataManager, cityQuestManager);
         cityHUD.start();
 
         // ── Maire ────────────────────────────────────────────────
@@ -114,8 +117,8 @@ public class CityCore extends JavaPlugin {
         for (CityNPC npcType : CityNPC.values()) {
             if (npcType == CityNPC.MAYOR) continue;
 
-            VillagerConfig config     = new VillagerConfig(this, npcType.skinId);
-            VillagerGUI    gui        = new VillagerGUI(npcType, config,
+            VillagerConfig config      = new VillagerConfig(this, npcType.skinId);
+            VillagerGUI    gui         = new VillagerGUI(npcType, config,
                     npcDataManager, npcManager, playerDataManager, this);
             QuestConfig    questConfig = new QuestConfig(this, npcType.skinId);
             QuestGUI       questGUI   = new QuestGUI(npcType, questConfig,
@@ -140,14 +143,23 @@ public class CityCore extends JavaPlugin {
                         economy, this, villagerConfigMap, questHUD,
                         npcManager, notificationManager), this);
 
-        // ── Chunks ────────────────────────────────────────────
-        getServer().getPluginManager().registerEvents(new ClaimProtectionListener(cityManager), this);
+        // ── GUI Sélection Quêtes (/city quests) ──────────────────
+        // NOUVEAU : GUI avec têtes NPC pour toggle suivi par NPC
+        CityQuestSelectionGUI questSelectionGUI = new CityQuestSelectionGUI(
+                questManager, questHUD, questGUIs, this);
+        getServer().getPluginManager().registerEvents(
+                new CityQuestSelectionListener(questSelectionGUI), this);
+
+        // ── Chunks ────────────────────────────────────────────────
+        getServer().getPluginManager().registerEvents(
+                new ClaimProtectionListener(cityManager), this);
 
         // ── Commandes ────────────────────────────────────────────
         var cityCmd = getCommand("city");
         cityCmd.setExecutor(new CityCommand(cityManager, npcManager, this,
                 npcDataManager, questHUD, buildingManager, buildingSession,
-                buildingGUI, buildingBorderTask, notificationManager, playerDataManager));
+                buildingGUI, buildingBorderTask, notificationManager,
+                playerDataManager, questSelectionGUI));
         cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager, npcManager));
 
         // ── Listeners globaux ─────────────────────────────────────

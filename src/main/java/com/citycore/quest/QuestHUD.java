@@ -16,7 +16,16 @@ public class QuestHUD {
     private final QuestManager   questManager;
     private final NPCDataManager dataManager;
     private final List<QuestGUI> questGUIs;
-    private final Set<UUID>      hiddenPlayers = new HashSet<>();
+
+    /** Joueurs ayant masqué le HUD entier (/city quests toggle précédent). */
+    private final Set<UUID> hiddenPlayers = new HashSet<>();
+
+    /**
+     * NPC masqués par joueur (via CityQuestSelectionGUI).
+     * Si le tag d'un NPC est dans ce set, ses quêtes ne s'affichent pas
+     * dans le scoreboard de ce joueur.
+     */
+    private final Map<UUID, Set<String>> hiddenNpcTags = new HashMap<>();
 
     public QuestHUD(JavaPlugin plugin, QuestManager questManager,
                     NPCDataManager dataManager, List<QuestGUI> questGUIs) {
@@ -37,6 +46,10 @@ public class QuestHUD {
         }.runTaskTimer(plugin, 20L, 20L);
     }
 
+    /* =========================
+       TOGGLE HUD GLOBAL
+       ========================= */
+
     public void toggle(Player player) {
         UUID uuid = player.getUniqueId();
         if (hiddenPlayers.contains(uuid)) {
@@ -50,6 +63,39 @@ public class QuestHUD {
                     Bukkit.getScoreboardManager().getNewScoreboard());
         }
     }
+
+    /* =========================
+       TOGGLE PAR NPC (CityQuestSelectionGUI)
+       ========================= */
+
+    /**
+     * Active ou désactive l'affichage dans le scoreboard des quêtes d'un NPC
+     * spécifique pour un joueur donné.
+     *
+     * @param uuid    UUID du joueur
+     * @param npc     NPC concerné
+     * @param tracked true = affiché, false = masqué
+     */
+    public void setNpcTracked(UUID uuid, CityNPC npc, boolean tracked) {
+        Set<String> hidden = hiddenNpcTags.computeIfAbsent(uuid, k -> new HashSet<>());
+        if (tracked) {
+            hidden.remove(npc.tag);
+        } else {
+            hidden.add(npc.tag);
+        }
+        // Rafraîchit immédiatement le scoreboard du joueur si en ligne
+        Player player = Bukkit.getPlayer(uuid);
+        if (player != null) updateHUD(player);
+    }
+
+    /** Vérifie si les quêtes d'un NPC sont affichées pour un joueur. */
+    public boolean isNpcTracked(UUID uuid, CityNPC npc) {
+        return !hiddenNpcTags.getOrDefault(uuid, Collections.emptySet()).contains(npc.tag);
+    }
+
+    /* =========================
+       MISE À JOUR SCOREBOARD
+       ========================= */
 
     public void updateHUD(Player player) {
         if (hiddenPlayers.contains(player.getUniqueId())) return;
@@ -74,7 +120,7 @@ public class QuestHUD {
 
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-        // ✅ Cache tous les scores via NumberFormat.blank() — API Paper
+        // Cache tous les scores via NumberFormat.blank() — API Paper
         Set<String> used = new HashSet<>();
         int score = lines.size();
         for (String line : lines) {
@@ -82,7 +128,6 @@ public class QuestHUD {
             used.add(unique);
             Score s = obj.getScore(unique);
             s.setScore(score--);
-            // Cache le chiffre rouge sur cette ligne
             s.numberFormat(io.papermc.paper.scoreboard.numbers.NumberFormat.blank());
         }
 
@@ -91,10 +136,14 @@ public class QuestHUD {
 
     private List<String> buildLines(Player player) {
         UUID uuid  = player.getUniqueId();
+        Set<String> hidden = hiddenNpcTags.getOrDefault(uuid, Collections.emptySet());
         List<String> lines = new ArrayList<>();
 
         for (QuestGUI gui : questGUIs) {
             CityNPC npc = gui.getNpcType();
+
+            // Si ce NPC est masqué pour ce joueur, on saute
+            if (hidden.contains(npc.tag)) continue;
 
             QuestDefinition main    = questManager.getActiveQuest(uuid, npc, false);
             QuestDefinition special = questManager.getActiveQuest(uuid, npc, true);

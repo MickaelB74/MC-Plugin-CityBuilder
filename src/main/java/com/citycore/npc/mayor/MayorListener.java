@@ -17,16 +17,21 @@ public class MayorListener implements Listener {
     private final NPCGuiRegistry      guiRegistry;
     private final IntroductionManager introManager;
     private final JavaPlugin          plugin;
-    private final CityManager cityManager;
+    private final CityManager         cityManager;
 
     public MayorListener(NPCManager npcManager, NPCGuiRegistry guiRegistry,
-                         IntroductionManager introManager, CityManager cityManager, JavaPlugin plugin) {
+                         IntroductionManager introManager, CityManager cityManager,
+                         JavaPlugin plugin) {
         this.npcManager   = npcManager;
         this.guiRegistry  = guiRegistry;
         this.introManager = introManager;
         this.cityManager  = cityManager;
         this.plugin       = plugin;
     }
+
+    /* =========================
+       CLIC SUR LE MAIRE
+       ========================= */
 
     @EventHandler
     public void onNPCRightClick(NPCRightClickEvent event) {
@@ -47,8 +52,10 @@ public class MayorListener implements Listener {
                 if (type == CityNPC.MAYOR) {
                     cityManager.addMaxChunks(cityManager.getFreeChunks());
                     cityManager.addCityCoins(100);
-                    player.sendMessage("§6" + CityNPC.MAYOR.displayName + " §f: §o« Voici de quoi commencer... »");
-                    player.sendMessage("§a✅ La ville a gagné §f+8 slots de chunk §aet §6+100 coins§a.");
+                    player.sendMessage("§6" + CityNPC.MAYOR.displayName
+                            + " §f: §o« Voici de quoi commencer... »");
+                    player.sendMessage("§a✅ La ville a gagné §f+8 slots de chunk"
+                            + " §aet §6+100 coins§a.");
                 }
 
                 gui.open(player);
@@ -57,6 +64,10 @@ public class MayorListener implements Listener {
             gui.open(player);
         }
     }
+
+    /* =========================
+       CLICS INVENTAIRE
+       ========================= */
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
@@ -72,7 +83,7 @@ public class MayorListener implements Listener {
         boolean isBuildingGui = title.equals(MayorBuildingGUI.GUI_TITLE);
         boolean isDeleteGui   = title.equals(MayorBuildingGUI.GUI_TITLE_DELETE);
         boolean isEconomyGui  = title.equals(MayorEconomyGUI.GUI_TITLE);
-        boolean isQuestGui = mg != null && title.equals(
+        boolean isQuestGui    = mg != null && title.equals(
                 MayorQuestGUI.title(
                         CityTier.fromLevel(mg.getCityQuestManager().getCityLevel())));
 
@@ -120,6 +131,10 @@ public class MayorListener implements Listener {
         if (gui == null) return;
         gui.handleClick(player, slot);
     }
+
+    /* =========================
+       HELPERS
+       ========================= */
 
     private MayorGUI getMayorGUI() {
         NPCGui gui = guiRegistry.getByTitle(MayorGUI.GUI_TITLE);
