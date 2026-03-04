@@ -78,19 +78,6 @@ public enum CityNPC {
             // ── Quêtes personnelles de Jack, débloquées par niveau ──────────
             Map.of(
                     1, List.of(
-                            // Déclenchée par SummitListener via onSummitReached()
-                            // Le TriggerType.SUMMIT indique que la progression
-                            // vient de l'extérieur, pas du PlayerMoveEvent.
-                            // Le validator est un no-op (jamais appelé via MOVE).
-                            NPCPersonalQuest.of(
-                                    "jack_reach_summit",
-                                    "§6⛰ Conquérant des sommets",
-                                    "Atteindre le sommet d'une montagne.",
-                                    Material.STONE_SWORD,
-                                    SUMMIT,
-                                    (player, ctx) -> true, // validé en externe par SummitListener
-                                    500
-                            ),
                             NPCPersonalQuest.of(
                                     "jack_reach_deep_ocean",
                                     "§9🌊 Abyssal",
@@ -132,7 +119,52 @@ public enum CityNPC {
                             )
                     )
             )
+    ),
+
+    GANDALF(
+        "citycore_gandalf",
+                "§fGandalf",
+                "Mage",
+                "gandalf",
+                "eyJ0aW1lc3RhbXAiOjE0OTM1ODEyMDU2NjgsInByb2ZpbGVJZCI6ImUzYjQ0NWM4NDdmNTQ4ZmI4YzhmYTNmMWY3ZWZiYThlIiwicHJvZmlsZU5hbWUiOiJNaW5pRGlnZ2VyVGVzdCIsInNpZ25hdHVyZVJlcXVpcmVkIjp0cnVlLCJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMWM0YTVlNDc0N2UwZTY5ZmQ5MTY1OTQ1ZDZhYmIxYzBhNzI1OTYxYWNlNmJmNzRhZWM1NGY3NDQzZDZiOWUxNSJ9fX0=",
+                "imIk3vKxnCHHBzzjdvdRPgfFmhtOMvdowzPIQpLNDAl0Vk7JBWkt+q/aGaEoKtG+JzUWtyYXmPmmiCOlwdCD64u9kaloEZRllllzMkpFP84IKBqPYE6AJ0SB5jWyaq5uYL9bpjhsUx8d6z+gUjF3gCAFa8hn4K8oS350w++cPtjIBFDs106+xySUQdwJwtcoRrLRBbN/N/RGKjNfVASy7fKERDOZfIHZfPbhRa6B/e8ZeCgjDudLHlBmR2LeUHJaetRcE7P3xvGQcngw+wfnc4Q7P1MDd7R0R5q2JVjijoUIjb1Xe1YpDHeDE8MQnclIHiIZAlygN8BYv3bO/vOYVnCXaVtSAs4l+tPWMuF7yzOWnMNEqu0ZMc/Y/0Yt5FUqERsOcfigzTNzhXQGUusdhEEg3kMRUdIk8vdrLRv8LvbhuYzDW2aaYMZPXD4FhpJKUiLhxDeVOz0/emIus9OJ8HwsZlhE3P6/Zu8ClT2OWOsqS1oX1LF7rO38N0wOIVBN9ADV4YXNiyDA3eri8vN864N/1AJgQrfcbCpYm/gwoiIMHw/AbdGIeEXDPBsAt4g17nnMPsr67sLuCbkAY8thzSyaN1dc/yb3bQebQmmg/sWvMAfMGieBS6PBW0ZJtbIc7eUcALWdq/Jz+0hPfEYudI4uNk11+czDQLf56yTVNHA=",
+        Map.of(
+                "first_meeting", List.of(
+                        "§fGandalf §7: §oUn magicien n'est jamais en retard...",
+                        "§fGandalf §7: §oIl arrive précisément à l'heure prévue."
+                ),
+                "city_arrival", List.of(
+                        "§fGandalf §7: §oJe sens une grande destinée en ces terres.",
+                        "§fGandalf §7: §oMais l'ombre grandit à l'Est..."
+                ),
+                "building_assign", List.of(
+                        "§fGandalf §7: §oUn lieu de savoir. Voilà qui me convient.",
+                        "§fGandalf §7: §oReviens me voir lorsque tu auras gagné en sagesse."
+                )
+        ),
+
+        // ─────────────────────────────────────────────
+        // Quêtes personnelles de Gandalf
+        // ─────────────────────────────────────────────
+        Map.of(
+                1, List.of(
+                        // Déclenchée par SummitListener via onSummitReached()
+                        // Le TriggerType.SUMMIT indique que la progression
+                        // vient de l'extérieur, pas du PlayerMoveEvent.
+                        // Le validator est un no-op (jamais appelé via MOVE).
+                        NPCPersonalQuest.of(
+                                "jack_reach_summit",
+                                "§6⛰ Conquérant des sommets",
+                                "Atteindre le sommet d'une montagne.",
+                                Material.STONE_SWORD,
+                                SUMMIT,
+                                (player, ctx) -> true, // validé en externe par SummitListener
+                                500
+                        )
+                )
+        )
     );
+
 
     /* =========================
        CHAMPS
