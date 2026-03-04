@@ -1,7 +1,14 @@
 package com.citycore.npc;
 
+import com.citycore.quest.personal.NPCPersonalQuest;
+import com.citycore.quest.personal.PersonalQuestDefinition.TriggerType;
+import org.bukkit.Material;
+import org.bukkit.block.Biome;
+
 import java.util.List;
 import java.util.Map;
+
+import static com.citycore.quest.personal.PersonalQuestDefinition.TriggerType.*;
 
 public enum CityNPC {
 
@@ -19,7 +26,8 @@ public enum CityNPC {
                             "§6Alderic §f: §oParlez-moi si vous souhaitez consulter l'état de la ville,",
                             "§6Alderic §f: §oou pour agrandir notre territoire."
                     )
-            )
+            ),
+            Map.of() // Pas de quêtes personnelles pour le maire
     ),
 
     STONEMASON(
@@ -42,7 +50,8 @@ public enum CityNPC {
                             "§7Brennan §f: §oAh, enfin un atelier digne de ce nom !",
                             "§7Brennan §f: §oVenez me voir ici quand vous voulez vendre vos blocs."
                     )
-            )
+            ),
+            Map.of() // Pas de quêtes personnelles pour Brennan (pour l'instant)
     ),
 
     JACKSPARROW(
@@ -65,8 +74,69 @@ public enum CityNPC {
                             "§3Jack §f: §oUn port ! Enfin, presque... ça fera l'affaire.",
                             "§3Jack §f: §oVenez me voir ici pour tout ce qui vient de la mer."
                     )
+            ),
+            // ── Quêtes personnelles de Jack, débloquées par niveau ──────────
+            Map.of(
+                    1, List.of(
+                            NPCPersonalQuest.of(
+                                    "jack_reach_summit",
+                                    "§6⛰ Conquérant des sommets",
+                                    "Atteindre Y ≥ 200 dans un biome montagne.",
+                                    Material.STONE_SWORD,
+                                    MOVE,
+                                    (player, ctx) -> {
+                                        if (player.getLocation().getBlockY() < 200) return false;
+                                        Biome b = player.getLocation().getBlock().getBiome();
+                                        return isMountainBiome(b);
+                                    },
+                                    500
+                            ),
+                            NPCPersonalQuest.of(
+                                    "jack_reach_deep_ocean",
+                                    "§9🌊 Abyssal",
+                                    "Plonger à Y ≤ -40 dans un océan profond.",
+                                    Material.KELP,
+                                    MOVE,
+                                    (player, ctx) -> {
+                                        if (player.getLocation().getBlockY() > -40) return false;
+                                        Biome b = player.getLocation().getBlock().getBiome();
+                                        return isDeepOceanBiome(b);
+                                    },
+                                    400
+                            )
+                    ),
+                    3, List.of(
+                            NPCPersonalQuest.of(
+                                    "jack_kill_elder_guardian",
+                                    "§b🐟 Chasseur des abysses",
+                                    "Tuer un Elder Guardian.",
+                                    Material.PRISMARINE_SHARD,
+                                    KILL,
+                                    (player, ctx) -> ctx instanceof org.bukkit.entity.Entity e
+                                            && e.getType() == org.bukkit.entity.EntityType.ELDER_GUARDIAN,
+                                    1000
+                            )
+                    ),
+                    5, List.of(
+                            NPCPersonalQuest.of(
+                                    "jack_nether_roof",
+                                    "§4🔥 Au-dessus de l'Enfer",
+                                    "Atteindre Y ≥ 127 dans le Nether.",
+                                    Material.NETHERRACK,
+                                    MOVE,
+                                    (player, ctx) ->
+                                            player.getWorld().getEnvironment()
+                                                    == org.bukkit.World.Environment.NETHER
+                                                    && player.getLocation().getBlockY() >= 127,
+                                    1500
+                            )
+                    )
             )
     );
+
+    /* =========================
+       CHAMPS
+       ========================= */
 
     public final String tag;
     public final String displayName;
@@ -76,22 +146,64 @@ public enum CityNPC {
     public final String skinSignature;
     public final Map<String, List<String>> dialogues;
 
+    /**
+     * Quêtes personnelles disponibles par niveau de NPC.
+     * Clé = niveau minimum requis, valeur = liste de quêtes débloquées à ce niveau.
+     * Vide si le NPC n'en a pas.
+     */
+    public final Map<Integer, List<NPCPersonalQuest>> personalQuestsByLevel;
+
+    /* =========================
+       CONSTRUCTEUR
+       ========================= */
+
     CityNPC(String tag, String displayName, String function,
             String skinId, String skinValue, String skinSignature,
-            Map<String, List<String>> dialogues) {
-        this.tag           = tag;
-        this.displayName   = displayName;
-        this.function      = function;
-        this.skinId        = skinId;
-        this.skinValue     = skinValue;
-        this.skinSignature = skinSignature;
-        this.dialogues     = dialogues;
+            Map<String, List<String>> dialogues,
+            Map<Integer, List<NPCPersonalQuest>> personalQuestsByLevel) {
+        this.tag                   = tag;
+        this.displayName           = displayName;
+        this.function              = function;
+        this.skinId                = skinId;
+        this.skinValue             = skinValue;
+        this.skinSignature         = skinSignature;
+        this.dialogues             = dialogues;
+        this.personalQuestsByLevel = personalQuestsByLevel;
     }
 
+    /* =========================
+       API QUÊTES PERSO
+       ========================= */
+
     /**
-     * Retourne les lignes d'un dialogue par clé.
-     * Retourne une liste vide si la clé n'existe pas.
+     * Retourne toutes les quêtes personnelles disponibles pour un niveau de NPC donné.
+     * Inclut toutes les quêtes des niveaux inférieurs ou égaux.
      */
+    public List<NPCPersonalQuest> getPersonalQuestsForLevel(int npcLevel) {
+        return personalQuestsByLevel.entrySet().stream()
+                .filter(e -> e.getKey() <= npcLevel)
+                .flatMap(e -> e.getValue().stream())
+                .toList();
+    }
+
+    /** Retourne true si ce NPC a au moins une quête personnelle. */
+    public boolean hasPersonalQuests() {
+        return !personalQuestsByLevel.isEmpty();
+    }
+
+    /** Retourne une quête personnelle par son id, ou null. */
+    public NPCPersonalQuest getPersonalQuestById(String id) {
+        return personalQuestsByLevel.values().stream()
+                .flatMap(List::stream)
+                .filter(q -> q.id().equals(id))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /* =========================
+       AUTRES MÉTHODES
+       ========================= */
+
     public List<String> getDialogue(String key) {
         return dialogues.getOrDefault(key, List.of());
     }
@@ -105,5 +217,26 @@ public enum CityNPC {
 
     public String hologramLine() {
         return "§7✦ §e" + function + " §7✦";
+    }
+
+    /* =========================
+       HELPERS BIOMES (privés statiques)
+       ========================= */
+
+    private static boolean isMountainBiome(Biome b) {
+        return switch (b) {
+            case WINDSWEPT_HILLS, WINDSWEPT_GRAVELLY_HILLS, WINDSWEPT_FOREST,
+                 WINDSWEPT_SAVANNA, JAGGED_PEAKS, FROZEN_PEAKS, STONY_PEAKS,
+                 MEADOW, GROVE, SNOWY_SLOPES -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isDeepOceanBiome(Biome b) {
+        return switch (b) {
+            case DEEP_OCEAN, DEEP_COLD_OCEAN,
+                 DEEP_FROZEN_OCEAN, DEEP_LUKEWARM_OCEAN -> true;
+            default -> false;
+        };
     }
 }

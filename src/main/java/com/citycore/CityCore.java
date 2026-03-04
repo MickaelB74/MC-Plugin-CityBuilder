@@ -17,6 +17,8 @@ import com.citycore.quest.*;
 import com.citycore.quest.city.CityQuestManager;
 import com.citycore.quest.city.FindNpcQuestListener;
 import com.citycore.quest.city.FindNpcQuestManager;
+import com.citycore.quest.personal.NPCPersonalQuestGUI;
+import com.citycore.quest.personal.NPCPersonalQuestManager;
 import com.citycore.summit.SummitListener;
 import com.citycore.util.ChatInputManager;
 import com.citycore.util.ChunkListener;
@@ -68,9 +70,10 @@ public class CityCore extends JavaPlugin {
         playerDataManager   = new PlayerDataManager(databaseManager);
 
         // ── Managers partagés ────────────────────────────────────
-        NPCDataManager      npcDataManager = new NPCDataManager(databaseManager);
-        IntroductionManager introManager   = new IntroductionManager(databaseManager);
-        QuestManager        questManager   = new QuestManager(databaseManager);
+        NPCDataManager          npcDataManager       = new NPCDataManager(databaseManager);
+        IntroductionManager     introManager         = new IntroductionManager(databaseManager);
+        QuestManager            questManager         = new QuestManager(databaseManager, this);
+        NPCPersonalQuestManager personalQuestManager = new NPCPersonalQuestManager(databaseManager);
 
         // ── Bâtiments ────────────────────────────────────────────
         BuildingManager    buildingManager    = new BuildingManager(databaseManager);
@@ -96,7 +99,7 @@ public class CityCore extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new FindNpcQuestListener(findNpcQuestManager), this);
 
-        // ── HUD ─────────────────────────────────────────────────
+        // ── HUD ──────────────────────────────────────────────────
         cityHUD = new CityCoreHUD(this, cityManager, economy, playerDataManager, cityQuestManager);
         cityHUD.start();
 
@@ -121,8 +124,14 @@ public class CityCore extends JavaPlugin {
             VillagerGUI    gui         = new VillagerGUI(npcType, config,
                     npcDataManager, npcManager, playerDataManager, this);
             QuestConfig    questConfig = new QuestConfig(this, npcType.skinId);
-            QuestGUI       questGUI   = new QuestGUI(npcType, questConfig,
-                    questManager, npcDataManager);
+
+            // Crée le GUI perso seulement si le NPC a des quêtes perso déclarées
+            NPCPersonalQuestGUI personalGUI = npcType.hasPersonalQuests()
+                    ? new NPCPersonalQuestGUI(npcType, npcDataManager, personalQuestManager)
+                    : null;
+
+            QuestGUI questGUI = new QuestGUI(npcType, questConfig,
+                    questManager, npcDataManager, personalGUI);
 
             questGUIs.add(questGUI);
             villagerConfigMap.put(npcType, config);
@@ -139,12 +148,11 @@ public class CityCore extends JavaPlugin {
         questHUD.startUpdating();
 
         getServer().getPluginManager().registerEvents(
-                new QuestListener(questGUIs, questManager, npcDataManager,
-                        economy, this, villagerConfigMap, questHUD,
+                new QuestListener(questGUIs, questManager, personalQuestManager,
+                        npcDataManager, economy, this, villagerConfigMap, questHUD,
                         npcManager, notificationManager), this);
 
         // ── GUI Sélection Quêtes (/city quests) ──────────────────
-        // NOUVEAU : GUI avec têtes NPC pour toggle suivi par NPC
         CityQuestSelectionGUI questSelectionGUI = new CityQuestSelectionGUI(
                 questManager, questHUD, questGUIs, this);
         getServer().getPluginManager().registerEvents(
@@ -162,7 +170,7 @@ public class CityCore extends JavaPlugin {
                 playerDataManager, questSelectionGUI));
         cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager, npcManager));
 
-        // ── Summit event ────────────────────────────────────────────
+        // ── Summit event ──────────────────────────────────────────
         SummitListener summitListener = new SummitListener(this);
         getServer().getPluginManager().registerEvents(summitListener, this);
 
