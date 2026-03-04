@@ -8,9 +8,10 @@ import net.citizensnpcs.trait.SkinTrait;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.*;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,6 +27,7 @@ public class NPCManager {
     public NPCManager(JavaPlugin plugin) {
         this.plugin = plugin;
     }
+    public JavaPlugin getPlugin() { return plugin; }
 
     /**
      * À appeler dans onEnable — réattache la logique aux NPCs
@@ -174,7 +176,8 @@ public class NPCManager {
         npc.getNavigator().getDefaultParameters()
                 .range(50f)
                 .speedModifier(1f)
-                .distanceMargin(2.0);
+                .distanceMargin(2.0)
+                .useNewPathfinder(true);
 
         npc.getNavigator().setTarget(player, false);
         followingPlayers

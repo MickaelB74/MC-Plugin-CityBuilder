@@ -10,6 +10,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Boat;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Minecart;
+import org.bukkit.entity.Vehicle;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -121,7 +125,8 @@ public class NPCCityArrivalTask {
             if (cityCenter != null) {
                 npc.getNavigator().getDefaultParameters()
                         .speedModifier(0.6f)
-                        .range(200f);
+                        .range(200f)
+                        .useNewPathfinder(true);
                 npc.getNavigator().setTarget(cityCenter);
             }
         } else {
@@ -130,7 +135,8 @@ public class NPCCityArrivalTask {
             if (randomTarget != null) {
                 npc.getNavigator().getDefaultParameters()
                         .speedModifier(0.4f)
-                        .range(300f);
+                        .range(300f)
+                        .useNewPathfinder(true);
                 npc.getNavigator().setTarget(randomTarget);
             }
         }
@@ -196,7 +202,8 @@ public class NPCCityArrivalTask {
         npc.getNavigator().getDefaultParameters()
                 .speedModifier(0.5f)
                 .range(200f)
-                .distanceMargin(0.1f);
+                .distanceMargin(0.1f)
+                .useNewPathfinder(true);
 
         npc.getNavigator().getLocalParameters()
                 .addSingleUseCallback(cancelReason -> {
@@ -315,7 +322,6 @@ public class NPCCityArrivalTask {
         List<long[]> claimed = cityManager.getClaimedChunkCoords(world.getName());
         if (claimed.isEmpty()) return null;
 
-        // Prend un chunk claimé aléatoire parmi les 5 plus proches
         claimed.sort((a, b) -> {
             double distA = Math.pow(a[0] * 16 - near.getX(), 2)
                     + Math.pow(a[1] * 16 - near.getZ(), 2);
@@ -327,12 +333,41 @@ public class NPCCityArrivalTask {
         int pick = random.nextInt(Math.min(5, claimed.size()));
         long[] chunk = claimed.get(pick);
 
-        // Position aléatoire dans le chunk
-        double x = chunk[0] * 16 + random.nextInt(16);
-        double z = chunk[1] * 16 + random.nextInt(16);
-        double y = world.getHighestBlockYAt((int) x, (int) z) + 1;
+        // ✅ Plusieurs tentatives pour trouver un sol valide
+        for (int attempt = 0; attempt < 20; attempt++) {
+            int x = (int)(chunk[0] * 16 + random.nextInt(16));
+            int z = (int)(chunk[1] * 16 + random.nextInt(16));
 
-        return new Location(world, x, y, z);
+            // Descend depuis le plus haut bloc jusqu'à trouver un sol solide non-liquide
+            int highY = world.getHighestBlockYAt(x, z);
+            // Descend pour ignorer feuilles/bois/végétation
+            int y = highY;
+            while (y > 0) {
+                org.bukkit.block.Block floor = world.getBlockAt(x, y, z);
+                org.bukkit.block.Block above = world.getBlockAt(x, y + 1, z);
+                org.bukkit.block.Block above2 = world.getBlockAt(x, y + 2, z);
+                if (floor.getType().isSolid()
+                        && !floor.isLiquid()
+                        && !isVegetation(floor.getType())
+                        && above.getType().isAir()
+                        && above2.getType().isAir()) {
+                    return new Location(world, x + 0.5, y + 1, z + 0.5);
+                }
+                y--;
+            }
+        }
+        return null;
+    }
+
+    // ✅ Exclut les blocs végétaux qui sont "solides" selon Bukkit
+    private boolean isVegetation(org.bukkit.Material mat) {
+        String name = mat.name();
+        return name.contains("LEAVES") || name.contains("LOG")
+                || name.contains("WOOD") || name.contains("GRASS")
+                || name.contains("FERN") || name.contains("FLOWER")
+                || name.contains("BUSH") || name.contains("BAMBOO")
+                || mat == org.bukkit.Material.SNOW
+                || mat == org.bukkit.Material.CACTUS;
     }
 
     /**
