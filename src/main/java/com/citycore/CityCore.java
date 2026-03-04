@@ -17,6 +17,7 @@ import com.citycore.quest.*;
 import com.citycore.quest.city.CityQuestManager;
 import com.citycore.quest.city.FindNpcQuestListener;
 import com.citycore.quest.city.FindNpcQuestManager;
+import com.citycore.summit.SummitListener;
 import com.citycore.util.ChatInputManager;
 import com.citycore.util.ChunkListener;
 import com.citycore.util.DatabaseManager;
@@ -96,7 +97,6 @@ public class CityCore extends JavaPlugin {
                 new FindNpcQuestListener(findNpcQuestManager), this);
 
         // ── HUD ─────────────────────────────────────────────────
-        // MODIFIÉ : on passe cityQuestManager pour lire le vrai niveau de la ville
         cityHUD = new CityCoreHUD(this, cityManager, economy, playerDataManager, cityQuestManager);
         cityHUD.start();
 
@@ -161,6 +161,10 @@ public class CityCore extends JavaPlugin {
                 buildingGUI, buildingBorderTask, notificationManager,
                 playerDataManager, questSelectionGUI));
         cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager, npcManager));
+
+        // ── Summit event ────────────────────────────────────────────
+        SummitListener summitListener = new SummitListener(this);
+        getServer().getPluginManager().registerEvents(summitListener, this);
 
         // ── Listeners globaux ─────────────────────────────────────
         getServer().getPluginManager().registerEvents(

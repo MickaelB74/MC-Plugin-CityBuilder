@@ -284,3 +284,32 @@ jacksparrow:
           base-amount: 10
         - entity: GUARDIAN
           base-amount: 5
+
+# ============================================================
+#  SOMMET — Summit Listener
+# ============================================================
+summit:
+  # Activer/désactiver le système
+  enabled: true
+
+  # Altitude Y minimale pour considérer un sommet
+  min-height: 300
+
+  # Rayon circulaire (blocs) dans lequel aucun bloc ne doit
+  # exister à la même hauteur ou plus haut que le joueur
+  scan-radius: 100
+
+  # Clé du son dans le resource pack (assets/citycore/sounds.json)
+  sound-key: "citycore:summit_theme"
+
+  # Volume du son (0.0 à 1.0)
+  sound-volume: 1.0
+
+  # Pitch du son (0.5 = grave, 1.0 = normal, 2.0 = aigu)
+  sound-pitch: 1.0
+
+  # Délai minimum entre deux déclenchements pour le même joueur (secondes)
+  cooldown-seconds: 60
+
+  # Message envoyé au joueur (vide = aucun message)
+  message: "§b⛰ §eVous avez atteint un sommet !"
