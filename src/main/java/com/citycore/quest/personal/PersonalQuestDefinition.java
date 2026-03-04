@@ -31,6 +31,7 @@ public record PersonalQuestDefinition(
         KILL,        // EntityDeathEvent (entité tuée par le joueur)
         COLLECT,     // PlayerPickupItemEvent / InventoryCloseEvent
         CRAFT,       // CraftItemEvent
+        SUMMIT,      // Déclenché directement par SummitListener (event externe)
         ADVANCEMENT  // AdvancementDoneEvent — pour des conditions Minecraft natives
     }
 }

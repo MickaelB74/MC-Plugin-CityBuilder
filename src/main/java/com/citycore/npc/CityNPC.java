@@ -27,7 +27,7 @@ public enum CityNPC {
                             "§6Alderic §f: §oou pour agrandir notre territoire."
                     )
             ),
-            Map.of() // Pas de quêtes personnelles pour le maire
+            Map.of()
     ),
 
     STONEMASON(
@@ -51,7 +51,7 @@ public enum CityNPC {
                             "§7Brennan §f: §oVenez me voir ici quand vous voulez vendre vos blocs."
                     )
             ),
-            Map.of() // Pas de quêtes personnelles pour Brennan (pour l'instant)
+            Map.of()
     ),
 
     JACKSPARROW(
@@ -78,17 +78,17 @@ public enum CityNPC {
             // ── Quêtes personnelles de Jack, débloquées par niveau ──────────
             Map.of(
                     1, List.of(
+                            // Déclenchée par SummitListener via onSummitReached()
+                            // Le TriggerType.SUMMIT indique que la progression
+                            // vient de l'extérieur, pas du PlayerMoveEvent.
+                            // Le validator est un no-op (jamais appelé via MOVE).
                             NPCPersonalQuest.of(
                                     "jack_reach_summit",
                                     "§6⛰ Conquérant des sommets",
-                                    "Atteindre Y ≥ 200 dans un biome montagne.",
+                                    "Atteindre le sommet d'une montagne.",
                                     Material.STONE_SWORD,
-                                    MOVE,
-                                    (player, ctx) -> {
-                                        if (player.getLocation().getBlockY() < 200) return false;
-                                        Biome b = player.getLocation().getBlock().getBiome();
-                                        return isMountainBiome(b);
-                                    },
+                                    SUMMIT,
+                                    (player, ctx) -> true, // validé en externe par SummitListener
                                     500
                             ),
                             NPCPersonalQuest.of(
@@ -145,12 +145,6 @@ public enum CityNPC {
     public final String skinValue;
     public final String skinSignature;
     public final Map<String, List<String>> dialogues;
-
-    /**
-     * Quêtes personnelles disponibles par niveau de NPC.
-     * Clé = niveau minimum requis, valeur = liste de quêtes débloquées à ce niveau.
-     * Vide si le NPC n'en a pas.
-     */
     public final Map<Integer, List<NPCPersonalQuest>> personalQuestsByLevel;
 
     /* =========================
@@ -175,10 +169,6 @@ public enum CityNPC {
        API QUÊTES PERSO
        ========================= */
 
-    /**
-     * Retourne toutes les quêtes personnelles disponibles pour un niveau de NPC donné.
-     * Inclut toutes les quêtes des niveaux inférieurs ou égaux.
-     */
     public List<NPCPersonalQuest> getPersonalQuestsForLevel(int npcLevel) {
         return personalQuestsByLevel.entrySet().stream()
                 .filter(e -> e.getKey() <= npcLevel)
@@ -186,12 +176,10 @@ public enum CityNPC {
                 .toList();
     }
 
-    /** Retourne true si ce NPC a au moins une quête personnelle. */
     public boolean hasPersonalQuests() {
         return !personalQuestsByLevel.isEmpty();
     }
 
-    /** Retourne une quête personnelle par son id, ou null. */
     public NPCPersonalQuest getPersonalQuestById(String id) {
         return personalQuestsByLevel.values().stream()
                 .flatMap(List::stream)
@@ -201,7 +189,7 @@ public enum CityNPC {
     }
 
     /* =========================
-       AUTRES MÉTHODES
+       DIALOGUES
        ========================= */
 
     public List<String> getDialogue(String key) {
@@ -222,15 +210,6 @@ public enum CityNPC {
     /* =========================
        HELPERS BIOMES (privés statiques)
        ========================= */
-
-    private static boolean isMountainBiome(Biome b) {
-        return switch (b) {
-            case WINDSWEPT_HILLS, WINDSWEPT_GRAVELLY_HILLS, WINDSWEPT_FOREST,
-                 WINDSWEPT_SAVANNA, JAGGED_PEAKS, FROZEN_PEAKS, STONY_PEAKS,
-                 MEADOW, GROVE, SNOWY_SLOPES -> true;
-            default -> false;
-        };
-    }
 
     private static boolean isDeepOceanBiome(Biome b) {
         return switch (b) {

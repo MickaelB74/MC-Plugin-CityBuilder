@@ -42,7 +42,6 @@ public class QuestListener implements Listener {
     private final Map<CityNPC, VillagerConfig> villagerConfigs;
 
     // Déduplication chunks visités pour EXPLORE_CHUNK
-    // clé : "uuid_chunkX_chunkZ"
     private final Set<String> visitedChunkKeys = new HashSet<>();
 
     public QuestListener(List<QuestGUI> questGUIs,
@@ -106,14 +105,12 @@ public class QuestListener implements Listener {
         for (QuestObjective obj : active.objectives()) {
             if (!obj.isMaterialObjective()) continue;
 
-            // Compte les items réels dans l'inventaire
             int count = 0;
             for (ItemStack item : player.getInventory().getContents()) {
                 if (item != null && item.getType() == obj.material())
                     count += item.getAmount();
             }
 
-            // Synchronise la progression BDD avec l'inventaire réel
             int capped = Math.min(count, obj.amount());
             questManager.setProgress(player.getUniqueId(), npc, isSpecial,
                     obj.id(), capped);
@@ -178,7 +175,7 @@ public class QuestListener implements Listener {
     }
 
     /* =========================
-       PLAYER MOVE — EXPLORE_CHUNK + PERSONAL(MOVE)
+       PLAYER MOVE — EXPLORE_CHUNK + PERSONAL(MOVE seulement)
        ========================= */
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -205,13 +202,37 @@ public class QuestListener implements Listener {
             }
         }
 
-        // ── Quêtes personnelles (TriggerType.MOVE) ────────────────
+        // ── Quêtes personnelles MOVE uniquement (SUMMIT ignoré ici)
         for (QuestGUI gui : questGUIs) {
             CityNPC npc = gui.getNpcType();
             if (!npc.hasPersonalQuests()) continue;
             int npcLevel = dataManager.getLevel(npc);
             for (NPCPersonalQuest quest : npc.getPersonalQuestsForLevel(npcLevel)) {
-                if (quest.trigger() != TriggerType.MOVE) continue;
+                if (quest.trigger() != TriggerType.MOVE) continue; // SUMMIT ignoré
+                triggerPersonalQuest(player, npc, quest, null);
+            }
+        }
+    }
+
+    /* =========================
+       SUMMIT — appelé par SummitListener
+       La progression ne passe que si la quête est active (acceptée).
+       ========================= */
+
+    /**
+     * Point d'entrée pour SummitListener.
+     * Appeler quand un joueur atteint le sommet d'une montagne.
+     *
+     * Exemple dans SummitListener :
+     *   questListener.onSummitReached(player);
+     */
+    public void onSummitReached(Player player) {
+        for (QuestGUI gui : questGUIs) {
+            CityNPC npc = gui.getNpcType();
+            if (!npc.hasPersonalQuests()) continue;
+            int npcLevel = dataManager.getLevel(npc);
+            for (NPCPersonalQuest quest : npc.getPersonalQuestsForLevel(npcLevel)) {
+                if (quest.trigger() != TriggerType.SUMMIT) continue;
                 triggerPersonalQuest(player, npc, quest, null);
             }
         }
@@ -270,10 +291,8 @@ public class QuestListener implements Listener {
             QuestDefinition active = questManager.getActiveQuest(uuid, npc, isSpecial);
 
             if (active == null) {
-                // Récupère la quête pending (jamais régénérée ici)
                 QuestDefinition pending = questManager.getPendingQuest(uuid, npc, isSpecial);
                 if (pending == null) {
-                    // Ne devrait pas arriver — le GUI crée toujours une pending
                     player.sendMessage("§c❌ Erreur : aucune quête disponible.");
                     return;
                 }
@@ -342,7 +361,6 @@ public class QuestListener implements Listener {
 
                 gui.open(player);
             } else {
-                // En cours
                 player.sendMessage("§c❌ Quête en cours — continuez à progresser !");
             }
             return;
@@ -367,7 +385,29 @@ public class QuestListener implements Listener {
                 return;
             }
 
-            // Clic sur une quête — progression passive, pas d'action directe
+            // Clic sur une quête perso — acceptation si non encore active
+            CityNPC npc = personalGUI.getNpc();
+            int npcLevel = dataManager.getLevel(npc);
+            List<NPCPersonalQuest> quests = npc.getPersonalQuestsForLevel(npcLevel);
+
+            if (slot >= 0 && slot < quests.size()) {
+                NPCPersonalQuest quest = quests.get(slot);
+                UUID uuid = player.getUniqueId();
+
+                if (personalQuestManager.isCompleted(uuid, npc, quest.id())) {
+                    player.sendMessage("§a✔ Cette quête est déjà complétée !");
+                } else if (personalQuestManager.isActive(uuid, npc, quest.id())) {
+                    player.sendMessage("§e⏳ Quête en cours : " + quest.displayName());
+                } else {
+                    // Acceptation
+                    personalQuestManager.accept(uuid, npc, quest.id());
+                    player.sendMessage("§a✅ Quête acceptée : " + quest.displayName());
+                    player.sendMessage("§7Progressez dans le monde pour la compléter !");
+                    player.playSound(player.getLocation(),
+                            org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.5f, 1.5f);
+                    personalGUI.open(player); // refresh
+                }
+            }
             return;
         }
     }
@@ -377,12 +417,14 @@ public class QuestListener implements Listener {
        ========================= */
 
     /**
-     * Évalue le validator d'une quête perso et incrémente si validé.
+     * Évalue le validator et incrémente si la quête est active.
      * Donne la récompense automatiquement à la complétion.
+     * Ne fait rien si la quête n'a pas été acceptée (inactive).
      */
     private void triggerPersonalQuest(Player player, CityNPC npc,
                                       NPCPersonalQuest quest, Object context) {
-        if (personalQuestManager.isCompleted(player.getUniqueId(), npc, quest.id())) return;
+        // Vérification active (BDD) avant toute évaluation
+        if (!personalQuestManager.isActive(player.getUniqueId(), npc, quest.id())) return;
         if (!quest.validator().validate(player, context)) return;
 
         boolean done = personalQuestManager.increment(player.getUniqueId(), npc, quest);

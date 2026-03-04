@@ -1,10 +1,12 @@
 package com.citycore.summit;
 
+import com.citycore.quest.QuestListener;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.HashMap;
@@ -17,7 +19,8 @@ import java.util.UUID;
  */
 public class SummitListener implements Listener {
 
-    private final JavaPlugin plugin;
+    private final JavaPlugin    plugin;
+    private final QuestListener questListener; // null si non encore initialisé
 
     // ── Valeurs chargées depuis config.yml ───────────────────────────────────
     private int     minHeight;
@@ -33,8 +36,21 @@ public class SummitListener implements Listener {
     private final Map<UUID, Long>    lastTriggered = new HashMap<>();
     private final Map<UUID, Boolean> wasOnSummit   = new HashMap<>();
 
+    /**
+     * Constructeur sans QuestListener — pour les cas où il n'est pas encore disponible.
+     * Utiliser setQuestListener() ensuite.
+     */
     public SummitListener(JavaPlugin plugin) {
-        this.plugin = plugin;
+        this(plugin, null);
+    }
+
+    /**
+     * Constructeur principal — à utiliser depuis CityCore après avoir
+     * créé le QuestListener.
+     */
+    public SummitListener(JavaPlugin plugin, QuestListener questListener) {
+        this.plugin        = plugin;
+        this.questListener = questListener;
         reload();
     }
 
@@ -87,12 +103,19 @@ public class SummitListener implements Listener {
         if (now - last < cooldownMs) return;
 
         lastTriggered.put(uuid, now);
+
+        // ── Effets visuels/sonores ────────────────────────────────
         playSummitSound(player);
+
+        // ── Progression quête personnelle SUMMIT ──────────────────
+        if (questListener != null) {
+            questListener.onSummitReached(player);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    private boolean isSummit(int px, int py, int pz, World world) {
+    public boolean isSummit(int px, int py, int pz, World world) {
         if (py < minHeight) return false;
 
         int maxY = world.getMaxHeight();
@@ -131,6 +154,12 @@ public class SummitListener implements Listener {
     }
 
     // ── Nettoyage à la déconnexion ────────────────────────────────────────────
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        cleanup(event.getPlayer().getUniqueId());
+    }
+
     public void cleanup(UUID uuid) {
         lastTriggered.remove(uuid);
         wasOnSummit.remove(uuid);

@@ -147,10 +147,13 @@ public class CityCore extends JavaPlugin {
         QuestHUD questHUD = new QuestHUD(this, questManager, npcDataManager, questGUIs);
         questHUD.startUpdating();
 
-        getServer().getPluginManager().registerEvents(
-                new QuestListener(questGUIs, questManager, personalQuestManager,
-                        npcDataManager, economy, this, villagerConfigMap, questHUD,
-                        npcManager, notificationManager), this);
+        // ── QuestListener — instancié AVANT SummitListener ───────
+        QuestListener questListener = new QuestListener(
+                questGUIs, questManager, personalQuestManager,
+                npcDataManager, economy, this, villagerConfigMap, questHUD,
+                npcManager, notificationManager);
+
+        getServer().getPluginManager().registerEvents(questListener, this);
 
         // ── GUI Sélection Quêtes (/city quests) ──────────────────
         CityQuestSelectionGUI questSelectionGUI = new CityQuestSelectionGUI(
@@ -170,8 +173,8 @@ public class CityCore extends JavaPlugin {
                 playerDataManager, questSelectionGUI));
         cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager, npcManager));
 
-        // ── Summit event ──────────────────────────────────────────
-        SummitListener summitListener = new SummitListener(this);
+        // ── Summit — instancié APRÈS QuestListener ────────────────
+        SummitListener summitListener = new SummitListener(this, questListener);
         getServer().getPluginManager().registerEvents(summitListener, this);
 
         // ── Listeners globaux ─────────────────────────────────────
