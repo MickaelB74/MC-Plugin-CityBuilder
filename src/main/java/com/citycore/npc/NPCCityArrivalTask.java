@@ -21,28 +21,34 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class NPCCityArrivalTask {
 
-    private final NPCManager      npcManager;
-    private final NPCNotificationManager notificationManager;
-    private final NPCDataManager  dataManager;
-    private final CityManager     cityManager;
-    private final JavaPlugin      plugin;
-    private final BuildingManager buildingManager;
-    private final FindNpcQuestManager findNpcQuestManager;
-    private final Random          random = new Random();
+    private final NPCManager              npcManager;
+    private final NPCNotificationManager  notificationManager;
+    private final NPCDataManager          dataManager;
+    private final CityManager             cityManager;
+    private final JavaPlugin              plugin;
+    private final BuildingManager         buildingManager;
+    private final FindNpcQuestManager     findNpcQuestManager;
+    private final Random                  random = new Random();
 
-    private final Set<CityNPC> blockedNPCs = new HashSet<>();
+    private final Set<CityNPC> blockedNPCs    = new HashSet<>();
+    // Empêche de lancer plusieurs navigations en attente pour le même NPC
+    private final Set<CityNPC> pendingNavigation = new HashSet<>();
 
     public NPCCityArrivalTask(NPCManager npcManager, NPCDataManager dataManager,
-                              CityManager cityManager, JavaPlugin plugin, BuildingManager buildingManager, NPCNotificationManager notificationManager, FindNpcQuestManager findNpcQuestManager) {
-        this.npcManager      = npcManager;
+                              CityManager cityManager, JavaPlugin plugin,
+                              BuildingManager buildingManager,
+                              NPCNotificationManager notificationManager,
+                              FindNpcQuestManager findNpcQuestManager) {
+        this.npcManager          = npcManager;
         this.notificationManager = notificationManager;
-        this.dataManager     = dataManager;
-        this.cityManager     = cityManager;
-        this.plugin          = plugin;
-        this.buildingManager = buildingManager;
+        this.dataManager         = dataManager;
+        this.cityManager         = cityManager;
+        this.plugin              = plugin;
+        this.buildingManager     = buildingManager;
         this.findNpcQuestManager = findNpcQuestManager;
     }
 
@@ -61,7 +67,7 @@ public class NPCCityArrivalTask {
                     switch (state) {
                         case WANDERER -> handleWanderer(type, npc);
                         case ARRIVED  -> handleArrived(type, npc);
-                        case ASSIGNED -> handleAssigned(type, npc); // ✅
+                        case ASSIGNED -> handleAssigned(type, npc);
                     }
                 }
             }
@@ -81,16 +87,14 @@ public class NPCCityArrivalTask {
         cityManager.addResident();
         findNpcQuestManager.onNpcArrived(type);
         npcManager.setWandering(type, true);
-        notificationManager.notifyAll(type,
-                plugin.getServer(), npcManager);
+        notificationManager.notifyAll(type, plugin.getServer(), npcManager);
         plugin.getLogger().info(type.displayName + " est arrivé dans la ville !");
 
         // ✅ Stop le suivi automatiquement
         npc.getEntity().getWorld().getPlayers().forEach(p -> {
             if (npcManager.isFollowing(p, type)) {
                 npcManager.stopFollowing(p, type);
-                p.sendMessage("§a" + type.displayName
-                        + " §aest arrivé dans la ville !");
+                p.sendMessage("§a" + type.displayName + " §aest arrivé dans la ville !");
             }
         });
 
@@ -99,22 +103,21 @@ public class NPCCityArrivalTask {
         if (lines.isEmpty()) return;
 
         npc.getEntity().getLocation().getWorld().getPlayers().stream()
-                .filter(p -> p.getLocation().distance(
-                        npc.getEntity().getLocation()) <= 16)
+                .filter(p -> p.getLocation().distance(npc.getEntity().getLocation()) <= 16)
                 .forEach(p -> TypewriterUtil.play(plugin, p, lines, null));
     }
 
     /* =========================
        ARRIVED — balade aléatoire dans la ville
-       Si suivi actif → le suivi prend le dessus
        Si hors ville → retour vers la ville
        ========================= */
 
     private void handleArrived(CityNPC type, NPC npc) {
         if (!npcManager.isWandering(type)) return;
-
         if (npc.getNavigator().isPaused()) return;
         if (npc.getNavigator().isNavigating()) return;
+        // ✅ FIX : évite de lancer deux navigations async simultanées
+        if (pendingNavigation.contains(type)) return;
 
         Location npcLoc = npc.getEntity().getLocation();
         Chunk chunk     = npcLoc.getChunk();
@@ -123,27 +126,19 @@ public class NPCCityArrivalTask {
             // ✅ Hors ville — retourne vers un chunk claimé
             Location cityCenter = getCityCenter(npcLoc.getWorld());
             if (cityCenter != null) {
-                npc.getNavigator().getDefaultParameters()
-                        .speedModifier(0.6f)
-                        .range(200f)
-                        .useNewPathfinder(true);
-                npc.getNavigator().setTarget(cityCenter);
+                navigateSafely(type, npc, cityCenter, 0.6f, 200f);
             }
         } else {
-            // ✅ Dans la ville — balade aléatoire
+            // ✅ Dans la ville — balade aléatoire (uniquement vers chunks déjà chargés)
             Location randomTarget = getRandomCityLocation(npcLoc.getWorld(), npcLoc);
             if (randomTarget != null) {
-                npc.getNavigator().getDefaultParameters()
-                        .speedModifier(0.4f)
-                        .range(300f)
-                        .useNewPathfinder(true);
-                npc.getNavigator().setTarget(randomTarget);
+                navigateSafely(type, npc, randomTarget, 0.4f, 300f);
             }
         }
     }
 
     /* =========================
-       ASSIGNED — assigné a un batiment
+       ASSIGNED — assigné à un bâtiment
        ========================= */
 
     private void handleAssigned(CityNPC type, NPC npc) {
@@ -152,7 +147,7 @@ public class NPCCityArrivalTask {
         Building building = buildingManager.getAssignedBuilding(type.tag);
         if (building == null) return;
 
-        World world     = npc.getEntity().getWorld();
+        World    world  = npc.getEntity().getWorld();
         Location npcLoc = npc.getEntity().getLocation();
         Location target;
 
@@ -173,30 +168,28 @@ public class NPCCityArrivalTask {
         }
 
         if (target == null) return;
-
         if (npcLoc.distanceSquared(target) < 0.1) return;
 
-        // ✅ Téléportation avant le check isNavigating
+        // ✅ Téléportation si très proche
         if (npcLoc.distanceSquared(target) < 1) {
-            float yaw = getFacingYaw(building);
-            target.setYaw(yaw);
-            target.setPitch(0);
+            float    yaw      = getFacingYaw(building);
+            Location finalTarget = target.clone();
+            finalTarget.setYaw(yaw);
+            finalTarget.setPitch(0);
 
             npc.getNavigator().cancelNavigation();
-            npc.getEntity().teleport(target);
+            npc.getEntity().teleport(finalTarget);
 
-            // Force le yaw après
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (!npc.isSpawned()) return;
-                Location finalLoc = npc.getEntity().getLocation().clone();
-                finalLoc.setYaw(yaw);
-                finalLoc.setPitch(0);
-                npc.getEntity().teleport(finalLoc);
+                Location loc = npc.getEntity().getLocation().clone();
+                loc.setYaw(yaw);
+                loc.setPitch(0);
+                npc.getEntity().teleport(loc);
             }, 5L);
             return;
         }
 
-        // ✅ Check isNavigating seulement pour éviter de spammer setTarget
         if (npc.getNavigator().isNavigating()) return;
 
         npc.getNavigator().getDefaultParameters()
@@ -207,15 +200,14 @@ public class NPCCityArrivalTask {
 
         npc.getNavigator().getLocalParameters()
                 .addSingleUseCallback(cancelReason -> {
-                    if (cancelReason != null) return; // Navigation annulée — pas arrivé
+                    if (cancelReason != null) return;
                     if (!npc.isSpawned()) return;
 
-                    float yaw = getFacingYaw(building);
+                    float    yaw      = getFacingYaw(building);
                     Location finalLoc = npc.getEntity().getLocation().clone();
                     finalLoc.setYaw(yaw);
                     finalLoc.setPitch(0);
 
-                    // Petit délai pour laisser Citizens finir
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         npc.getEntity().teleport(finalLoc);
                     }, 2L);
@@ -224,105 +216,126 @@ public class NPCCityArrivalTask {
         npc.getNavigator().setTarget(target);
     }
 
-    private float getFacingYaw(Building building) {
-        if (building.npcYaw() == null) return 0f;
-        float yaw = ((building.npcYaw() % 360) + 360) % 360;
-        if (yaw > 180) yaw -= 360;
-        if (yaw >= -45 && yaw < 45)   return 0f;    // Sud
-        if (yaw >= 45 && yaw < 135)   return 90f;   // Ouest
-        if (yaw >= 135 || yaw < -135) return 180f;  // Nord
-        return -90f;                                  // Est
-    }
-
-    private boolean isAccessible(World world, Location loc) {
-        int x = loc.getBlockX();
-        int y = loc.getBlockY();
-        int z = loc.getBlockZ();
-        return world.getBlockAt(x, y - 1, z).getType().isSolid()
-                && !world.getBlockAt(x, y, z).getType().isSolid()
-                && !world.getBlockAt(x, y + 1, z).getType().isSolid();
-    }
+    /* =========================
+       NAVIGATION SAFE (async chunk loading)
+       FIX PRINCIPAL : évite le freeze du thread principal
+       ========================= */
 
     /**
-     * Cherche la case accessible la plus proche du point NPC défini.
+     * Lance la navigation vers {@code target} en s'assurant que le chunk
+     * de destination est chargé AVANT d'appeler setTarget().
+     * Si le chunk n'est pas chargé, il est chargé de manière asynchrone,
+     * puis setTarget() est appelé sur le thread principal une fois prêt.
      */
-    private Location findClosestAccessible(World world, Building building,
-                                           Location origin) {
-        Location best   = null;
-        double bestDist = Double.MAX_VALUE;
-
-        for (int x = building.x1(); x <= building.x2(); x++) {
-            for (int z = building.z1(); z <= building.z2(); z++) {
-                int y = world.getHighestBlockYAt(x, z);
-                Location candidate = new Location(world, x + 0.5, y + 1, z + 0.5);
-
-                if (!isAccessible(world, candidate)) continue;
-
-                double dist = origin.distanceSquared(candidate);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    best     = candidate;
-                }
-            }
+    private void navigateSafely(CityNPC type, NPC npc, Location target,
+                                float speed, float range) {
+        if (target.getWorld().isChunkLoaded(
+                target.getBlockX() >> 4, target.getBlockZ() >> 4)) {
+            // Chunk déjà en mémoire → navigation directe, pas de risque de freeze
+            applyNavigation(npc, target, speed, range);
+        } else {
+            // ✅ FIX : charge le chunk de façon async, puis navigue sur le main thread
+            pendingNavigation.add(type);
+            target.getWorld().getChunkAtAsync(target).thenAccept(chunk ->
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        pendingNavigation.remove(type);
+                        if (!npc.isSpawned()) return;
+                        if (npc.getNavigator().isNavigating()) return;
+                        applyNavigation(npc, target, speed, range);
+                    })
+            );
         }
-        return best;
     }
 
-    /**
-     * Vérifie si une location est dans les limites X/Z du bâtiment.
-     */
-    private boolean isInBuilding(Location loc, Building building) {
-        return loc.getBlockX() >= building.x1()
-                && loc.getBlockX() <= building.x2()
-                && loc.getBlockZ() >= building.z1()
-                && loc.getBlockZ() <= building.z2();
-    }
-
-    /**
-     * Cherche une case accessible dans le bâtiment.
-     * Parcourt toutes les cases et retourne la première
-     * où le sol est solide et l'espace au-dessus est libre.
-     * Si aucune n'est parfaite, retourne la plus proche du NPC.
-     */
-    private Location findAccessibleLocation(World world, Building building,
-                                            Location npcLoc) {
-        Location best     = null;
-        double bestDist   = Double.MAX_VALUE;
-
-        for (int x = building.x1(); x <= building.x2(); x++) {
-            for (int z = building.z1(); z <= building.z2(); z++) {
-                int y = world.getHighestBlockYAt(x, z);
-
-                Location candidate = new Location(world, x + 0.5, y + 1, z + 0.5);
-
-                // ✅ Vérifie sol solide + 2 blocs libres au-dessus
-                if (!world.getBlockAt(x, y, z).getType().isSolid()) continue;
-                if (world.getBlockAt(x, y + 1, z).getType().isSolid()) continue;
-                if (world.getBlockAt(x, y + 2, z).getType().isSolid()) continue;
-
-                double dist = npcLoc.distanceSquared(candidate);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    best     = candidate;
-                }
-            }
-        }
-
-        return best;
+    private void applyNavigation(NPC npc, Location target, float speed, float range) {
+        npc.getNavigator().getDefaultParameters()
+                .speedModifier(speed)
+                .range(range)
+                .useNewPathfinder(true);
+        npc.getNavigator().setTarget(target);
     }
 
     /* =========================
        HELPERS
        ========================= */
 
+    private float getFacingYaw(Building building) {
+        if (building.npcYaw() == null) return 0f;
+        float yaw = ((building.npcYaw() % 360) + 360) % 360;
+        if (yaw > 180) yaw -= 360;
+        if (yaw >= -45  && yaw < 45)   return 0f;
+        if (yaw >= 45   && yaw < 135)  return 90f;
+        if (yaw >= 135  || yaw < -135) return 180f;
+        return -90f;
+    }
+
+    private boolean isAccessible(World world, Location loc) {
+        int x = loc.getBlockX();
+        int y = loc.getBlockY();
+        int z = loc.getBlockZ();
+        return  world.getBlockAt(x, y - 1, z).getType().isSolid()
+                && !world.getBlockAt(x, y,     z).getType().isSolid()
+                && !world.getBlockAt(x, y + 1, z).getType().isSolid();
+    }
+
+    private Location findClosestAccessible(World world, Building building, Location origin) {
+        Location best     = null;
+        double   bestDist = Double.MAX_VALUE;
+
+        for (int x = building.x1(); x <= building.x2(); x++) {
+            for (int z = building.z1(); z <= building.z2(); z++) {
+                int      y         = world.getHighestBlockYAt(x, z);
+                Location candidate = new Location(world, x + 0.5, y + 1, z + 0.5);
+                if (!isAccessible(world, candidate)) continue;
+                double dist = origin.distanceSquared(candidate);
+                if (dist < bestDist) { bestDist = dist; best = candidate; }
+            }
+        }
+        return best;
+    }
+
+    private boolean isInBuilding(Location loc, Building building) {
+        return loc.getBlockX() >= building.x1() && loc.getBlockX() <= building.x2()
+                && loc.getBlockZ() >= building.z1() && loc.getBlockZ() <= building.z2();
+    }
+
+    private Location findAccessibleLocation(World world, Building building, Location npcLoc) {
+        Location best     = null;
+        double   bestDist = Double.MAX_VALUE;
+
+        for (int x = building.x1(); x <= building.x2(); x++) {
+            for (int z = building.z1(); z <= building.z2(); z++) {
+                int      y         = world.getHighestBlockYAt(x, z);
+                Location candidate = new Location(world, x + 0.5, y + 1, z + 0.5);
+
+                if (!world.getBlockAt(x, y,     z).getType().isSolid()) continue;
+                if ( world.getBlockAt(x, y + 1, z).getType().isSolid()) continue;
+                if ( world.getBlockAt(x, y + 2, z).getType().isSolid()) continue;
+
+                double dist = npcLoc.distanceSquared(candidate);
+                if (dist < bestDist) { bestDist = dist; best = candidate; }
+            }
+        }
+        return best;
+    }
+
     /**
-     * Retourne une position aléatoire dans un chunk claimé proche du NPC.
+     * Retourne une position aléatoire dans un chunk claimé ET DÉJÀ CHARGÉ proche du NPC.
+     * ✅ FIX : on filtre les chunks non chargés pour éviter getHighestBlockYAt() sur
+     * des chunks absents, ce qui pouvait causer des micro-freezes.
      */
     private Location getRandomCityLocation(World world, Location near) {
         List<long[]> claimed = cityManager.getClaimedChunkCoords(world.getName());
         if (claimed.isEmpty()) return null;
 
-        claimed.sort((a, b) -> {
+        // ✅ FIX : on ne travaille QUE sur les chunks déjà en mémoire
+        List<long[]> loaded = claimed.stream()
+                .filter(c -> world.isChunkLoaded((int) c[0], (int) c[1]))
+                .collect(Collectors.toList());
+
+        if (loaded.isEmpty()) return null;
+
+        loaded.sort((a, b) -> {
             double distA = Math.pow(a[0] * 16 - near.getX(), 2)
                     + Math.pow(a[1] * 16 - near.getZ(), 2);
             double distB = Math.pow(b[0] * 16 - near.getX(), 2)
@@ -330,21 +343,18 @@ public class NPCCityArrivalTask {
             return Double.compare(distA, distB);
         });
 
-        int pick = random.nextInt(Math.min(5, claimed.size()));
-        long[] chunk = claimed.get(pick);
+        int    pick  = random.nextInt(Math.min(5, loaded.size()));
+        long[] chunk = loaded.get(pick);
 
-        // ✅ Plusieurs tentatives pour trouver un sol valide
         for (int attempt = 0; attempt < 20; attempt++) {
-            int x = (int)(chunk[0] * 16 + random.nextInt(16));
-            int z = (int)(chunk[1] * 16 + random.nextInt(16));
-
-            // Descend depuis le plus haut bloc jusqu'à trouver un sol solide non-liquide
+            int x    = (int) (chunk[0] * 16 + random.nextInt(16));
+            int z    = (int) (chunk[1] * 16 + random.nextInt(16));
             int highY = world.getHighestBlockYAt(x, z);
-            // Descend pour ignorer feuilles/bois/végétation
-            int y = highY;
+            int y    = highY;
+
             while (y > 0) {
-                org.bukkit.block.Block floor = world.getBlockAt(x, y, z);
-                org.bukkit.block.Block above = world.getBlockAt(x, y + 1, z);
+                org.bukkit.block.Block floor  = world.getBlockAt(x, y,     z);
+                org.bukkit.block.Block above  = world.getBlockAt(x, y + 1, z);
                 org.bukkit.block.Block above2 = world.getBlockAt(x, y + 2, z);
                 if (floor.getType().isSolid()
                         && !floor.isLiquid()
@@ -359,13 +369,12 @@ public class NPCCityArrivalTask {
         return null;
     }
 
-    // ✅ Exclut les blocs végétaux qui sont "solides" selon Bukkit
     private boolean isVegetation(org.bukkit.Material mat) {
         String name = mat.name();
         return name.contains("LEAVES") || name.contains("LOG")
-                || name.contains("WOOD") || name.contains("GRASS")
-                || name.contains("FERN") || name.contains("FLOWER")
-                || name.contains("BUSH") || name.contains("BAMBOO")
+                || name.contains("WOOD")   || name.contains("GRASS")
+                || name.contains("FERN")   || name.contains("FLOWER")
+                || name.contains("BUSH")   || name.contains("BAMBOO")
                 || mat == org.bukkit.Material.SNOW
                 || mat == org.bukkit.Material.CACTUS;
     }

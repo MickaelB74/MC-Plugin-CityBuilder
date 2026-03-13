@@ -163,7 +163,23 @@ public enum CityNPC {
                         )
                 )
         )
+    ),
+
+    GERALDE(
+            "citycore_geralde",
+                    "§7Geralde",
+                    "Electricien",
+                    "geralde",
+                    "ewogICJ0aW1lc3RhbXAiIDogMTc3MzQwOTE5MTcxMCwKICAicHJvZmlsZUlkIiA6ICJkM2IzMDU4YmIxNGY0Njg5OWRmMWRjMTRlNGRlNTk2YyIsCiAgInByb2ZpbGVOYW1lIiA6ICJzdzNhcnQiLAogICJzaWduYXR1cmVSZXF1aXJlZCIgOiB0cnVlLAogICJ0ZXh0dXJlcyIgOiB7CiAgICAiU0tJTiIgOiB7CiAgICAgICJ1cmwiIDogImh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNDA2ODhkMGU4MDMwYjYzYmY0Yzk2ZGZlOTkxYzZkN2FhNzYzNzc2MmUwNDFjZWNjMWJiZjVlYzcyY2MxZDhmZSIsCiAgICAgICJtZXRhZGF0YSIgOiB7CiAgICAgICAgIm1vZGVsIiA6ICJzbGltIgogICAgICB9CiAgICB9LAogICAgIkNBUEUiIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzI4ZGU0YTgxNjg4YWQxOGI0OWU3MzVhMjczZTA4NmMxOGYxZTM5NjY5NTYxMjNjY2I1NzQwMzRjMDZmNWQzMzYiCiAgICB9CiAgfQp9",
+                    "pgmaIYJxWA4Y1sFVGNxpruWVx5oZ5yLy4CH79G/Tx1fUf53VR0YbKa92CI72AJfiMscmGd5pRRBOBfgVi93VvyBr//vmn8xIV8bgBEKcGIVxl4AK4MGlP7yyHT/dv8THkiJ0nW+kg/w4DDIxdjd0VindL+lEpsFWG1O/5Lqxv4lvr9jngZ5dL8AxOF6ADiJSIkYdFVgPl4La5yOu1JFTZUeriRvNaFewsjI9xDgBtUW3tUW2HLa2lvUXllMQiL+LmntZuznhTlegqIcYw3O9oDOFS0+A0e4H5j5gTWDnVgyff/91Iz1KFCUD5vRi2Uk0tvgLlWfCMRK8AS4RNXRfZJu7RboIM02waOJGz19WydDFTYc8OU/79N4uiFXnOaFnOzXtOzXsOfkiB3sID8xO5IYKjt3iH80Le/+Vc3CDzk2iKHmXeIzXncA7LMB9dV6P8gYj4hmtdrf/76aaGW762wkp3nGqUgTRinX2d7UW9Eq2DIou6PcqpLsLPLJIeFjfjjYuJn/NQ67oYmfNKZQXeOJ4OSPGcvNm+GmlzNsiW5eiKmV20nO9jhQ18uBw4cHVF9YvkNuDMiDxqNo8P7oNSRuWdnqIDBnZx7hWttigbXeOUySSwLSxAByu40pYfAgm3c0wQarIyITW9zCb0aq5hu3MqEhjjA5ag12KUxGsXEw=",
+            Map.of(
+                    "first_meeting", List.of("coucou"),
+                    "city_arrival", List.of("haaaaaa"),
+                    "building_assign", List.of("merci")
+            ),
+            Map.of()
     );
+
 
 
     /* =========================

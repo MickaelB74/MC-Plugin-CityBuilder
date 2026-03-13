@@ -438,6 +438,128 @@ gandalf:
           base-amount: 1
 
 # ============================================================
+#  GERALDE
+# ============================================================
+geralde:
+  xp-per-stack: 10
+  xp-per-coin: 1
+  level-thresholds:
+    2: 500
+    3: 1500
+    4: 3000
+    5: 5000
+  sell-prices:
+    COBBLESTONE:
+      price: 2
+      quantity: 64
+    STONE:
+      price: 3
+      quantity: 64
+    GRANITE:
+      price: 4
+      quantity: 64
+    DIORITE:
+      price: 4
+      quantity: 64
+    ANDESITE:
+      price: 4
+      quantity: 64
+    GRAVEL:
+      price: 2
+      quantity: 64
+    SAND:
+      price: 2
+      quantity: 64
+    SANDSTONE:
+      price: 3
+      quantity: 64
+    DEEPSLATE:
+      price: 5
+      quantity: 64
+    OBSIDIAN:
+      price: 20
+      quantity: 16
+  shop:
+    1:
+      - material: STONE_PICKAXE
+        price: 50
+        quantity: 1
+      - material: STONE_SHOVEL
+        price: 30
+        quantity: 1
+    2:
+      - material: IRON_PICKAXE
+        price: 150
+        quantity: 1
+      - material: IRON_SHOVEL
+        price: 100
+        quantity: 1
+      - material: CHISELED_STONE_BRICKS
+        price: 20
+        quantity: 16
+    3:
+      - material: DIAMOND_PICKAXE
+        price: 500
+        quantity: 1
+      - material: SMOOTH_STONE
+        price: 10
+        quantity: 32
+      - material: POLISHED_GRANITE
+        price: 15
+        quantity: 32
+    4:
+      - material: NETHERITE_PICKAXE
+        price: 2000
+        quantity: 1
+      - material: DEEPSLATE_BRICKS
+        price: 25
+        quantity: 32
+      - material: SCULK
+        price: 50
+        quantity: 16
+  quests:
+    quantity-multiplier:
+      1: 1
+      2: 1.5
+      3: 2
+      4: 2.5
+      5: 3
+    main:
+      xp-reward-per-level: 50
+      reward-per-level: 100
+      objectives-count: 2
+      item-pool:
+        - material: COBBLESTONE
+          base-amount: 64
+        - material: STONE
+          base-amount: 32
+        - material: GRAVEL
+          base-amount: 64
+        - material: SAND
+          base-amount: 64
+        - material: DEEPSLATE
+          base-amount: 32
+    special:
+      xp-reward-per-level: 50
+      reward-per-level: 300
+      objectives-count: 3
+      item-pool:
+        - material: OBSIDIAN
+          base-amount: 16
+        - material: GRANITE
+          base-amount: 64
+        - material: ANDESITE
+          base-amount: 64
+      entity-pool:
+        - entity: CREEPER
+          base-amount: 5
+        - entity: ZOMBIE
+          base-amount: 10
+        - entity: SKELETON
+          base-amount: 8
+
+
+# ============================================================
 #  SOMMET — Summit Listener
 # ============================================================
 summit:
