@@ -587,3 +587,15 @@ summit:
 
   # Message envoyé au joueur (vide = aucun message)
   message: "§b⛰ §eVous avez atteint un sommet !"
+
+# ============================================================
+#  DRAGON — Dragon Listener
+# ============================================================
+dragon:
+  enabled: true
+  min-height: 500          # altitude de déclenchement (blocs)
+  sound-key: "citycore:dragon"
+  sound-volume: 1.0
+  sound-pitch: 1.0
+  cooldown-seconds: 120
+  message: "§5🐉 §dVous planez au-dessus des nuages !"

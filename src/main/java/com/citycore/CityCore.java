@@ -19,6 +19,7 @@ import com.citycore.quest.city.FindNpcQuestListener;
 import com.citycore.quest.city.FindNpcQuestManager;
 import com.citycore.quest.personal.NPCPersonalQuestGUI;
 import com.citycore.quest.personal.NPCPersonalQuestManager;
+import com.citycore.summit.DragonListener;
 import com.citycore.summit.SummitListener;
 import com.citycore.util.ChatInputManager;
 import com.citycore.util.ChunkListener;
@@ -176,6 +177,9 @@ public class CityCore extends JavaPlugin {
         // ── Summit — instancié APRÈS QuestListener ────────────────
         SummitListener summitListener = new SummitListener(this, questListener);
         getServer().getPluginManager().registerEvents(summitListener, this);
+
+        // Dragon
+        getServer().getPluginManager().registerEvents(new DragonListener(this), this);
 
         // ── Listeners globaux ─────────────────────────────────────
         getServer().getPluginManager().registerEvents(

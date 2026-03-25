@@ -78,11 +78,16 @@ public class SummitListener implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         if (!enabled) return;
 
-        // Optimisation : ignorer si le joueur n'a pas changé de bloc Y
         if (event.getFrom().getBlockY() == event.getTo().getBlockY()) return;
 
         Player player = event.getPlayer();
         UUID   uuid   = player.getUniqueId();
+
+        // ── Contrainte : le joueur doit être à pied ───────────────────────────
+        if (player.isGliding())              return; // élytre
+        if (player.isFlying())               return; // vol créatif / spectateur
+        if (player.getVehicle() != null)     return; // monture (cheval, bateau, dragon…)
+        if (player.isSwimming())             return; // nage
 
         boolean onSummit = isSummit(
                 event.getTo().getBlockX(),
@@ -91,23 +96,19 @@ public class SummitListener implements Listener {
                 event.getTo().getWorld()
         );
 
-        // Déclencher uniquement au moment où le joueur ARRIVE sur un sommet
         boolean wasOn = wasOnSummit.getOrDefault(uuid, false);
         wasOnSummit.put(uuid, onSummit);
 
         if (!onSummit || wasOn) return;
 
-        // Cooldown
         long now  = System.currentTimeMillis();
         long last = lastTriggered.getOrDefault(uuid, 0L);
         if (now - last < cooldownMs) return;
 
         lastTriggered.put(uuid, now);
 
-        // ── Effets visuels/sonores ────────────────────────────────
         playSummitSound(player);
 
-        // ── Progression quête personnelle SUMMIT ──────────────────
         if (questListener != null) {
             questListener.onSummitReached(player);
         }
