@@ -599,3 +599,17 @@ dragon:
   sound-pitch: 1.0
   cooldown-seconds: 120
   message: "§5🐉 §dVous planez au-dessus des nuages !"
+
+# ============================================================
+#  PIRATE — Pirate listener
+# ============================================================
+pirate:
+  enabled: true
+  sound-key: "citycore:pirate"
+  sound-volume: 1.0
+  sound-pitch: 1.0
+  cooldown-seconds: 180
+  message: "§6☀ §eL'horizon rougit sous vos yeux, capitaine !"
+  time-start: 11500   # début du coucher (~11500 = 17h30 in-game)
+  time-end: 13000     # fin du coucher  (~13000 = 19h00 in-game)
+  yaw-tolerance: 30.0 # tolérance angulaire en degrés autour de l'ouest

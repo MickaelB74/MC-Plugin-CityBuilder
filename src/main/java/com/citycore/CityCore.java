@@ -20,6 +20,7 @@ import com.citycore.quest.city.FindNpcQuestManager;
 import com.citycore.quest.personal.NPCPersonalQuestGUI;
 import com.citycore.quest.personal.NPCPersonalQuestManager;
 import com.citycore.summit.DragonListener;
+import com.citycore.summit.PirateListener;
 import com.citycore.summit.SummitListener;
 import com.citycore.util.ChatInputManager;
 import com.citycore.util.ChunkListener;
@@ -180,6 +181,9 @@ public class CityCore extends JavaPlugin {
 
         // Dragon
         getServer().getPluginManager().registerEvents(new DragonListener(this), this);
+
+        // Pirate
+        getServer().getPluginManager().registerEvents(new PirateListener(this), this);
 
         // ── Listeners globaux ─────────────────────────────────────
         getServer().getPluginManager().registerEvents(
