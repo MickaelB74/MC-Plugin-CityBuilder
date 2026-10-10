@@ -44,14 +44,14 @@ public class CityTabCompleter implements TabCompleter {
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "deposit"  -> List.of("100", "500", "1000", "5000");
-                case "create"   -> cityManager.isCityInitialized()
-                        ? new ArrayList<>()
-                        : List.of("<nom_de_ville>");
+                case "create"   -> new ArrayList<>(); // la ville s'appelle Valmont : rien à saisir
                 case "npc"      -> Arrays.stream(CityNPC.values())
                         .filter(n -> n != CityNPC.MAYOR)
                         .map(n -> n.tag.replace("citycore_", ""))
                         .collect(Collectors.toList());
-                case "quests"   -> List.of("toggle");
+                case "quests"   -> List.of("toggle", "recits");
+                case "ui"       -> List.of("valmont", "classique");
+                case "eco"      -> player.isOp() ? List.of("check") : new ArrayList<>();
                 case "build"    -> List.of("new", "show", "remove", "assign", "skip");
                 case "player"   -> player.isOp()
                         ? Bukkit.getOnlinePlayers().stream()

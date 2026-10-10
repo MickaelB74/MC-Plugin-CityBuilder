@@ -113,6 +113,7 @@ public class NPCCityArrivalTask {
        ========================= */
 
     private void handleArrived(CityNPC type, NPC npc) {
+        if (npcManager.isFollowingSomeone(type)) return; // accompagne un joueur
         if (!npcManager.isWandering(type)) return;
         if (npc.getNavigator().isPaused()) return;
         if (npc.getNavigator().isNavigating()) return;
@@ -123,17 +124,13 @@ public class NPCCityArrivalTask {
         Chunk chunk     = npcLoc.getChunk();
 
         if (!cityManager.isChunkClaimed(chunk)) {
-            // ✅ Hors ville — retourne vers un chunk claimé
-            Location cityCenter = getCityCenter(npcLoc.getWorld());
-            if (cityCenter != null) {
-                navigateSafely(type, npc, cityCenter, 0.6f, 200f);
-            }
+            // Hors ville : retour vers le centre (marche si c'est près, sinon téléportation)
+            Location cityCenter = getCityCenter(type, npcLoc.getWorld());
+            if (cityCenter != null) SafeNavigation.walkTo(npc, cityCenter, 0.6f, true);
         } else {
-            // ✅ Dans la ville — balade aléatoire (uniquement vers chunks déjà chargés)
+            // Dans la ville : balade vers un chunk claimé déjà chargé, à portée de marche
             Location randomTarget = getRandomCityLocation(npcLoc.getWorld(), npcLoc);
-            if (randomTarget != null) {
-                navigateSafely(type, npc, randomTarget, 0.4f, 300f);
-            }
+            if (randomTarget != null) SafeNavigation.walkTo(npc, randomTarget, 0.4f, false);
         }
     }
 
@@ -142,6 +139,7 @@ public class NPCCityArrivalTask {
        ========================= */
 
     private void handleAssigned(CityNPC type, NPC npc) {
+        if (npcManager.isFollowingSomeone(type)) return; // accompagne un joueur
         if (npc.getNavigator().isPaused()) return;
 
         Building building = buildingManager.getAssignedBuilding(type.tag);
@@ -150,6 +148,25 @@ public class NPCCityArrivalTask {
         World    world  = npc.getEntity().getWorld();
         Location npcLoc = npc.getEntity().getLocation();
         Location target;
+
+        // Bâtiment dans des chunks non chargés : lire ses blocs les chargerait de force, chaque
+        // seconde. Avec un point PNJ connu, on l'y envoie directement ; sinon on attend.
+        if (!buildingLoaded(world, building)) {
+            if (building.hasNpcPoint() && !pendingNavigation.contains(type)) {
+                Location point = new Location(world, building.npcX(), building.npcY(), building.npcZ(),
+                        getFacingYaw(building), 0f);
+                if (npcLoc.distanceSquared(point) < 4) return; // déjà à son poste
+                pendingNavigation.add(type);
+                world.getChunkAtAsync(point).whenComplete((c, err) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                    pendingNavigation.remove(type);
+                    if (c != null && npc.isSpawned() && !npcManager.isFollowingSomeone(type)) {
+                        npc.getNavigator().cancelNavigation();
+                        npc.teleport(point, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN);
+                    }
+                }));
+            }
+            return;
+        }
 
         if (building.hasNpcPoint()) {
             Location defined = new Location(world,
@@ -192,12 +209,24 @@ public class NPCCityArrivalTask {
 
         if (npc.getNavigator().isNavigating()) return;
 
-        npc.getNavigator().getDefaultParameters()
-                .speedModifier(0.5f)
-                .range(200f)
-                .distanceMargin(0.1f)
-                .useNewPathfinder(true);
+        npc.getNavigator().getDefaultParameters().distanceMargin(0.1f);
+        // Chemin court dans une zone chargée ; trop loin : téléportation directe à son poste
+        SafeNavigation.Result result = SafeNavigation.walkTo(npc, target, 0.5f, true);
+        if (result == SafeNavigation.Result.TELEPORTED) {
+            float yaw = getFacingYaw(building);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!npc.isSpawned()) return;
+                Location loc = npc.getEntity().getLocation().clone();
+                loc.setYaw(yaw);
+                loc.setPitch(0);
+                npc.getEntity().teleport(loc);
+            }, 2L);
+            return;
+        }
+        if (result != SafeNavigation.Result.WALKING) return;
 
+        // Rappel de fin de chemin : ajouté APRÈS setTarget, sur les paramètres de CE trajet
+        // (avant, il s'ajoutait aux paramètres par défaut et s'accumulait à chaque trajet)
         npc.getNavigator().getLocalParameters()
                 .addSingleUseCallback(cancelReason -> {
                     if (cancelReason != null) return;
@@ -209,55 +238,24 @@ public class NPCCityArrivalTask {
                     finalLoc.setPitch(0);
 
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                        npc.getEntity().teleport(finalLoc);
+                        if (npc.isSpawned()) npc.getEntity().teleport(finalLoc);
                     }, 2L);
                 });
-
-        npc.getNavigator().setTarget(target);
-    }
-
-    /* =========================
-       NAVIGATION SAFE (async chunk loading)
-       FIX PRINCIPAL : évite le freeze du thread principal
-       ========================= */
-
-    /**
-     * Lance la navigation vers {@code target} en s'assurant que le chunk
-     * de destination est chargé AVANT d'appeler setTarget().
-     * Si le chunk n'est pas chargé, il est chargé de manière asynchrone,
-     * puis setTarget() est appelé sur le thread principal une fois prêt.
-     */
-    private void navigateSafely(CityNPC type, NPC npc, Location target,
-                                float speed, float range) {
-        if (target.getWorld().isChunkLoaded(
-                target.getBlockX() >> 4, target.getBlockZ() >> 4)) {
-            // Chunk déjà en mémoire → navigation directe, pas de risque de freeze
-            applyNavigation(npc, target, speed, range);
-        } else {
-            // ✅ FIX : charge le chunk de façon async, puis navigue sur le main thread
-            pendingNavigation.add(type);
-            target.getWorld().getChunkAtAsync(target).thenAccept(chunk ->
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        pendingNavigation.remove(type);
-                        if (!npc.isSpawned()) return;
-                        if (npc.getNavigator().isNavigating()) return;
-                        applyNavigation(npc, target, speed, range);
-                    })
-            );
-        }
-    }
-
-    private void applyNavigation(NPC npc, Location target, float speed, float range) {
-        npc.getNavigator().getDefaultParameters()
-                .speedModifier(speed)
-                .range(range)
-                .useNewPathfinder(true);
-        npc.getNavigator().setTarget(target);
     }
 
     /* =========================
        HELPERS
        ========================= */
+
+    /** Tous les chunks du bâtiment sont-ils chargés (lecture de ses blocs sans chargement forcé) ? */
+    private boolean buildingLoaded(World world, Building building) {
+        for (int cx = building.x1() >> 4; cx <= building.x2() >> 4; cx++) {
+            for (int cz = building.z1() >> 4; cz <= building.z2() >> 4; cz++) {
+                if (!world.isChunkLoaded(cx, cz)) return false;
+            }
+        }
+        return true;
+    }
 
     private float getFacingYaw(Building building) {
         if (building.npcYaw() == null) return 0f;
@@ -380,16 +378,27 @@ public class NPCCityArrivalTask {
     }
 
     /**
-     * Retourne le centre géographique de la ville (moyenne des chunks claimés).
+     * Retourne le centre géographique de la ville (moyenne des chunks claimés), ou null si son
+     * chunk n'est pas encore chargé : il est alors chargé en arrière-plan pour un prochain passage.
      */
-    private Location getCityCenter(World world) {
+    private Location getCityCenter(CityNPC type, World world) {
         List<long[]> claimed = cityManager.getClaimedChunkCoords(world.getName());
         if (claimed.isEmpty()) return null;
 
         double avgX = claimed.stream().mapToLong(c -> c[0]).average().orElse(0) * 16 + 8;
         double avgZ = claimed.stream().mapToLong(c -> c[1]).average().orElse(0) * 16 + 8;
-        double y    = world.getHighestBlockYAt((int) avgX, (int) avgZ) + 1;
-
+        int cx = (int) Math.floor(avgX) >> 4, cz = (int) Math.floor(avgZ) >> 4;
+        if (!world.isChunkLoaded(cx, cz)) {
+            if (pendingNavigation.add(type)) {
+                world.getChunkAtAsync(cx, cz).whenComplete((c, err) ->
+                        Bukkit.getScheduler().runTask(plugin, () -> pendingNavigation.remove(type)));
+            }
+            return null;
+        }
+        // Sol naturel : un centre placé sur la cime d'un arbre serait inaccessible
+        Location ground = com.citycore.util.GroundFinder.groundAt(world, (int) Math.floor(avgX), (int) Math.floor(avgZ));
+        if (ground != null) return ground;
+        double y = world.getHighestBlockYAt((int) avgX, (int) avgZ, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
         return new Location(world, avgX, y, avgZ);
     }
 }

@@ -7,6 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +24,50 @@ public class CityManager {
     public CityManager(DatabaseManager db, JavaPlugin plugin) {
         this.db     = db;
         this.plugin = plugin;
+        ensureBonusColumn();
+        ensureGiftColumn();
+    }
+
+    /** Colonne mayor_gift : le cadeau de fondation d'Alderic n'est versé qu'une fois. */
+    private void ensureGiftColumn() {
+        try {
+            db.execute("ALTER TABLE city ADD COLUMN mayor_gift INTEGER NOT NULL DEFAULT 0");
+            // Base existante : une ville qui a déjà des emplacements a reçu le cadeau
+            db.execute("UPDATE city SET mayor_gift = 1 WHERE max_chunks > 1");
+        } catch (SQLException ignored) {
+            // Colonne déjà présente
+        }
+    }
+
+    public boolean isMayorGiftGiven() {
+        // Pas de ville ou erreur : on considère le cadeau donné (jamais en double)
+        return db.queryInt("SELECT mayor_gift FROM city WHERE id = 1", "mayor_gift", 1) == 1;
+    }
+
+    public void markMayorGiftGiven() {
+        try {
+            db.execute("UPDATE city SET mayor_gift = 1 WHERE id = 1");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Colonne bonus_chunks : emplacements offerts (création, première rencontre du maire,
+     * récompenses de palier). Ils ne comptent pas dans le prix des agrandissements.
+     */
+    private void ensureBonusColumn() {
+        try {
+            db.execute("ALTER TABLE city ADD COLUMN bonus_chunks INTEGER NOT NULL DEFAULT 0");
+            // Base existante : on considère les emplacements de départ comme offerts
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET bonus_chunks = MIN(max_chunks, ?)");
+            ps.setInt(1, 1 + getFreeChunks());
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException ignored) {
+            // Colonne déjà présente
+        }
     }
 
     /* =========================
@@ -30,23 +75,14 @@ public class CityManager {
        ========================= */
 
     public boolean isCityInitialized() {
-        try {
-            ResultSet rs = db.getConnection()
-                    .createStatement()
-                    .executeQuery("SELECT COUNT(*) FROM city");
-            rs.next();
-            return rs.getInt(1) > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
+        return db.queryInt("SELECT COUNT(*) AS n FROM city", "n", 0) > 0;
     }
 
     public void initializeCity(String name) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
-                INSERT INTO city (id, name, level, coins, max_chunks, residents)
-                VALUES (1, ?, 1, 0, 1, 0)
+                INSERT INTO city (id, name, level, coins, max_chunks, residents, bonus_chunks)
+                VALUES (1, ?, 1, 0, 1, 0, 1)
             """);
             ps.setString(1, name);
             ps.executeUpdate();
@@ -61,15 +97,7 @@ public class CityManager {
        ========================= */
 
     public int getCityCoins() {
-        try {
-            ResultSet rs = db.getConnection()
-                    .createStatement()
-                    .executeQuery("SELECT coins FROM city WHERE id = 1");
-            if (rs.next()) return rs.getInt("coins");
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return db.queryInt("SELECT coins FROM city WHERE id = 1", "coins", 0);
     }
 
     public int addCityCoins(int amount) {
@@ -112,15 +140,7 @@ public class CityManager {
        ========================= */
 
     public int getResidentCount() {
-        try {
-            ResultSet rs = db.getConnection()
-                    .createStatement()
-                    .executeQuery("SELECT residents FROM city WHERE id = 1");
-            if (rs.next()) return rs.getInt("residents");
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return db.queryInt("SELECT residents FROM city WHERE id = 1", "residents", 0);
     }
 
     public void addResident() {
@@ -166,10 +186,9 @@ public class CityManager {
         int  basePrice   = cfg.getInt("city-expand.base-price",  DEFAULT_BASE_PRICE);
         double mult      = cfg.getDouble("city-expand.multiplier", DEFAULT_MULTIPLIER);
         int  maxPrice    = cfg.getInt("city-expand.max-price",   DEFAULT_MAX_PRICE);
-        int  freeChunks  = cfg.getInt("city-expand.free-chunks", DEFAULT_FREE_CHUNKS);
 
-        // Nombre de slots déjà achetés (hors slots gratuits)
-        int paidSlots = Math.max(0, getMaxChunks() - freeChunks);
+        // Nombre de slots déjà achetés (hors slots offerts : départ, maire, paliers)
+        int paidSlots = Math.max(0, getMaxChunks() - getBonusChunks());
 
         // Prix = basePrice * multiplier^paidSlots, plafonné à maxPrice
         double price = basePrice * Math.pow(mult, paidSlots);
@@ -288,28 +307,11 @@ public class CityManager {
     }
 
     public int getClaimedChunkCount() {
-        try {
-            ResultSet rs = db.getConnection()
-                    .createStatement()
-                    .executeQuery("SELECT COUNT(*) FROM claimed_chunks");
-            rs.next();
-            return rs.getInt(1);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return 0;
-        }
+        return db.queryInt("SELECT COUNT(*) AS n FROM claimed_chunks", "n", 0);
     }
 
     public int getMaxChunks() {
-        try {
-            ResultSet rs = db.getConnection()
-                    .createStatement()
-                    .executeQuery("SELECT max_chunks FROM city WHERE id = 1");
-            if (rs.next()) return rs.getInt("max_chunks");
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return db.queryInt("SELECT max_chunks FROM city WHERE id = 1", "max_chunks", 0);
     }
 
     public boolean canClaimChunk() {
@@ -336,10 +338,9 @@ public class CityManager {
        ========================= */
 
     public City getCity() {
-        try {
-            ResultSet rs = db.getConnection()
-                    .createStatement()
-                    .executeQuery("SELECT name, level, coins, max_chunks, residents FROM city WHERE id = 1");
+        try (Statement st = db.getConnection().createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT name, level, coins, max_chunks, residents FROM city WHERE id = 1")) {
             if (!rs.next()) return null;
             return new City(
                     rs.getString("name"),
@@ -356,15 +357,25 @@ public class CityManager {
     }
 
     public String getCityName() {
+        return db.queryString("SELECT name FROM city WHERE id = 1", "name", "Ville");
+    }
+
+    public int getBonusChunks() {
+        return db.queryInt("SELECT bonus_chunks FROM city WHERE id = 1", "bonus_chunks", 0);
+    }
+
+    /** Ajoute des emplacements offerts (n'augmentent pas le prix des agrandissements). */
+    public void addBonusChunks(int amount) {
         try {
-            ResultSet rs = db.getConnection()
-                    .createStatement()
-                    .executeQuery("SELECT name FROM city WHERE id = 1");
-            if (rs.next()) return rs.getString("name");
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE city SET max_chunks = max_chunks + ?, bonus_chunks = bonus_chunks + ? WHERE id = 1");
+            ps.setInt(1, amount);
+            ps.setInt(2, amount);
+            ps.executeUpdate();
+            ps.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return "Ville";
     }
 
     public void addMaxChunks(int amount) {

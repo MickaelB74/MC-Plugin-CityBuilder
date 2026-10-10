@@ -122,6 +122,27 @@ public class PlayerDataManager {
         setJob(uuid, null);
     }
 
+    /**
+     * Retire les jobs liés à un PNJ qui n'existe plus.
+     * @return nombre de joueurs concernés
+     */
+    public int clearUnknownJobs(java.util.Set<String> knownTags) {
+        if (knownTags.isEmpty()) return 0;
+        String placeholders = String.join(",", java.util.Collections.nCopies(knownTags.size(), "?"));
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE players SET job = NULL WHERE job IS NOT NULL AND job NOT IN (" + placeholders + ")");
+            int i = 1;
+            for (String tag : knownTags) ps.setString(i++, tag);
+            int affected = ps.executeUpdate();
+            ps.close();
+            return affected;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
     /* =========================
        HELPERS
        ========================= */

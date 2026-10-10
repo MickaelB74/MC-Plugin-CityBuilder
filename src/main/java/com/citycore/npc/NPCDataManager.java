@@ -145,6 +145,25 @@ public class NPCDataManager {
         }
     }
 
+    /**
+     * Retire jusqu'à {@code amount} items du stock, sans descendre sous zéro
+     * (consommation naturelle des stocks).
+     */
+    public void removeUpTo(CityNPC npc, Material mat, int amount) {
+        if (amount <= 0) return;
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE npc_inventory SET amount = MAX(0, amount - ?) WHERE npc_tag = ? AND material = ?");
+            ps.setInt(1, amount);
+            ps.setString(2, npc.tag);
+            ps.setString(3, mat.name());
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     public int getInventoryAmount(CityNPC npc, Material mat) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement(
@@ -256,6 +275,13 @@ public class NPCDataManager {
             ps3.setString(1, npc.tag);
             ps3.executeUpdate();
             ps3.close();
+
+            // Reset approvisionnement de boutique (table créée par MarketService)
+            PreparedStatement ps4 = db.getConnection().prepareStatement(
+                    "DELETE FROM npc_shop_supply WHERE npc_tag = ?");
+            ps4.setString(1, npc.tag);
+            ps4.executeUpdate();
+            ps4.close();
 
         } catch (SQLException e) {
             e.printStackTrace();

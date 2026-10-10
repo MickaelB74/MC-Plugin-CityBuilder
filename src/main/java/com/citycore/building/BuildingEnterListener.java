@@ -50,7 +50,7 @@ public class BuildingEnterListener implements Listener {
                         ? cityManager.getCityName()
                         : "Ville";
 
-                player.sendActionBar("§e" + cityName + " : §f" + building.name()
+                com.citycore.util.TypewriterUtil.actionBar(player, "§e" + cityName + " : §f" + building.name()
                 );
             }
         } else {

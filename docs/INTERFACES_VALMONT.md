@@ -1,0 +1,106 @@
+# Interfaces illustrées « Valmont »
+
+Les menus des habitants (artisans, quêtes, récits, maire) sont dessinés par un petit pack de
+ressources généré par le plugin. Seuls les menus ouverts par les PNJ changent : coffres, fours,
+villageois et autres menus du jeu restent ceux de Minecraft. Le pack ne modifie aucune texture
+de bloc ni d'objet.
+
+Aperçus : `docs/ui-previews/*.png` (agrandis 3 fois).
+
+## Écrans couverts
+
+| Habitant | Écrans |
+|---|---|
+| Artisan rencontré hors de la ville | Portrait sur décor de route, « Suivez-moi / Attendez ici », son histoire, étapes du recrutement |
+| Artisan arrivé en ville | « Son logis » (liste des bâtiments libres), « Promenade / Restez ici », son histoire |
+| Artisan installé | Portrait, rang (étoiles), barre d'expérience, travail, suivi, Vendre, Entrepôt, Boutique, Quêtes |
+| Vendre / Entrepôt / Boutique | Grille 9 × 4 avec pagination, cadres de couleur (prix plein, prix réduit, entrepôt plein, rupture, cadenas pour les articles d'un rang supérieur), bourse du joueur |
+| Quêtes d'un artisan | Cartes « principale » et « spéciale » : récompense ou temps de repos, objectifs avec progression, bouton Accepter / Valider / En cours / En repos, accès aux récits |
+| Récits (quêtes personnelles) | Les cinq récits, un par rang : progression et état (accompli, en cours, à accepter) ; ceux d'un rang pas encore atteint sont verrouillés (cadenas, titre illisible, rang requis) |
+| Alderic (maire) | Accueil (palier, parcelles, quêtes, bâtiments, trésor, agrandir), quêtes de la cité avec récit et charte, bâtiments (liste et suppression), trésor (caisse, bourse, dépôt) |
+| Journal de quêtes (`/city quests`), onglet « Suivi » | Habitants ayant une quête en cours (anneau vert = suivi, gris = masqué), position du panneau (Bord, Marge, Près), panneau affiché / masqué, « Tous » pour tout suivre. Aperçu : `docs/ui-previews/quetes_suivies.png` |
+| Journal de quêtes, onglet « Récits » (`/city quests recits`) | Tous les personnages à récits, dans l'ordre de la trame : survivants (rangées 1 et 2), légendes (rangée 3). Cadenas = pas encore à Valmont ; anneau doré = récit à accepter, ambre = récit en cours, vert = à jour, gris = en ville sans atelier, rouge = mod absent. La bulle liste ses cinq récits (✔ accompli, ● en cours avec avancement, ! à accepter, cadenas et rang requis). Un clic sur un personnage installé ouvre l'écran de ses récits (le même que chez lui, retour vers le journal). Rangée 4 : bilan (à accepter, en cours) ; rangée 5 : récits accomplis, tous personnages. Aperçu : `docs/ui-previews/journal_recits.png` |
+
+Toute la logique reste celle des menus classiques (prix, stocks, XP, messages) : les nouveaux
+écrans appellent exactement les mêmes actions.
+
+## Affichages hors des menus
+
+Ces deux affichages utilisent le même panneau compact : bandeau doré titré, lignes de 8 pixels
+en petites capitales, barre de progression fine sous les objectifs.
+
+- **Liste des joueurs (touche Tab)** : par-dessus la liste de Minecraft, une plaque « MyCivilisation »
+  au centre, le panneau de la **cité** à gauche (nom, palier et niveau, habitants, trésor,
+  parcelles avec barre) et celui du **joueur** à droite (pseudo, niveau, barre d'expérience,
+  bourse, métier). Les joueurs connectés restent listés au milieu, entre les deux panneaux.
+  Aperçus : `docs/ui-previews/tab.png` et `docs/ui-previews/ecran_tab_1080p.png` (écran entier).
+  - Les panneaux sont placés à 72 pixels d'interface de part et d'autre du centre : au-delà de
+    20 joueurs connectés (liste sur plusieurs colonnes) ou avec des pseudos très longs, la liste
+    peut passer sous les panneaux.
+- **Panneau « Quêtes »** (remplace le tableau de droite) : à gauche de l'écran, 84 pixels de large.
+  Une ligne par habitant, puis ses objectifs avec leur barre ; « ★ Voir … ! » quand une quête est
+  prête à valider ; 12 lignes au plus. Aperçu : `docs/ui-previews/hud_quetes.png`.
+  - Trois positions, au choix de chaque joueur dans `/city quests` : **Bord** (contre le bord
+    gauche en 1080p avec l'échelle d'interface 4, réglage par défaut), **Marge** (un peu plus au
+    centre : écrans 1440p, 720p, 1366 × 768) et **Près** (juste à gauche de l'inventaire : écrans
+    16:10 ou interface agrandie). Minecraft place ce panneau par rapport au centre de l'écran : le
+    serveur ne connaît pas la taille de l'écran du joueur, d'où ce choix manuel.
+  - Minecraft ne prévient pas le serveur quand un joueur ouvre son inventaire : le panneau est donc
+    affiché en permanence (comme l'ancien tableau), et l'inventaire l'assombrit comme le reste.
+  - `/city quests` ouvre le journal de quêtes (onglet « Suivi ») ; `/city quests toggle` masque ou
+    réaffiche le panneau ; `/city quests recits` ouvre directement l'onglet « Récits ». Ces réglages
+    (habitants suivis, position, affichage) sont gardés après une déconnexion ou un redémarrage.
+    Sans le pack, le tableau de droite reste affiché et le journal classique est utilisé (têtes à
+    cliquer, livre « Récits des habitants » en bas, même grille des personnages).
+  - Technique : il est dessiné dans le titre d'une barre de boss blanche dont le pack rend la barre
+    invisible. Les barres de boss **blanches** d'autres plugins perdent donc leur barre (leur titre
+    reste affiché) ; les barres des boss du jeu (dragon, Wither, raids) ne sont pas concernées, mais
+    elles s'affichent sous la barre invisible du panneau (19 pixels plus bas qu'à l'habitude).
+
+## Fonctionnement
+
+- Au démarrage, le plugin construit `plugins/CityCore/ui-pack/CityCore-UI.zip` à partir des images
+  embarquées, puis le propose à chaque joueur à la connexion.
+- Chaque image est un caractère d'une police ; le titre du coffre dessine toute l'interface. Sous
+  les boutons dessinés, des objets invisibles portent les bulles d'information et les clics.
+- Les portraits sont redessinés pixel par pixel à partir du vrai skin du personnage (lu une fois
+  sur le serveur de textures de Mojang, puis mis en cache dans `ui-pack/skins/`). Sans skin connu,
+  une silhouette encapuchonnée le remplace : renseignez `npc-skins.<clé>` dans config.yml.
+- Un joueur qui refuse le pack garde les menus classiques. `/city ui classique` et
+  `/city ui valmont` permettent de changer de style à tout moment.
+
+## Hébergement du pack (config.yml, section `ui-pack`)
+
+| Clé | Rôle |
+|---|---|
+| `enabled` | Active les menus illustrés |
+| `self-host` / `port` | Le plugin sert lui-même le pack (port 8164 par défaut) |
+| `public-address` | Adresse que les joueurs utilisent pour joindre le serveur. Vide = adresse locale détectée (même PC ou réseau local) |
+| `url` | Adresse externe où vous avez déposé `CityCore-UI.zip` (prioritaire). Le fichier doit être identique à celui généré |
+| `required` | `true` = pack obligatoire (un refus déconnecte) |
+
+Pour des joueurs venant d'Internet : ouvrez le port choisi sur la box ou chez l'hébergeur, et
+renseignez l'IP publique ou le nom de domaine dans `public-address`. L'adresse utilisée est
+affichée dans la console au démarrage.
+
+## Modifier les images
+
+Les images sont produites par `tools/ui-art/ValmontArt.java` (dessin pixel par pixel, aucune
+ressource Mojang copiée) :
+
+```
+java tools/ui-art/ValmontArt.java .
+```
+
+Vous pouvez aussi remplacer directement un PNG de `src/main/resources/pack/assets/citycore/textures/ui/`
+par une version faite à la main, **en gardant son nom et ses dimensions**, puis recompiler.
+Aucune image ne doit dépasser 256 × 256 pixels : au-delà, Minecraft affiche un rectangle vide à la
+place (le plugin refuse alors de construire le pack et garde les menus classiques).
+
+## Limites connues
+
+- Techniquement, l'écran reste une fenêtre d'inventaire : l'inventaire du joueur est visible en
+  bas (il est habillé aux couleurs de Valmont).
+- Au survol, Minecraft 1.21.1 éclaire la case visée d'un carré blanc ; un pack ne peut pas le
+  retirer.
+- Les menus sans lien avec un habitant (`/city build`) restent classiques.

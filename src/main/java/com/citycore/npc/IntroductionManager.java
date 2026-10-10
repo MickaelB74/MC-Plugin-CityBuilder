@@ -37,6 +37,22 @@ public class IntroductionManager {
     }
 
     /**
+     * Au moins un joueur a déjà rencontré ce PNJ (première étape de son recrutement).
+     */
+    public boolean hasAnyoneMet(CityNPC npc) {
+        try (PreparedStatement ps = db.getConnection().prepareStatement(
+                "SELECT 1 FROM npc_introductions WHERE npc_tag = ? LIMIT 1")) {
+            ps.setString(1, npc.tag);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Marque l'intro comme vue pour ce joueur + NPC.
      */
     public void markIntroSeen(UUID playerUUID, CityNPC npc) {

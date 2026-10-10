@@ -1,14 +1,20 @@
 package com.citycore.npc.villager;
 
 import com.citycore.building.Building;
+import com.citycore.economy.ItemTags;
+import com.citycore.economy.MarketService;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
 import com.citycore.npc.NPCState;
+import com.citycore.npc.villager.VillagerConfig.Requirement;
+import com.citycore.npc.villager.VillagerConfig.SellPrice;
+import com.citycore.npc.villager.VillagerConfig.ShopItem;
 import com.citycore.player.PlayerDataManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
@@ -35,7 +41,7 @@ public class VillagerGUI {
         return "§8[" + npc.displayName + "§8] §aAmical";
     }
     public static String titleSell(CityNPC npc)      { return "§8[" + npc.displayName + "§8] §aVendre"; }
-    public static String titleInventory(CityNPC npc) { return "§8[" + npc.displayName + "§8] §6Inventaire"; }
+    public static String titleInventory(CityNPC npc) { return "§8[" + npc.displayName + "§8] §6Entrepôt"; }
     public static String titleShop(CityNPC npc)      { return "§8[" + npc.displayName + "§8] §bBoutique"; }
 
     // Slots menu principal
@@ -47,21 +53,44 @@ public class VillagerGUI {
     public static final int SLOT_BACK      = 8;
     public static final int SLOT_JOB       = 1;
 
-    private final CityNPC        npcType;
-    private final VillagerConfig config;
-    private final NPCDataManager dataManager;
-    private final NPCManager     npcManager;
+    private final CityNPC           npcType;
+    private final VillagerConfig    config;
+    private final NPCDataManager    dataManager;
+    private final NPCManager        npcManager;
     private final PlayerDataManager playerDataManager;
-    private final JavaPlugin plugin;
+    private final MarketService     market;
+    private final NamespacedKey     entryKey;
+    private final JavaPlugin        plugin;
+    /** Écrans illustrés « Valmont » (null = menus classiques uniquement). */
+    private com.citycore.ui.screens.ArtisanScreens themed;
+    /** Mods du serveur : un habitant lié à un mod absent n'ouvre pas son menu. */
+    private com.citycore.integration.ModIntegrations integrations;
+
+    public void setIntegrations(com.citycore.integration.ModIntegrations integrations) {
+        this.integrations = integrations;
+    }
+
+    /** L'habitant peut-il commercer et confier des quêtes (mod requis présent) ? */
+    public boolean isAvailable() {
+        return integrations == null || integrations.isAvailable(npcType);
+    }
+
+    public void setThemed(com.citycore.ui.screens.ArtisanScreens themed) {
+        this.themed = themed;
+    }
 
     public VillagerGUI(CityNPC npcType, VillagerConfig config,
-                       NPCDataManager dataManager, NPCManager npcManager, PlayerDataManager playerDataManager, JavaPlugin javaPlugin) {
-        this.npcType     = npcType;
-        this.config      = config;
-        this.dataManager = dataManager;
-        this.npcManager  = npcManager;
+                       NPCDataManager dataManager, NPCManager npcManager,
+                       PlayerDataManager playerDataManager, MarketService market,
+                       JavaPlugin plugin) {
+        this.npcType           = npcType;
+        this.config            = config;
+        this.dataManager       = dataManager;
+        this.npcManager        = npcManager;
         this.playerDataManager = playerDataManager;
-        this.plugin = javaPlugin;
+        this.market            = market;
+        this.entryKey          = new NamespacedKey(plugin, "gui_entry");
+        this.plugin            = plugin;
     }
 
     /* =========================
@@ -69,12 +98,39 @@ public class VillagerGUI {
        ========================= */
 
     public void open(Player player) {
+        // Installé mais lié à un mod absent : un dialogue remplace le menu (recrutement et
+        // installation restent possibles, voir ModIntegrations)
+        if (!isAvailable() && dataManager.getState(npcType) == NPCState.ASSIGNED) {
+            explainUnavailable(player);
+            return;
+        }
+        if (themed != null && themed.openMain(player)) return; // joueur équipé du pack
         NPCState state = dataManager.getState(npcType);
         switch (state) {
             case WANDERER -> openWanderer(player);
             case ARRIVED  -> openArrived(player);
             case ASSIGNED -> openAssigned(player);
         }
+    }
+
+    /**
+     * Dialogue de l'habitant (mod_missing), puis une ligne hors personnage qui nomme le mod.
+     * Un clic pendant le dialogue ne le relance pas.
+     */
+    private void explainUnavailable(Player player) {
+        if (player.getOpenInventory().getTopInventory().getType() != org.bukkit.event.inventory.InventoryType.CRAFTING) {
+            player.closeInventory();
+        }
+        if (com.citycore.util.TypewriterUtil.isTalking(player)) return;
+        List<String> lines = npcType.getDialogue("mod_missing");
+        if (lines.isEmpty()) {
+            lines = List.of(npcType.displayName + " §f: §oJe ne peux rien pour vous ici... pas encore.");
+        }
+        com.citycore.integration.ModIntegrations.Mod mod = com.citycore.integration.ModIntegrations.requiredBy(npcType);
+        String modName = mod == null ? "Un mod requis" : "Le mod " + mod.displayName;
+        com.citycore.util.TypewriterUtil.play(plugin, player, lines, () -> player.sendMessage(
+                "§8(" + modName + " n'est pas installé sur ce serveur : " + plainName()
+                        + " ne peut ni commercer ni confier de quêtes.)"));
     }
 
     /* =========================
@@ -85,14 +141,14 @@ public class VillagerGUI {
         Inventory inv = Bukkit.createInventory(null, 9, titleWanderer(npcType));
         fillFiller(inv, 9, Material.GRAY_STAINED_GLASS_PANE);
 
+        List<String> lore = new ArrayList<>(backstoryLore());
+        lore.add("");
+        lore.add("§7Ce personnage n'a pas encore");
+        lore.add("§7rejoint votre ville.");
+        lore.add("");
+        lore.add("§8Invitez-le à visiter la ville.");
         inv.setItem(0, makeItem(Material.COMPASS,
-                "§7" + npcType.displayName.replaceAll("§.", "") + " — Inconnu",
-                List.of(
-                        "§7Ce personnage n'a pas encore",
-                        "§7rejoint votre ville.",
-                        "",
-                        "§8Invitez-le à visiter la ville."
-                )));
+                "§7" + plainName() + " — §f" + npcType.function, lore));
 
         // Bouton suivi
         boolean following = npcManager.isFollowing(player, npcType);
@@ -101,7 +157,7 @@ public class VillagerGUI {
                 following ? "§c⛔ Arrêter de suivre" : "§a👣 Inviter à suivre",
                 List.of(following
                         ? "§7Cliquez pour arrêter"
-                        : "§7Cliquez pour que " + npcType.displayName.replaceAll("§.", "")
+                        : "§7Cliquez pour que " + plainName()
                         + " §7vous suive jusqu'à la ville.")
         ));
 
@@ -116,19 +172,16 @@ public class VillagerGUI {
         Inventory inv = Bukkit.createInventory(null, 9, titleArrived(npcType));
         fillFiller(inv, 9, Material.GREEN_STAINED_GLASS_PANE);
 
-        inv.setItem(0, makeItem(Material.COMPASS,
-                "§a" + npcType.displayName.replaceAll("§.", "") + " — Dans la ville",
-                List.of(
-                        "§7Ce personnage a rejoint votre ville !",
-                        "",
-                        "§7Assignez-lui un bâtiment pour",
-                        "§7débloquer ses fonctionnalités.",
-                        "",
-                        "§8/city build assign <bâtiment> "
-                                + npcType.tag.replace("citycore_", "")
-                )));
+        List<String> lore = new ArrayList<>(backstoryLore());
+        lore.add("");
+        lore.add("§7Ce personnage a rejoint votre ville !");
+        lore.add("§7Assignez-lui un bâtiment pour");
+        lore.add("§7débloquer son commerce.");
+        lore.add("");
+        lore.add("§8/city build assign <bâtiment> " + npcType.tag.replace("citycore_", ""));
+        inv.setItem(0, makeItem(Material.COMPASS, "§a" + plainName() + " — Dans la ville", lore));
 
-        // ✅ Bouton recherche bâtiment
+        // Bouton recherche bâtiment
         inv.setItem(4, makeItem(Material.SPYGLASS,
                 "§e🔍 Chercher un bâtiment",
                 List.of(
@@ -152,19 +205,17 @@ public class VillagerGUI {
         player.openInventory(inv);
     }
 
-    // ✅ Sous-menu bâtiments disponibles
+    // Sous-menu bâtiments disponibles
     public static String titleBuildingSearch(CityNPC npc) {
         return "§8[" + npc.displayName + "§8] §eBâtiments";
     }
 
-    public void openBuildingSearch(Player player,
-                                   List<Building> availableBuildings) {
-        int size = Math.max(9, (int) Math.ceil(
-                (availableBuildings.size() + 1) / 9.0) * 9);
+    public void openBuildingSearch(Player player, List<Building> availableBuildings) {
+        if (themed != null && themed.openBuildings(player, availableBuildings)) return;
+        int size = Math.max(9, (int) Math.ceil((availableBuildings.size() + 1) / 9.0) * 9);
         size = Math.min(size, 54);
 
-        Inventory inv = Bukkit.createInventory(null, size,
-                titleBuildingSearch(npcType));
+        Inventory inv = Bukkit.createInventory(null, size, titleBuildingSearch(npcType));
         fillFiller(inv, size, Material.GREEN_STAINED_GLASS_PANE);
 
         if (availableBuildings.isEmpty()) {
@@ -194,14 +245,12 @@ public class VillagerGUI {
                                         ? "§a✔ Point NPC défini"
                                         : "§c✘ Aucun point NPC",
                                 "",
-                                "§eCliquez pour assigner §f"
-                                        + npcType.displayName.replaceAll("§.", "")
+                                "§eCliquez pour assigner §f" + plainName()
                         )));
             }
         }
 
-        inv.setItem(size - 1, makeItem(Material.ARROW,
-                "§7← Retour", List.of()));
+        inv.setItem(size - 1, makeItem(Material.ARROW, "§7← Retour", List.of()));
         player.openInventory(inv);
     }
 
@@ -217,30 +266,34 @@ public class VillagerGUI {
         Inventory inv = Bukkit.createInventory(null, 9, titleMain(npcType, dataManager));
         fillFiller(inv, 9, Material.GRAY_STAINED_GLASS_PANE);
 
-        // Tête avec niveau
-        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-        ItemMeta headMeta = head.getItemMeta();
-        headMeta.setDisplayName(npcType.displayName + " §8— §7" + npcType.function);
-        headMeta.setLore(List.of(
-                buildStarLevel(level),
-                buildNativeBar(level, xp, xpNext),
-                "§7XP : §f" + xp + (xpNext > 0 ? " §7/ §f" + xpNext : " §7(max)")
-        ));
-        headMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
-        head.setItemMeta(headMeta);
-        inv.setItem(0, head);
+        // Tête avec niveau + histoire
+        List<String> headLore = new ArrayList<>();
+        headLore.add(buildStarLevel(level));
+        headLore.add(buildNativeBar(level, xp, xpNext));
+        headLore.add("§7XP : §f" + xp + (xpNext > 0 ? " §7/ §f" + xpNext : " §7(max)"));
+        headLore.add("");
+        headLore.addAll(backstoryLore());
+        inv.setItem(0, makeItem(Material.PLAYER_HEAD,
+                npcType.displayName + " §8— §7" + npcType.function, headLore));
+
         inv.setItem(SLOT_JOB, makeJobButton(player));
         inv.setItem(SLOT_SELL, makeItem(Material.EMERALD, "§a💰 Vendre",
-                List.of("§7Vendez vos ressources", "§7et recevez des coins.")));
-        inv.setItem(SLOT_INVENTORY, makeItem(Material.CHEST, "§6📦 Inventaire",
-                List.of("§7Items achetés par " + npcType.displayName,
-                        "§7Rachetables par la ville.")));
+                List.of("§7Vendez vos ressources.",
+                        "§7Le prix baisse quand son",
+                        "§7entrepôt se remplit.")));
+        inv.setItem(SLOT_INVENTORY, makeItem(Material.CHEST, "§6📦 Entrepôt",
+                List.of("§7Réserves de " + npcType.displayName + "§7.",
+                        "§7Rachetez-lui ses matières",
+                        "§7premières (non revendables).")));
         inv.setItem(SLOT_SHOP, makeItem(Material.GOLD_INGOT, "§b🛒 Boutique",
-                List.of("§7Achetez des items",
-                        "§7Niveau actuel : §e" + level)));
+                List.of("§7Ses fabrications et raretés.",
+                        "§7Produites à partir des stocks",
+                        "§7de la ville.",
+                        "",
+                        "§7Niveau actuel : " + getLevelName(level))));
         inv.setItem(SLOT_QUESTS, makeItem(Material.WRITABLE_BOOK, "§d📜 Quêtes",
                 List.of("§7Quêtes principales et spéciales",
-                        "§7de " + npcType.displayName + ".",
+                        "§7de " + npcType.displayName + "§7.",
                         "",
                         "§eCliquez pour voir")));
 
@@ -260,97 +313,106 @@ public class VillagerGUI {
        ========================= */
 
     public void openSell(Player player) {
-        Map<Material, VillagerConfig.SellPrice> prices = config.getSellPrices();
-        int size = Math.max(18, (int) Math.ceil((prices.size() + 1) / 9.0) * 9);
+        if (themed != null && themed.openSell(player)) return;
+        Map<Material, SellPrice> prices = config.getSellPrices();
+        int size = menuSize(prices.size());
         Inventory inv = Bukkit.createInventory(null, size, titleSell(npcType));
         fillFiller(inv, size, Material.GREEN_STAINED_GLASS_PANE);
 
         int slot = 0;
-        for (Map.Entry<Material, VillagerConfig.SellPrice> entry : prices.entrySet()) {
+        for (Map.Entry<Material, SellPrice> entry : prices.entrySet()) {
             if (slot == SLOT_BACK) slot++;
-            Material mat              = entry.getKey();
-            VillagerConfig.SellPrice sp = entry.getValue();
-            int playerCount           = countMaterial(player, mat);
-            int fullSets              = playerCount / sp.quantity();
-            int total                 = fullSets * sp.price();
-
-            List<String> lore = new ArrayList<>();
-            lore.add("§7Prix : §6" + sp.price() + " coins §7/ " + sp.quantity() + " items");
-            lore.add("");
-            lore.add("§7Vos stocks : §f" + playerCount
-                    + " §7(" + fullSets + "x" + sp.quantity() + ")");
-            lore.add("§7Valeur totale : §6" + total + " coins");
-            boolean hasJob = npcType == playerDataManager.getJob(player.getUniqueId());
-            if (hasJob) {
-                int bonus = (int) Math.round(fullSets * sp.quantity() * config.getJobInventoryMultiplier());
-                lore.add("§a💼 Bonus job : §f+"
-                        + (bonus - fullSets * sp.quantity()) + " items stockés");
-            }
-            lore.add("");
-            lore.add(fullSets > 0 ? "§eCliquez pour vendre" : "§cPas assez d'items");
-
-            int taggedCount = countTaggedMaterial(player, mat); // méthode miroir qui compte les tagués
-            if (taggedCount > 0) {
-                lore.add("§c⚠ " + taggedCount + " item(s) récupérés §cnon revendables");
-            }
-
-            inv.setItem(slot++, makeItem(mat, "§f" + formatName(mat), lore));
+            if (slot >= size) break;
+            Material mat = entry.getKey();
+            inv.setItem(slot++, withEntry(makeItem(mat, "§f" + formatName(mat),
+                    sellLore(player, mat, entry.getValue())), mat.name()));
         }
 
         inv.setItem(SLOT_BACK, makeItem(Material.ARROW, "§7← Retour", List.of()));
         player.openInventory(inv);
     }
 
-    private int countTaggedMaterial(Player player, Material mat) {
-        NamespacedKey key = new NamespacedKey(plugin, "buyback");
-        int count = 0;
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item == null || item.getType() != mat) continue;
-            ItemMeta meta = item.getItemMeta();
-            if (meta != null && meta.getPersistentDataContainer()
-                    .has(key, PersistentDataType.BYTE)) count += item.getAmount();
+    /** Bulle d'une ressource à vendre (prix, demande, stock, quantités du joueur). */
+    public List<String> sellLore(Player player, Material mat, SellPrice sp) {
+        boolean employee = market.isEmployee(player, npcType);
+        int stock  = dataManager.getInventoryAmount(npcType, mat);
+        int owned  = ItemTags.countUntagged(player, mat);
+        int tagged = ItemTags.countTagged(player, mat);
+        MarketService.SellQuote all = market.quoteSell(npcType, mat, owned, Integer.MAX_VALUE, employee);
+
+        List<String> lore = new ArrayList<>();
+        lore.add("§7Prix plein : §6" + sp.price() + " coins §7/ " + sp.quantity());
+        lore.add("§7Prix actuel : §6" + format(market.currentLotPrice(npcType, mat, employee))
+                + " coins §7/ " + sp.quantity());
+        lore.add("§7Demande : " + market.demandLabel(stock, sp.capacity()));
+        lore.add(market.stockBar(stock, sp.capacity()));
+        if (employee) lore.add("§a💼 Prime d'employé : §f+" + market.cfg().jobSellBonus() + "%");
+        lore.add("");
+        lore.add("§7Vous avez : §f" + owned);
+        if (all.lots() > 0) {
+            lore.add("§7Tout vendre : §f" + all.items() + " §7→ §6" + all.coins() + " coins");
+            lore.add("");
+            lore.add("§eClic gauche §7: tout vendre");
+            lore.add("§eClic droit §7: vendre 1 lot");
+        } else if (sp.capacity() > 0 && stock + sp.quantity() > sp.capacity()) {
+            lore.add("");
+            lore.add("§cEntrepôt plein — revenez plus tard");
+        } else {
+            lore.add("");
+            lore.add("§cIl faut au moins " + sp.quantity() + " items");
         }
-        return count;
+        if (tagged > 0) lore.add("§8" + tagged + " item(s) achetés à un PNJ : non revendables");
+        return lore;
     }
 
     /* =========================
-       SOUS-MENU INVENTAIRE
+       SOUS-MENU ENTREPÔT
        ========================= */
 
     public void openInventory(Player player) {
-        Map<Material, Integer> inventory = dataManager.getInventory(npcType);
-        int size = Math.max(18, (int) Math.ceil((inventory.size() + 1) / 9.0) * 9);
+        if (themed != null && themed.openStock(player)) return;
+        Map<Material, SellPrice> prices = config.getSellPrices();
+        int size = menuSize(prices.size());
         Inventory inv = Bukkit.createInventory(null, size, titleInventory(npcType));
         fillFiller(inv, size, Material.ORANGE_STAINED_GLASS_PANE);
 
         int slot = 0;
-        for (Map.Entry<Material, Integer> entry : inventory.entrySet()) {
+        for (Map.Entry<Material, SellPrice> entry : prices.entrySet()) {
             if (slot == SLOT_BACK) slot++;
-            Material mat     = entry.getKey();
-            int amount       = entry.getValue();
-            int stackCount   = amount / 64;
-            int remainder    = amount % 64;
-
-            List<String> lore = new ArrayList<>();
-            lore.add("§7Stock : §f" + amount + " §7(" + stackCount + " stacks"
-                    + (remainder > 0 ? " + " + remainder : "") + ")");
-            lore.add("");
-            lore.add("§aRachat : §fGratuit");
-            lore.add("");
-            lore.add(stackCount > 0
-                    ? "§eCliquez pour récupérer (1 stack)"
-                    : "§cStock insuffisant");
-
-            inv.setItem(slot++, makeItem(mat, "§f" + formatName(mat), lore));
+            if (slot >= size) break;
+            Material mat   = entry.getKey();
+            int      stock = dataManager.getInventoryAmount(npcType, mat);
+            ItemStack icon = makeItem(stock > 0 ? mat : Material.GRAY_STAINED_GLASS_PANE,
+                    (stock > 0 ? "§f" : "§8") + formatName(mat), stockLore(player, mat, entry.getValue()));
+            inv.setItem(slot++, withEntry(icon, mat.name()));
         }
 
-        if (inventory.isEmpty()) {
-            inv.setItem(4, makeItem(Material.BARRIER, "§cInventaire vide",
-                    List.of("§7Rien à racheter.")));
+        if (prices.isEmpty()) {
+            inv.setItem(4, makeItem(Material.BARRIER, "§cAucune réserve",
+                    List.of("§7Ce personnage ne stocke rien.")));
         }
 
         inv.setItem(SLOT_BACK, makeItem(Material.ARROW, "§7← Retour", List.of()));
         player.openInventory(inv);
+    }
+
+    /** Bulle d'une réserve de l'entrepôt (stock, prix de revente). */
+    public List<String> stockLore(Player player, Material mat, SellPrice sp) {
+        boolean employee = market.isEmployee(player, npcType);
+        int stock = dataManager.getInventoryAmount(npcType, mat);
+        int price = market.resaleLotPrice(sp, employee);
+        List<String> lore = new ArrayList<>();
+        lore.add(market.stockBar(stock, sp.capacity()));
+        lore.add("");
+        lore.add("§7Prix : §6" + price + " coins §7/ " + sp.quantity()
+                + (employee ? " §a(-" + market.cfg().jobShopDiscount() + "% employé)" : ""));
+        lore.add("§8Rachat actuel par le PNJ : "
+                + format(market.currentLotPrice(npcType, mat, false)) + " / " + sp.quantity());
+        lore.add("");
+        lore.add(stock >= sp.quantity()
+                ? "§eCliquez pour acheter " + sp.quantity()
+                : "§cStock insuffisant");
+        return lore;
     }
 
     /* =========================
@@ -358,110 +420,155 @@ public class VillagerGUI {
        ========================= */
 
     public void openShop(Player player) {
+        if (themed != null && themed.openShop(player)) return;
         int currentLevel = dataManager.getLevel(npcType);
+        List<ShopItem> entries = config.getAllShopItems();
 
-        List<ShopEntry> allEntries = new ArrayList<>();
-        for (int lvl = 1; lvl <= 5; lvl++) {
-            for (VillagerConfig.ShopItem item : config.getShopItemsForLevel(lvl)) {
-                allEntries.add(new ShopEntry(item, lvl));
-            }
-        }
-
-        int size = Math.max(18, (int) Math.ceil((allEntries.size() + 1) / 9.0) * 9);
+        int size = menuSize(entries.size());
         Inventory inv = Bukkit.createInventory(null, size, titleShop(npcType));
         fillFiller(inv, size, Material.BLUE_STAINED_GLASS_PANE);
 
         int slot = 0;
-        for (ShopEntry entry : allEntries) {
+        for (ShopItem item : entries) {
             if (slot == SLOT_BACK) slot++;
+            if (slot >= size) break;
 
-            VillagerConfig.ShopItem item = entry.item();
-            int itemLevel                = entry.level();
-            boolean unlocked             = itemLevel <= currentLevel;
-
-            List<String> lore = new ArrayList<>();
-            lore.add(VillagerGUI.getLevelName(itemLevel)
-                    + (unlocked ? " §a✔" : " §c✘"));
-            lore.add("");
-
-            if (unlocked) {
-                boolean hasJob = npcType == playerDataManager.getJob(player.getUniqueId());
-                int finalPrice = hasJob ? config.applyJobDiscount(item.price()) : item.price();
-
-                if (hasJob && finalPrice < item.price()) {
-                    lore.add("§7Prix : §4§m" + item.price() + "§r §6" + finalPrice + " coins");
-                    lore.add("§a💼 Réduction employé : §f-" + config.getJobShopDiscount() + "%");
-                } else {
-                    lore.add("§7Prix : §6" + finalPrice + " coins");
-                }
-                lore.add("§7Quantité : §fx" + item.quantity());
-                lore.add("");
-                lore.add("§eCliquez pour acheter");
+            boolean unlocked = item.level() <= currentLevel;
+            List<String> lore = shopLore(player, item);
+            ItemStack icon;
+            if (!unlocked) {
+                icon = makeItem(Material.GRAY_STAINED_GLASS_PANE, "§8🔒 " + displayName(item), lore);
             } else {
-                lore.add("§cDébloqué au niveau §e" + getLevelName(itemLevel));
-                lore.add("");
-                lore.add("§8Continuez à commercer pour");
-                lore.add("§8débloquer cet item.");
+                icon = makeItem(item.material(), "§f" + displayName(item), lore);
+                if (!item.enchantments().isEmpty()) {
+                    // Effet brillant sur l'icône
+                    ItemMeta meta = icon.getItemMeta();
+                    meta.setEnchantmentGlintOverride(true);
+                    icon.setItemMeta(meta);
+                }
             }
-
-            Material display = unlocked
-                    ? item.material()
-                    : Material.GRAY_STAINED_GLASS_PANE;
-            String name = unlocked
-                    ? "§f" + formatName(item.material())
-                    : "§8🔒 " + formatName(item.material());
-
-            inv.setItem(slot++, makeItem(display, name, lore));
+            inv.setItem(slot++, withEntry(icon, item.key()));
         }
 
-        if (allEntries.isEmpty()) {
+        if (entries.isEmpty()) {
             inv.setItem(4, makeItem(Material.BARRIER, "§cBoutique vide",
-                    List.of("§7Aucun item configuré.")));
+                    List.of("§7Aucun article configuré.")));
         }
 
         inv.setItem(SLOT_BACK, makeItem(Material.ARROW, "§7← Retour", List.of()));
         player.openInventory(inv);
     }
 
-    private record ShopEntry(VillagerConfig.ShopItem item, int level) {}
+    /** Bulle d'un article de boutique (niveau, prix, ingrédients, disponibilité). */
+    public List<String> shopLore(Player player, ShopItem item) {
+        int currentLevel = dataManager.getLevel(npcType);
+        boolean employee = market.isEmployee(player, npcType);
+        boolean unlocked = item.level() <= currentLevel;
+        List<String> lore = new ArrayList<>();
+        lore.add(getLevelName(item.level()) + (unlocked ? " §a✔" : " §c✘"));
+        lore.addAll(item.lore());
+        lore.addAll(enchantLore(item));
+        lore.add("");
 
-    /* =========================
-       SELL MATERIAL
-       ========================= */
-
-    public int sellMaterial(Player player, Material mat) {
-        VillagerConfig.SellPrice sp = config.getSellPrice(mat);
-        if (sp == null) return -1;
-
-        int totalCount = countMaterial(player, mat);
-        int fullSets   = totalCount / sp.quantity();
-        if (fullSets == 0) return -1;
-
-        // Retire les items du joueur (inchangé)
-        int toRemove = fullSets * sp.quantity();
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item == null || item.getType() != mat || toRemove <= 0) continue;
-            int take = Math.min(item.getAmount(), toRemove);
-            item.setAmount(item.getAmount() - take);
-            toRemove -= take;
+        if (!unlocked) {
+            lore.add("§cDébloqué au niveau " + getLevelName(item.level()));
+            lore.add("§8Commercez avec " + plainName() + " pour");
+            lore.add("§8débloquer cet article.");
+            return lore;
         }
+        int finalPrice = market.shopPrice(item, employee);
+        if (employee && finalPrice < item.price()) {
+            lore.add("§7Prix : §4§m" + item.price() + "§r §6" + finalPrice + " coins");
+            lore.add("§a💼 Réduction employé : §f-" + market.cfg().jobShopDiscount() + "%");
+        } else {
+            lore.add("§7Prix : §6" + finalPrice + " coins");
+        }
+        lore.add("§7Quantité : §fx" + item.quantity());
 
-        int earned        = fullSets * sp.price();
-        int itemsSold     = fullSets * sp.quantity();
+        for (Requirement r : item.requires()) {
+            CityNPC supplier = market.supplierOf(npcType, r);
+            int have = market.stockOf(supplier, r.materials());
+            boolean ok = have >= r.amount();
+            String who = supplier == null ? "§c?"
+                    : supplier == npcType ? "son stock"
+                    : "stock " + supplier.displayName.replaceAll("§.", "");
+            lore.add((ok ? "§a✔ " : "§c✘ ") + "§7" + r.amount() + "× "
+                    + tokenName(r) + " §8(" + who + " : " + have + ")");
+        }
+        int available = market.availableCount(npcType, item);
+        if (item.supply() != null) {
+            int supply = market.getSupply(npcType, item);
+            long next = market.minutesUntilRestock(npcType, item);
+            lore.add("§7Disponible : §f" + supply + "§7/§f" + item.supply().max()
+                    + (next > 0 ? " §8(+1 dans " + next + " min)" : ""));
+        }
+        lore.add("");
+        lore.add(available > 0 ? "§eCliquez pour acheter" : "§cRupture de stock");
+        return lore;
+    }
 
-        // Bonus job : le NPC reçoit plus d'items si le joueur travaille pour lui
-        boolean hasJob = npcType == playerDataManager.getJob(player.getUniqueId());
-        int itemsToStock = hasJob
-                ? (int) Math.round(itemsSold * config.getJobInventoryMultiplier())
-                : itemsSold;
-
-        dataManager.addToInventory(npcType, mat, itemsToStock);
-        return earned;
+    /** Clé d'entrée stockée dans l'icône (matériau ou clé d'article), ou null. */
+    public String readEntry(ItemStack icon) {
+        if (icon == null || !icon.hasItemMeta()) return null;
+        return icon.getItemMeta().getPersistentDataContainer().get(entryKey, PersistentDataType.STRING);
     }
 
     /* =========================
        HELPERS
        ========================= */
+
+    private ItemStack withEntry(ItemStack icon, String value) {
+        ItemMeta meta = icon.getItemMeta();
+        meta.getPersistentDataContainer().set(entryKey, PersistentDataType.STRING, value);
+        icon.setItemMeta(meta);
+        return icon;
+    }
+
+    public List<String> backstoryLore() {
+        List<String> lore = new ArrayList<>();
+        for (String line : npcType.backstory) lore.add("§8§o" + line);
+        return lore;
+    }
+
+    private List<String> enchantLore(ShopItem item) {
+        List<String> lore = new ArrayList<>();
+        for (Map.Entry<Enchantment, Integer> e : item.enchantments().entrySet()) {
+            lore.add("§9" + formatName(e.getKey().getKey().getKey().toUpperCase()) + " " + roman(e.getValue()));
+        }
+        if (item.potion() != null) lore.add("§9Potion : " + formatName(item.potion().name()));
+        if (item.book() != null)   lore.add("§9« " + item.book().title() + " »");
+        return lore;
+    }
+
+    public String displayName(ShopItem item) {
+        return item.displayName() != null ? item.displayName() : formatName(item.material());
+    }
+
+    private String tokenName(Requirement r) {
+        return r.token().startsWith("#")
+                ? formatName(r.token().substring(1)) + " §8(au choix)§7"
+                : formatName(r.token());
+    }
+
+    private int menuSize(int entries) {
+        // +1 pour le bouton retour (slot 8), max 54
+        return Math.min(54, Math.max(18, (int) Math.ceil((entries + 1) / 9.0) * 9));
+    }
+
+    private String plainName() {
+        return npcType.displayName.replaceAll("§.", "");
+    }
+
+    private static String roman(int n) {
+        return switch (n) {
+            case 1 -> "I"; case 2 -> "II"; case 3 -> "III"; case 4 -> "IV"; case 5 -> "V";
+            default -> String.valueOf(n);
+        };
+    }
+
+    private static String format(double v) {
+        return v >= 10 ? String.valueOf(Math.round(v)) : String.format(java.util.Locale.FRANCE, "%.1f", v);
+    }
 
     private String buildStarLevel(int level) {
         return switch (level) {
@@ -478,10 +585,10 @@ public class VillagerGUI {
 
         int xpCurrent     = config.getXpThresholds().getOrDefault(level, 0);
         int xpInLevel     = xp - xpCurrent;
-        int xpNeededLevel = xpNext - xpCurrent;
+        int xpNeededLevel = Math.max(1, xpNext - xpCurrent);
         int barLength     = 10;
-        int filled        = Math.min(
-                (int)((double) xpInLevel / xpNeededLevel * barLength), barLength);
+        int filled        = Math.max(0, Math.min(
+                (int) ((double) xpInLevel / xpNeededLevel * barLength), barLength));
 
         StringBuilder bar = new StringBuilder();
         for (int i = 0; i < barLength; i++) {
@@ -494,40 +601,32 @@ public class VillagerGUI {
         return switch (level) {
             case 1  -> "§8Novice";
             case 2  -> "§7Apprenti";
-            case 3  -> "§bJournalier";
+            case 3  -> "§bCompagnon";
             case 4  -> "§6Expert";
             default -> "§4Maître";
         };
     }
 
-    private int getXpForNextLevel(int level) {
+    public int getXpForNextLevel(int level) {
         return config.getXpThresholds().getOrDefault(level + 1, -1);
     }
 
-    private int countMaterial(Player player, Material mat) {
-        NamespacedKey key = new NamespacedKey(plugin, "buyback");
-        int count = 0;
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item == null || item.getType() != mat) continue;
-            ItemMeta meta = item.getItemMeta();
-            if (meta != null && meta.getPersistentDataContainer()
-                    .has(key, PersistentDataType.BYTE)) continue; // item racheté, ignoré
-            count += item.getAmount();
-        }
-        return count;
-    }
-
-    public CityNPC getNpcType()      { return npcType; }
-    public VillagerConfig getConfig() { return config; }
+    public CityNPC        getNpcType() { return npcType; }
+    public VillagerConfig getConfig()  { return config; }
 
     private void fillFiller(Inventory inv, int size, Material mat) {
         ItemStack filler = makeItem(mat, " ");
         for (int i = 0; i < size; i++) inv.setItem(i, filler);
     }
 
-    private String formatName(Material mat) {
+    public static String formatName(Material mat) {
+        return com.citycore.integration.ItemIds.label(mat); // noms français des objets de mods
+    }
+
+    public static String formatName(String raw) {
         StringBuilder sb = new StringBuilder();
-        for (String word : mat.name().split("_")) {
+        for (String word : raw.split("_")) {
+            if (word.isEmpty()) continue;
             sb.append(Character.toUpperCase(word.charAt(0)))
                     .append(word.substring(1).toLowerCase()).append(" ");
         }
@@ -539,12 +638,13 @@ public class VillagerGUI {
         ItemMeta meta  = item.getItemMeta();
         meta.setDisplayName(name);
         meta.setLore(lore);
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS,
+                ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         item.setItemMeta(meta);
         return item;
     }
 
-    private ItemStack makeJobButton(Player player) {
+    public ItemStack makeJobButton(Player player) {
         CityNPC currentJob = playerDataManager.getJob(player.getUniqueId());
         boolean hasThisJob = npcType == currentJob;
 
@@ -572,6 +672,9 @@ public class VillagerGUI {
                     List.of(
                             "§7Rejoignez l'atelier de",
                             "§e" + npcType.displayName + "§7.",
+                            "",
+                            "§a+" + market.cfg().jobSellBonus() + "% §7sur vos ventes à ce PNJ",
+                            "§a-" + market.cfg().jobShopDiscount() + "% §7sur vos achats chez lui",
                             "",
                             "§eCliquez pour accepter."
                     ));

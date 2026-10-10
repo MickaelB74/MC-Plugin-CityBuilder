@@ -1,0 +1,5 @@
+# Fichiers lus tels quels par le plugin : fins de ligne Unix quel que soit le poste
+# (core.autocrlf convertirait sinon font_chars.txt en CRLF).
+*.txt text eol=lf
+# Images du pack d'interface : jamais modifiées par git
+*.png binary

@@ -25,11 +25,11 @@ public class MayorGUI implements NPCGui {
 
     public static final String GUI_TITLE = ChatColor.GOLD + CityNPC.MAYOR.displayName + " — Maire";
 
-    public static final int SLOT_INFO      = 0;
-    public static final int SLOT_BUILDINGS = 2;
-    public static final int SLOT_ECONOMY   = 4;
-    public static final int SLOT_EXPAND    = 6;
-    public static final int SLOT_FOLLOW    = 8;
+    public static final int SLOT_INFO        = 0;
+    public static final int SLOT_BUILDINGS   = 2;
+    public static final int SLOT_ECONOMY     = 4;
+    public static final int SLOT_EXPAND      = 6;
+    public static final int SLOT_FOLLOW      = 8;
 
     private final CityManager      cityManager;
     private final NPCManager       npcManager;
@@ -37,6 +37,15 @@ public class MayorGUI implements NPCGui {
     private final MayorEconomyGUI  economyGUI;
     private final MayorQuestGUI    questGUI;
     private final CityQuestManager cityQuestManager;
+    /** Écrans illustrés « Valmont » (null = menus classiques uniquement). */
+    private com.citycore.ui.screens.MayorScreens themed;
+
+    public void setThemed(com.citycore.ui.screens.MayorScreens themed) {
+        this.themed = themed;
+        buildingGUI.setThemed(themed);
+        economyGUI.setThemed(themed);
+        questGUI.setThemed(themed);
+    }
 
     public MayorGUI(CityManager cityManager, NPCManager npcManager,
                     BuildingManager buildingManager, Economy economy,
@@ -94,6 +103,7 @@ public class MayorGUI implements NPCGui {
     }
 
     public void open(Player player) {
+        if (themed != null && themed.openMain(player)) return; // joueur équipé du pack
         City city = cityManager.getCity();
         if (city == null) return;
 
@@ -105,29 +115,23 @@ public class MayorGUI implements NPCGui {
         ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < 9; i++) inv.setItem(i, filler);
 
-        // ── INFO ─────────────────────────────────────────────────
-        inv.setItem(SLOT_INFO, makeItem(Material.BOOK, "§6📖 Informations",
-                List.of(
-                        "§7Niveau : §f" + city.getLevel(),
-                        "§7Caisse : §6" + city.getCoins() + " coins",
-                        "§7Chunks : §f" + city.getClaimedChunks()
-                                + " §7/ §f" + city.getMaxChunks(),
-                        "", "§eCliquez pour afficher"
-                )));
-
-        // ── INFO + QUÊTES (fusionné) ─────────────────────────────
+        // ── INFO + QUÊTES ────────────────────────────────────────
         inv.setItem(SLOT_INFO, makeItem(
                 tierComplete ? Material.NETHER_STAR : Material.BOOK,
                 tierComplete ? "§6📖 Infos de la ville §l[PRÊT]" : "§6📖 Infos de la ville",
                 List.of(
-                        "§7Niveau  : §f" + city.getLevel(),
+                        "§7Niveau  : §f" + tier.level,
                         "§7Palier  : " + tier.tierName,
+                        "§7" + tier.chapter,
                         "§7Taille  : §f" + city.getClaimedChunks()
                                 + " §7/ §f" + city.getMaxChunks(),
                         "",
                         tierComplete
                                 ? "§a✔ Toutes les quêtes complètes !"
                                 : "§7Quêtes du palier disponibles.",
+                        "",
+                        "§8Vue d'ensemble : menu Progrès (touche L),",
+                        "§8onglet « La Renaissance de Valmont ».",
                         "",
                         "§eCliquez pour ouvrir les quêtes"
                 )));

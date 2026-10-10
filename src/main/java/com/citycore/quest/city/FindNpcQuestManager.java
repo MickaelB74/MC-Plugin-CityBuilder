@@ -4,6 +4,7 @@ import com.citycore.city.CityManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
+import com.citycore.util.GroundFinder;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.*;
 import org.bukkit.boss.BarColor;
@@ -37,6 +38,10 @@ public class FindNpcQuestManager {
     private final Map<String, BukkitTask> npcTrackerTasks      = new HashMap<>();
     private final Map<UUID, String>       playerActiveQuest    = new HashMap<>();
     private final Map<UUID, BossBar>      playerBossBars       = new HashMap<>();
+    /** Quêtes dont le lieu d'apparition est en cours de recherche (en arrière-plan). */
+    private final Set<String>             searching            = new HashSet<>();
+    /** Essais de la recherche du lieu d'apparition. */
+    private static final int              SPAWN_ATTEMPTS       = 48;
 
     public FindNpcQuestManager(JavaPlugin plugin, NPCManager npcManager,
                                NPCDataManager npcDataManager,
@@ -66,20 +71,41 @@ public class FindNpcQuestManager {
             return;
         }
 
-        // Récupère ou spawne le NPC — un seul appel à getNPC ici
+        // PNJ déjà présent dans le monde (même dans un chunk déchargé) : on part de lui
         NPC npc = npcManager.getNPC(quest.targetNpc());
-        Location spawnLoc;
-
-        if (npc != null && npc.isSpawned() && npc.getEntity() != null) {
-            spawnLoc = npc.getEntity().getLocation();
-        } else {
-            spawnLoc = findSafeLocation(quest.spawnRadius(), trigger.getWorld());
-            if (spawnLoc == null) {
-                trigger.sendMessage("§c❌ Impossible de trouver un endroit sûr.");
+        if (npc != null) {
+            Location where = npc.isSpawned() && npc.getEntity() != null
+                    ? npc.getEntity().getLocation() : npc.getStoredLocation();
+            if (where != null) {
+                startQuest(quest, npc, where);
                 return;
             }
-            npc = npcManager.spawnNPC(quest.targetNpc(), spawnLoc);
         }
+
+        // Sinon, lieu d'apparition cherché en arrière-plan : charger (voire générer) des chunks
+        // lointains sur le fil principal gelait le serveur
+        String name = ChatColor.stripColor(quest.targetNpc().displayName);
+        if (!searching.add(quest.id())) {
+            trigger.sendMessage("§7🗺 On cherche encore la trace de " + name + "...");
+            return;
+        }
+        trigger.sendMessage("§7🗺 On cherche la trace de " + name + "...");
+        findSafeLocationAsync(quest.spawnRadius(), trigger.getWorld(), quest.biomes(), spawnLoc -> {
+            searching.remove(quest.id());
+            if (isQuestActive(quest.id()) || questManager.isCompleted(quest.id())) return;
+            if (spawnLoc == null) {
+                if (trigger.isOnline()) trigger.sendMessage("§c❌ Impossible de trouver un endroit sûr (explorez davantage autour de la ville).");
+                return;
+            }
+            NPC existing = npcManager.getNPC(quest.targetNpc());
+            NPC spawned  = existing != null ? existing : npcManager.spawnNPC(quest.targetNpc(), spawnLoc);
+            startQuest(quest, spawned, spawnLoc);
+        });
+    }
+
+    /** Lance la piste : PNJ placé, annonce, objet de quête et barre pour chaque joueur. */
+    private void startQuest(CityQuest quest, NPC npc, Location spawnLoc) {
+        questManager.markRecruitStarted(quest);
 
         activeQuestLocations.put(quest.id(), spawnLoc);
         // Cache le NPC — plus besoin de getNPC() ensuite
@@ -102,14 +128,17 @@ public class FindNpcQuestManager {
        COMPLÉTION QUÊTE
        ========================= */
 
+    /**
+     * Étape 2 du recrutement : le PNJ est entré en ville. La quête se termine quand il
+     * est installé dans un bâtiment (étape 3, détectée par la synchronisation).
+     */
     public void onNpcArrived(CityNPC npc) {
-        CityTier tier = CityTier.fromLevel(questManager.getCityLevel());
-        for (CityQuest quest : tier.quests) {
+        for (CityQuest quest : questManager.displayedQuests()) {
             if (quest.type() != CityQuestType.FIND_NPC) continue;
             if (quest.targetNpc() != npc) continue;
             if (questManager.isCompleted(quest.id())) continue;
 
-            questManager.setProgress(quest.id(), 1, true);
+            questManager.setProgress(quest.id(), 2, false);
             activeQuestLocations.remove(quest.id());
             activeQuestNpcs.remove(quest.id());
 
@@ -117,12 +146,17 @@ public class FindNpcQuestManager {
             if (task != null) task.cancel();
 
             for (Player p : Bukkit.getOnlinePlayers()) {
-                removeQuestItem(p);
-                destroyBossBar(p);
-                playerActiveQuest.remove(p.getUniqueId());
+                // Seuls les joueurs qui suivaient CETTE piste la perdent (une autre recherche
+                // peut être en cours en parallèle)
+                if (quest.id().equals(playerActiveQuest.get(p.getUniqueId()))) {
+                    removeQuestItem(p);
+                    destroyBossBar(p);
+                    playerActiveQuest.remove(p.getUniqueId());
+                }
                 p.sendMessage("");
-                p.sendMessage("§a🎉 Quête complétée : " + quest.displayName());
-                p.sendMessage("§a" + npc.displayName + " §aest arrivé en ville !");
+                p.sendMessage("§a🏰 " + npc.displayName + " §aest arrivé en ville !");
+                p.sendMessage("§7Parlez-lui pour l'installer dans un bâtiment et terminer : "
+                        + quest.displayName());
                 p.sendMessage("");
             }
             break;
@@ -133,7 +167,12 @@ public class FindNpcQuestManager {
        ITEM DE QUÊTE
        ========================= */
 
+    /**
+     * Donne la « piste » de recherche. Elle va dans le dernier emplacement de la barre
+     * seulement s'il est libre : on n'écrase jamais l'objet d'un joueur.
+     */
     public void giveQuestItem(Player player, CityQuest quest) {
+        removeQuestItem(player); // une seule piste à la fois
         ItemStack item = new ItemStack(Material.PAPER);
         ItemMeta  meta = item.getItemMeta();
         meta.setDisplayName("§e🗺 " + quest.displayName());
@@ -142,15 +181,24 @@ public class FindNpcQuestManager {
                 "§7Suivez la barre en haut de l'écran."
         ));
         item.setItemMeta(meta);
-        player.getInventory().setItem(COMPASS_SLOT, item);
+        ItemStack current = player.getInventory().getItem(COMPASS_SLOT);
+        if (current == null || current.getType().isAir()) {
+            player.getInventory().setItem(COMPASS_SLOT, item);
+        } else {
+            player.getInventory().addItem(item).values().forEach(rest ->
+                    player.sendMessage("§7🗺 Inventaire plein : suivez la barre en haut de l'écran."));
+        }
     }
 
+    /** Retire la piste où qu'elle soit dans l'inventaire. */
     private void removeQuestItem(Player player) {
-        ItemStack item = player.getInventory().getItem(COMPASS_SLOT);
-        if (item == null) return;
-        if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) return;
-        if (item.getItemMeta().getDisplayName().contains("🗺"))
-            player.getInventory().setItem(COMPASS_SLOT, null);
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item == null || item.getType() != Material.PAPER) continue;
+            if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) continue;
+            if (item.getItemMeta().getDisplayName().contains("🗺")) player.getInventory().setItem(i, null);
+        }
     }
 
     /* =========================
@@ -182,6 +230,13 @@ public class FindNpcQuestManager {
 
         BossBar bar = playerBossBars.get(player.getUniqueId());
         if (bar == null) return;
+
+        // Autre dimension (Nether, End) : distance non mesurable, piste « froide »
+        if (!player.getWorld().equals(npcLoc.getWorld())) {
+            bar.setProgress(0.005);
+            bar.setColor(BarColor.RED);
+            return;
+        }
 
         double dist     = player.getLocation().distance(npcLoc);
         double progress = Math.max(0.005, Math.min(1.0, 1.0 - (dist / MAX_DISTANCE)));
@@ -238,21 +293,56 @@ public class FindNpcQuestManager {
        SPAWN SAFE
        ========================= */
 
-    private Location findSafeLocation(int radius, World world) {
-        Location center = getCityCenter(world);
-        if (center == null) return null;
+    /**
+     * Cherche en arrière-plan un point sûr hors de la ville, de préférence dans un des biomes du
+     * personnage (le pêcheur sur une plage, le forgeron dans la neige…).
+     *
+     * Chaque essai charge son chunk de façon asynchrone puis l'examine sur le fil principal ;
+     * les chunks jamais générés sont ignorés (générer du terrain avec des mods prend parfois
+     * plusieurs secondes par chunk). Le premier point sûr hors biome sert de repli.
+     */
+    private void findSafeLocationAsync(int radius, World world, Set<org.bukkit.block.Biome> biomes,
+                                       java.util.function.Consumer<Location> done) {
+        double[] center = getCityCenterXZ(world);
+        if (center == null) {
+            done.accept(null);
+            return;
+        }
         Random random = new Random();
-        for (int attempt = 0; attempt < 50; attempt++) {
+        List<int[]> candidates = new ArrayList<>();
+        for (int attempt = 0; attempt < SPAWN_ATTEMPTS; attempt++) {
             double angle = random.nextDouble() * 2 * Math.PI;
             double dist  = (radius / 2.0) + random.nextDouble() * (radius / 2.0);
-            int x = (int) (center.getX() + Math.cos(angle) * dist);
-            int z = (int) (center.getZ() + Math.sin(angle) * dist);
-            if (!world.isChunkLoaded(x >> 4, z >> 4)) world.loadChunk(x >> 4, z >> 4);
-            int y = world.getHighestBlockYAt(x, z);
-            Location loc = new Location(world, x + 0.5, y + 1, z + 0.5);
-            if (isSafe(loc)) return loc;
+            candidates.add(new int[]{(int) (center[0] + Math.cos(angle) * dist), (int) (center[1] + Math.sin(angle) * dist)});
         }
-        return null;
+        tryCandidate(world, biomes, candidates, 0, null, done);
+    }
+
+    private void tryCandidate(World world, Set<org.bukkit.block.Biome> biomes, List<int[]> candidates,
+                              int index, Location fallback, java.util.function.Consumer<Location> done) {
+        // Essais épuisés : repli sur un point sûr hors biome (ou rien)
+        int i = index;
+        while (i < candidates.size() && !world.isChunkGenerated(candidates.get(i)[0] >> 4, candidates.get(i)[1] >> 4)) i++;
+        if (i >= candidates.size()) {
+            done.accept(fallback);
+            return;
+        }
+        int[] c = candidates.get(i);
+        int next = i + 1;
+        world.getChunkAtAsync(c[0] >> 4, c[1] >> 4, false).whenComplete((chunk, error) ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Location loc = chunk == null ? null : GroundFinder.groundAt(world, c[0], c[1]);
+                    Location keep = fallback;
+                    if (loc != null && isSafe(loc)) {
+                        // Sol naturel (sous les arbres, jamais sur leur cime) dans un biome du personnage
+                        if (biomes.isEmpty() || biomes.contains(world.getBiome(c[0], loc.getBlockY(), c[1]))) {
+                            done.accept(loc);
+                            return;
+                        }
+                        if (keep == null) keep = loc;
+                    }
+                    tryCandidate(world, biomes, candidates, next, keep, done);
+                }));
     }
 
     private boolean isSafe(Location loc) {
@@ -262,17 +352,20 @@ public class FindNpcQuestManager {
         if (!floor.getType().isSolid() || floor.isLiquid()) return false;
         org.bukkit.block.Block feet = world.getBlockAt(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         org.bukkit.block.Block head = world.getBlockAt(loc.getBlockX(), loc.getBlockY() + 1, loc.getBlockZ());
-        if (!feet.getType().isAir() || !head.getType().isAir()) return false;
+        // Herbes hautes et fleurs acceptées ; feuillage, tronc et liquide refusés
+        if (!feet.isPassable() || feet.isLiquid() || !head.isPassable() || head.isLiquid()) return false;
+        if (org.bukkit.Tag.LEAVES.isTagged(floor.getType()) || org.bukkit.Tag.LOGS.isTagged(floor.getType())) return false;
         if (cityManager.isChunkClaimed(feet.getChunk())) return false;
         return true;
     }
 
-    private Location getCityCenter(World world) {
+    /** Centre de la ville (x, z), sans lire de bloc (aucun chunk à charger). */
+    private double[] getCityCenterXZ(World world) {
         List<long[]> chunks = cityManager.getClaimedChunkCoords(world.getName());
         if (chunks.isEmpty()) return null;
         double avgX = chunks.stream().mapToLong(c -> c[0]).average().orElse(0) * 16 + 8;
         double avgZ = chunks.stream().mapToLong(c -> c[1]).average().orElse(0) * 16 + 8;
-        return new Location(world, avgX, world.getHighestBlockYAt((int) avgX, (int) avgZ) + 1, avgZ);
+        return new double[]{avgX, avgZ};
     }
 
     /* =========================
@@ -290,8 +383,7 @@ public class FindNpcQuestManager {
     public void onPlayerJoin(Player player) {
         for (Map.Entry<String, Location> entry : activeQuestLocations.entrySet()) {
             String questId = entry.getKey();
-            CityTier tier  = CityTier.fromLevel(questManager.getCityLevel());
-            for (CityQuest quest : tier.quests) {
+            for (CityQuest quest : questManager.displayedQuests()) {
                 if (!quest.id().equals(questId)) continue;
                 if (questManager.isCompleted(questId)) continue;
                 playerActiveQuest.put(player.getUniqueId(), questId);

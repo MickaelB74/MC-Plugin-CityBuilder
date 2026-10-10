@@ -5,6 +5,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -165,11 +166,52 @@ public class DatabaseManager {
             INSERT OR IGNORE INTO city_level (id, level) VALUES (1, 1)
         """);
 
+        // Découpage des chapitres auquel se rapporte le niveau (7 = ancienne trame, 10 = actuelle)
+        try {
+            stmt.execute("ALTER TABLE city_level ADD COLUMN scheme INTEGER NOT NULL DEFAULT 7");
+        } catch (SQLException ignored) {
+            // colonne déjà présente
+        }
+
         stmt.close();
     }
 
     public Connection getConnection() {
         return connection;
+    }
+
+    /* =========================
+       REQUÊTES SIMPLES (ressources toujours fermées)
+       sqlite-jdbc garde une référence à chaque Statement non fermé jusqu'à la fermeture
+       de la connexion : sans fermeture, les requêtes périodiques (HUD, synchronisations)
+       font grossir la mémoire pendant toute la durée de vie du serveur.
+       ========================= */
+
+    /** Colonne entière de la première ligne, ou {@code def} si aucune ligne / erreur. */
+    public int queryInt(String sql, String column, int def) {
+        try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            return rs.next() ? rs.getInt(column) : def;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return def;
+        }
+    }
+
+    /** Colonne texte de la première ligne, ou {@code def} si aucune ligne / erreur. */
+    public String queryString(String sql, String column, String def) {
+        try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            return rs.next() ? rs.getString(column) : def;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return def;
+        }
+    }
+
+    /** Instruction sans paramètre (création de table, mise à jour). Propage l'erreur. */
+    public void execute(String sql) throws SQLException {
+        try (Statement st = connection.createStatement()) {
+            st.execute(sql);
+        }
     }
 
     public void closeDatabase() {

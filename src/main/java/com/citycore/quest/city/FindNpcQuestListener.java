@@ -48,6 +48,16 @@ public class FindNpcQuestListener implements Listener {
         findNpcQuestManager.onPlayerMoved(event.getPlayer());
     }
 
+    /** À cheval ou en bateau, PlayerMoveEvent n'est pas émis : on met la barre à jour ici. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onVehicleMove(org.bukkit.event.vehicle.VehicleMoveEvent event) {
+        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
+                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) return;
+        for (org.bukkit.entity.Entity passenger : event.getVehicle().getPassengers()) {
+            if (passenger instanceof org.bukkit.entity.Player player) findNpcQuestManager.onPlayerMoved(player);
+        }
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         findNpcQuestManager.onPlayerJoin(event.getPlayer());

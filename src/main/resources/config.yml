@@ -1,563 +1,1761 @@
 # ============================================================
-#  Configuration de l'expansion de la ville (slots de chunks)
+#  CityCore — configuration
+#  ⚠ Économie générée et vérifiée (aucun arbitrage achat → craft → revente
+#    avec les recettes vanilla 1.21.1). Après modification, lancez /city eco check.
+# ============================================================
+
+# Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
+# Ne modifiez pas cette valeur.
+config-version: 6
+
+# ============================================================
+#  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
 # ============================================================
 city-expand:
-  # Prix de base pour le premier slot acheté (hors slots offerts)
-  base-price: 200
-  # Multiplicateur appliqué à chaque slot supplémentaire
-  # ex: 1.5 → slot 1 = 200, slot 2 = 300, slot 3 = 450...
-  multiplier: 1.5
-  # Prix maximum plafonné (le multiplicateur n'agit plus au-delà)
-  max-price: 5000
-  # Nombre de slots offerts lors de la première rencontre avec le maire
-  free-chunks: 8
+  # Prix du premier emplacement acheté (hors emplacements offerts)
+  base-price: 150
+  # Chaque emplacement acheté coûte 8 % de plus que le précédent
+  multiplier: 1.08
+  # Plafond du prix d'un emplacement
+  max-price: 2500
+  # Emplacements offerts par Alderic à la fondation (une seule fois)
+  free-chunks: 6
+  # Coins versés dans la caisse à la fondation
+  first-meeting-coins: 100
 
 # ============================================================
-#  CityCore - Configuration des NPCs villageois
+#  PALIERS DE LA VILLE — surcharges facultatives
+#  Valeurs par défaut dans CityTier.java (charte = coût pour passer au palier suivant)
+#  Dix chapitres : 1→2 : 150 | 2→3 : 400 | 3→4 : 800 | 4→5 : 1500 | 5→6 : 2500
+#  6→7 : 4000 | 7→8 : 6000 | 8→9 : 8500 | 9→10 : 12000 (le dragon est vaincu au chapitre IX)
 # ============================================================
+city-tiers: {}
+#  Exemple :
+#  city-tiers:
+#    4:
+#      upgrade-cost: 3000
+#      reward-chunks: 12
 
-npc-settings:
-  # Multiplicateur d'items donnés au NPC quand le joueur a le job correspondant
-  # ex: 1.5 → le NPC reçoit 50% d'items en plus (le joueur en vend autant, le NPC en stocke plus)
-  job-inventory-multiplier: 1.5
-  # Réduction en % sur les achats en boutique pour le joueur qui travaille pour ce NPC
-  # ex: 20 → -20% sur le prix affiché (arrondi à l'entier inférieur, minimum 1 coin)
-  job-shop-discount: 20
+# Objectifs des quêtes de ville (par id de quête, voir CityTier.java)
+city-quests:
+  targets: {}
+#  Exemple : targets: {t4_walls: 512, t3_rounds: 40}
 
 # ============================================================
-#  TAILLEUR DE PIERRE - Brennan
+#  PROGRESSION (/city progression)
+# ============================================================
+progression:
+  # Onglet « La Renaissance de Valmont » dans l'écran des progrès (touche L) :
+  # chapitres, habitants recrutés et hauts faits, avec notifications « Progrès réalisé »
+  advancements: true
+
+# ============================================================
+#  INTERFACES DES HABITANTS (pack de ressources « Valmont »)
+#  Menus illustrés des PNJ. Le pack ne contient que des images de menus :
+#  aucun bloc ni objet n'est modifié. Un joueur qui refuse le pack garde
+#  les menus classiques (/city ui pour changer de style).
+# ============================================================
+ui-pack:
+  enabled: true
+  # Le plugin héberge lui-même le pack (mini serveur web intégré)
+  self-host: true
+  port: 8164
+  # Adresse que les joueurs utilisent pour joindre ce serveur (IP publique ou nom de domaine).
+  # Vide : adresse locale détectée (suffit sur le même PC ou en réseau local).
+  public-address: ""
+  # Ou adresse web où vous avez déposé plugins/CityCore/ui-pack/CityCore-UI.zip
+  # (prioritaire sur l'hébergement intégré ; le fichier doit être identique)
+  url: ""
+  # true : pack obligatoire (un refus déconnecte le joueur)
+  required: false
+
+# ============================================================
+#  MODS DU SERVEUR (serveur hybride mods + plugins, ex. Youer)
+#  Certains habitants dépendent d'un mod. Sans lui, ils se recrutent et
+#  s'installent, mais ne commercent pas et ne confient pas de quêtes.
+#  auto = détection | on = forcer « présent » | off = forcer « absent » (test)
+# ============================================================
+mod-integrations:
+  # Dragon Mounts Remastered (identifiant dmr) : Harold, le dresseur de dragons
+  dmr: auto
+  # Tax' Ocean Villager (identifiant taxov) : Jack Sparrow et les navires du large
+  taxov: auto
+
+# ============================================================
+#  ÉCONOMIE DES PNJ
+#  - Ce qu'un joueur vend entre dans le stock du PNJ (capacité limitée).
+#  - Plus l'entrepôt est plein, moins il paie ; plein, il n'achète plus.
+#  - Le stock se revend au prix de rachat × resale-multiplier (toujours plus cher).
+#  - Les articles fabriqués consomment des ingrédients dans les stocks.
+#  - Les items achetés aux PNJ sont marqués : ni revendables, ni valables
+#    pour les quêtes des PNJ (mais utilisables pour bâtir et livrer les chantiers).
+# ============================================================
+npc-economy:
+  resale-multiplier: 2.0
+  # Prix plein tant que le stock est sous ce % de la capacité
+  full-price-until: 40
+  # % du prix plein payé quand l'entrepôt est presque plein
+  min-price-percent: 35
+  # % de la capacité consommé par heure (si au moins un joueur est connecté). 0 = off
+  consumption-percent-per-hour: 8
+  # Avantages de l'employé d'un PNJ (remplace l'ancien multiplicateur de stock, source de duplication)
+  job-sell-bonus: 10
+  job-shop-discount: 15
+  # Marge minimale exigée par le contrôle anti-arbitrage (/city eco check)
+  validator-margin: 10
+
+npc-quests:
+  # Délai (minutes) entre deux quêtes d'un même PNJ, par joueur
+  main-cooldown-minutes: 20
+  special-cooldown-minutes: 60
+  # Récompense = valeur de marché des items/créatures demandés × prime
+  main-reward-premium: 1.25
+  special-reward-premium: 1.5
+
+# ============================================================
+#  SKINS DES PNJ (Alderic, Brennan, Jack Sparrow et Gandalf ont le leur dans le plugin)
+#  1. Sur https://mineskin.org, importez l'image du skin (ou le pseudo d'un joueur).
+#  2. Copiez « Texture Value » dans value et « Texture Signature » dans signature.
+#  3. Redémarrez : le skin s'applique au PNJ (même déjà présent) et à son portrait.
+# ============================================================
+npc-skins:
+  bastien: {value: "", signature: ""}
+  helene: {value: "", signature: ""}
+  martin: {value: "", signature: ""}
+  godefroy: {value: "", signature: ""}
+  rosalie: {value: "", signature: ""}
+  thorvald: {value: "", signature: ""}
+  agathe: {value: "", signature: ""}
+  edmond: {value: "", signature: ""}
+  roland: {value: "", signature: ""}
+  anselme: {value: "", signature: ""}
+  isabeau: {value: "", signature: ""}
+  leon: {value: "", signature: ""}
+  beatrice: {value: "", signature: ""}
+  robin: {value: "", signature: ""}
+  indiana: {value: "", signature: ""}
+  docbrown: {value: "", signature: ""}
+  geralt: {value: "", signature: ""}
+  harold: {value: "", signature: ""}
+
+# ============================================================
+#  BÛCHERON & CHARBONNIER — Bastien (chapitre I)
+#  Les forêts : il rachète toutes les essences de bois et en tire charbon,
+#  bois écorcé et menuiserie. Il vend aussi les pousses des forêts lointaines.
+# ============================================================
+bastien:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 300, 3: 1200, 4: 3500, 5: 8000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    OAK_LOG: {price: 5, quantity: 16, capacity: 1536}
+    SPRUCE_LOG: {price: 5, quantity: 16, capacity: 1536}
+    BIRCH_LOG: {price: 5, quantity: 16, capacity: 1536}
+    JUNGLE_LOG: {price: 6, quantity: 16, capacity: 1024}
+    ACACIA_LOG: {price: 6, quantity: 16, capacity: 1024}
+    DARK_OAK_LOG: {price: 6, quantity: 16, capacity: 1024}
+    MANGROVE_LOG: {price: 6, quantity: 16, capacity: 1024}
+    CHERRY_LOG: {price: 7, quantity: 16, capacity: 768}
+    CRIMSON_STEM: {price: 10, quantity: 16, capacity: 512}
+    WARPED_STEM: {price: 10, quantity: 16, capacity: 512}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: CHARCOAL, price: 6, quantity: 8, requires: {"#LOGS": 8}}
+      - {material: CHEST, price: 2, quantity: 1, requires: {"#LOGS": 2}}
+      - {material: OAK_SAPLING, price: 3, quantity: 4, supply: {max: 16, restock-minutes: 20}}
+      - {material: SPRUCE_SAPLING, price: 3, quantity: 4, supply: {max: 16, restock-minutes: 20}}
+      - {material: BIRCH_SAPLING, price: 3, quantity: 4, supply: {max: 16, restock-minutes: 20}}
+    2:
+      - {material: STRIPPED_OAK_LOG, price: 12, quantity: 16, requires: {OAK_LOG: 16}}
+      - {material: STRIPPED_SPRUCE_LOG, price: 12, quantity: 16, requires: {SPRUCE_LOG: 16}}
+      - {material: LADDER, price: 4, quantity: 16, requires: {"#LOGS": 5}}
+      - {material: BARREL, price: 2, quantity: 1, requires: {"#LOGS": 2}}
+      - {material: CAMPFIRE, price: 3, quantity: 1, requires: {"#LOGS": 4}}
+    3:
+      - {material: JUNGLE_SAPLING, price: 6, quantity: 2, supply: {max: 8, restock-minutes: 60}}
+      - {material: ACACIA_SAPLING, price: 6, quantity: 2, supply: {max: 8, restock-minutes: 60}}
+      - {material: DARK_OAK_SAPLING, price: 8, quantity: 4, supply: {max: 8, restock-minutes: 60}}
+    4:
+      - {material: CHERRY_SAPLING, price: 10, quantity: 2, supply: {max: 6, restock-minutes: 90}}
+      - {material: MANGROVE_PROPAGULE, price: 8, quantity: 2, supply: {max: 6, restock-minutes: 90}}
+      - {material: AZALEA, price: 8, quantity: 2, supply: {max: 6, restock-minutes: 90}}
+    5:
+      - {material: CRIMSON_FUNGUS, price: 15, quantity: 2, supply: {max: 4, restock-minutes: 120}}
+      - {material: WARPED_FUNGUS, price: 15, quantity: 2, supply: {max: 4, restock-minutes: 120}}
+      - {material: IRON_AXE, price: 60, quantity: 1, requires: {"thorvald:IRON_INGOT": 3}, enchantments: {efficiency: 4, unbreaking: 3}, name: "§2Hache du charbonnier"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 20
+      objectives-count: 2
+      item-pool:
+        - {material: OAK_LOG, base-amount: 64}
+        - {material: SPRUCE_LOG, base-amount: 64}
+        - {material: BIRCH_LOG, base-amount: 64}
+        - {material: DARK_OAK_LOG, base-amount: 48, min-level: 2}
+        - {material: JUNGLE_LOG, base-amount: 48, min-level: 2}
+        - {material: ACACIA_LOG, base-amount: 48, min-level: 2}
+    special:
+      xp-reward-per-level: 50
+      objectives-count: 2
+      item-pool:
+        - {material: CHERRY_LOG, base-amount: 32, min-level: 2}
+        - {material: MANGROVE_LOG, base-amount: 32, min-level: 2}
+        - {material: CRIMSON_STEM, base-amount: 24, min-level: 4}
+        - {material: WARPED_STEM, base-amount: 24, min-level: 4}
+        - {material: APPLE, base-amount: 6}
+      entity-pool:
+        - {entity: ZOMBIE, base-amount: 8, value: 1.5}
+        - {entity: SPIDER, base-amount: 6, value: 1.5}
+
+# ============================================================
+#  FERMIÈRE — Hélène (chapitre II)
+#  Les cultures : céréales, légumes, fruits et engrais.
+#  Gardienne des semences, elle vend même les graines anciennes du renifleur.
+# ============================================================
+helene:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 300, 3: 1200, 4: 3500, 5: 8000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    WHEAT: {price: 10, quantity: 32, capacity: 2048}
+    CARROT: {price: 8, quantity: 32, capacity: 2048}
+    POTATO: {price: 8, quantity: 32, capacity: 2048}
+    BEETROOT: {price: 12, quantity: 32, capacity: 1024}
+    PUMPKIN: {price: 8, quantity: 8, capacity: 512}
+    MELON_SLICE: {price: 8, quantity: 64, capacity: 2048}
+    SUGAR_CANE: {price: 8, quantity: 32, capacity: 2048}
+    SWEET_BERRIES: {price: 6, quantity: 32, capacity: 1024}
+    COCOA_BEANS: {price: 12, quantity: 32, capacity: 1024}
+    GLOW_BERRIES: {price: 12, quantity: 32, capacity: 512}
+    APPLE: {price: 8, quantity: 8, capacity: 256}
+    BONE: {price: 8, quantity: 32, capacity: 1024}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: WHEAT_SEEDS, price: 2, quantity: 16, supply: {max: 32, restock-minutes: 10}}
+      - {material: BEETROOT_SEEDS, price: 3, quantity: 16, supply: {max: 32, restock-minutes: 15}}
+      - {material: BONE_MEAL, price: 4, quantity: 18, requires: {BONE: 6}}
+      - {material: COMPOSTER, price: 2, quantity: 1, requires: {"bastien:#LOGS": 2}}
+    2:
+      - {material: HAY_BLOCK, price: 26, quantity: 4, requires: {WHEAT: 36}}
+      - {material: PUMPKIN_SEEDS, price: 5, quantity: 8, requires: {PUMPKIN: 2}}
+      - {material: MELON_SEEDS, price: 3, quantity: 8, requires: {MELON_SLICE: 8}}
+      - {material: SUGAR, price: 10, quantity: 16, requires: {SUGAR_CANE: 16}}
+    3:
+      - {material: CARVED_PUMPKIN, price: 10, quantity: 4, requires: {PUMPKIN: 4}}
+      - {material: JACK_O_LANTERN, price: 11, quantity: 4, requires: {PUMPKIN: 4, "godefroy:COAL": 1}}
+      - {material: MELON, price: 11, quantity: 4, requires: {MELON_SLICE: 36}}
+    4:
+      - material: TORCHFLOWER_SEEDS
+        price: 30
+        quantity: 1
+        supply: {max: 2, restock-minutes: 240}
+        lore:
+          - "§7Une graine ancienne, cachée"
+          - "§7depuis la Nuit Noire."
+      - material: PITCHER_POD
+        price: 30
+        quantity: 1
+        supply: {max: 2, restock-minutes: 240}
+        lore:
+          - "§7Une graine ancienne, cachée"
+          - "§7depuis la Nuit Noire."
+    5:
+      - {material: IRON_HOE, price: 70, quantity: 1, requires: {"thorvald:IRON_INGOT": 2}, enchantments: {fortune: 3, unbreaking: 3}, name: "§eHoue d'abondance"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 20
+      objectives-count: 2
+      item-pool:
+        - {material: WHEAT, base-amount: 96}
+        - {material: CARROT, base-amount: 96}
+        - {material: POTATO, base-amount: 96}
+        - {material: BEETROOT, base-amount: 64}
+        - {material: SUGAR_CANE, base-amount: 64}
+        - {material: PUMPKIN, base-amount: 16, min-level: 2}
+        - {material: MELON_SLICE, base-amount: 96, min-level: 2}
+    special:
+      xp-reward-per-level: 50
+      objectives-count: 2
+      item-pool:
+        - {material: COCOA_BEANS, base-amount: 32, min-level: 2}
+        - {material: SWEET_BERRIES, base-amount: 64}
+        - {material: GLOW_BERRIES, base-amount: 24, min-level: 3}
+        - {material: APPLE, base-amount: 8}
+        - {material: BONE, base-amount: 64}
+      entity-pool:
+        - {entity: ZOMBIE, base-amount: 6, value: 1.5}
+
+# ============================================================
+#  TAILLEUR DE PIERRE — Brennan (chapitre III)
+#  La pierre : il rachète roches et minéraux de construction
+#  et les taille en briques, pierres polies et dallages.
 # ============================================================
 brennan:
-  xp-per-stack: 10       # XP gagné par stack vendu
-  xp-per-coin: 1         # XP gagné par coin de valeur vendue
-  level-thresholds:      # XP total requis pour atteindre chaque niveau
-    2: 500
-    3: 1500
-    4: 3000
-    5: 5000
-
-  # Prix de rachat des ressources (coins / stack)
+  xp-per-stack: 2
+  xp-per-coin: 1
+  level-thresholds: {2: 200, 3: 800, 4: 2500, 5: 6000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
   sell-prices:
-    COBBLESTONE:
-      price: 2
-      quantity: 64      # prix pour 1 stack
-    STONE:
-      price: 3
-      quantity: 64
-    GRANITE:
-      price: 4
-      quantity: 64
-    DIORITE:
-      price: 4
-      quantity: 64
-    ANDESITE:
-      price: 4
-      quantity: 64
-    GRAVEL:
-      price: 2
-      quantity: 64
-    SAND:
-      price: 2
-      quantity: 64
-    SANDSTONE:
-      price: 3
-      quantity: 64
-    DEEPSLATE:
-      price: 5
-      quantity: 64
-    OBSIDIAN:
-      price: 20
-      quantity: 16      # prix pour 16 obsidiennes
-
-  # Boutique d'achat — items disponibles par niveau
+    COBBLESTONE: {price: 3, quantity: 64, capacity: 4096}
+    STONE: {price: 4, quantity: 64, capacity: 2048}
+    COBBLED_DEEPSLATE: {price: 3, quantity: 64, capacity: 2048}
+    GRANITE: {price: 3, quantity: 64, capacity: 2048}
+    DIORITE: {price: 3, quantity: 64, capacity: 2048}
+    ANDESITE: {price: 3, quantity: 64, capacity: 2048}
+    TUFF: {price: 3, quantity: 64, capacity: 2048}
+    CALCITE: {price: 6, quantity: 64, capacity: 1024}
+    DRIPSTONE_BLOCK: {price: 6, quantity: 64, capacity: 1024}
+    SANDSTONE: {price: 4, quantity: 64, capacity: 1024}
+    BLACKSTONE: {price: 6, quantity: 64, capacity: 1024}
+    BASALT: {price: 5, quantity: 64, capacity: 1024}
+    END_STONE: {price: 8, quantity: 64, capacity: 1024}
+    OBSIDIAN: {price: 12, quantity: 8, capacity: 256}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
   shop:
     1:
-      - material: STONE_PICKAXE
-        price: 50
-        quantity: 1
-      - material: STONE_SHOVEL
-        price: 30
-        quantity: 1
+      - {material: STONE_BRICKS, price: 10, quantity: 64, requires: {STONE: 64}}
+      - {material: SMOOTH_STONE, price: 5, quantity: 32, requires: {STONE: 32}}
+      - {material: FURNACE, price: 1, quantity: 1, requires: {COBBLESTONE: 8}}
+      - {material: STONE_PICKAXE, price: 1, quantity: 1, requires: {COBBLESTONE: 3}}
     2:
-      - material: IRON_PICKAXE
-        price: 150
-        quantity: 1
-      - material: IRON_SHOVEL
-        price: 100
-        quantity: 1
-      - material: CHISELED_STONE_BRICKS
-        price: 20
-        quantity: 16
+      - {material: POLISHED_ANDESITE, price: 7, quantity: 64, requires: {ANDESITE: 64}}
+      - {material: POLISHED_GRANITE, price: 7, quantity: 64, requires: {GRANITE: 64}}
+      - {material: POLISHED_DIORITE, price: 7, quantity: 64, requires: {DIORITE: 64}}
+      - {material: CHISELED_STONE_BRICKS, price: 3, quantity: 16, requires: {STONE: 16}}
+      - {material: CRACKED_STONE_BRICKS, price: 5, quantity: 32, requires: {STONE: 32}}
+      - {material: MOSSY_STONE_BRICKS, price: 5, quantity: 32, requires: {STONE: 32}}
+      - {material: STONECUTTER, price: 4, quantity: 1, requires: {STONE: 3, "thorvald:IRON_INGOT": 1}}
     3:
-      - material: DIAMOND_PICKAXE
-        price: 500
-        quantity: 1
-      - material: SMOOTH_STONE
-        price: 10
-        quantity: 32
-      - material: POLISHED_GRANITE
-        price: 15
-        quantity: 32
+      - {material: DEEPSLATE_BRICKS, price: 7, quantity: 64, requires: {COBBLED_DEEPSLATE: 64}}
+      - {material: DEEPSLATE_TILES, price: 8, quantity: 64, requires: {COBBLED_DEEPSLATE: 64}}
+      - {material: TUFF_BRICKS, price: 7, quantity: 64, requires: {TUFF: 64}}
+      - {material: CUT_SANDSTONE, price: 5, quantity: 32, requires: {SANDSTONE: 32}}
+      - {material: SMOOTH_SANDSTONE, price: 5, quantity: 32, requires: {SANDSTONE: 32}}
     4:
-      - material: NETHERITE_PICKAXE
-        price: 2000
-        quantity: 1
-      - material: DEEPSLATE_BRICKS
-        price: 25
-        quantity: 32
-      - material: SCULK
-        price: 50
-        quantity: 16
-
+      - {material: POLISHED_BLACKSTONE_BRICKS, price: 14, quantity: 64, requires: {BLACKSTONE: 64}}
+      - {material: SMOOTH_BASALT, price: 7, quantity: 32, requires: {BASALT: 32}}
+      - {material: CHISELED_DEEPSLATE, price: 2, quantity: 16, requires: {COBBLED_DEEPSLATE: 16}}
+    5:
+      - {material: END_STONE_BRICKS, price: 19, quantity: 64, requires: {END_STONE: 64}}
+      - {material: DIAMOND_PICKAXE, price: 200, quantity: 1, requires: {"godefroy:DIAMOND": 3}, enchantments: {efficiency: 4, unbreaking: 3}, name: "§7Pic du maître maçon"}
   quests:
-    # Scaling des quantités par niveau
-    quantity-multiplier:
-      1: 1.0
-      2: 1.5
-      3: 2.0
-      4: 2.5
-      5: 3.0
-
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
     main:
-      xp-reward-per-level: 50
-      reward-per-level: 100    # coins × niveau
-      objectives-count: 2      # nb d'objectifs générés aléatoirement
+      xp-reward-per-level: 20
+      objectives-count: 2
       item-pool:
-        - material: COBBLESTONE
-          base-amount: 64
-        - material: STONE
-          base-amount: 32
-        - material: GRAVEL
-          base-amount: 64
-        - material: SAND
-          base-amount: 64
-        - material: DEEPSLATE
-          base-amount: 32
-
+        - {material: COBBLESTONE, base-amount: 256}
+        - {material: STONE, base-amount: 128}
+        - {material: ANDESITE, base-amount: 128}
+        - {material: GRANITE, base-amount: 128}
+        - {material: DIORITE, base-amount: 128}
+        - {material: COBBLED_DEEPSLATE, base-amount: 128, min-level: 2}
+        - {material: TUFF, base-amount: 96, min-level: 2}
     special:
       xp-reward-per-level: 50
-      reward-per-level: 300
-      objectives-count: 3
+      objectives-count: 2
       item-pool:
-        - material: OBSIDIAN
-          base-amount: 16
-        - material: GRANITE
-          base-amount: 64
-        - material: ANDESITE
-          base-amount: 64
+        - {material: OBSIDIAN, base-amount: 8, min-level: 2}
+        - {material: CALCITE, base-amount: 64}
+        - {material: DRIPSTONE_BLOCK, base-amount: 64}
+        - {material: BLACKSTONE, base-amount: 64, min-level: 4}
       entity-pool:
-        - entity: CREEPER
-          base-amount: 5
-        - entity: ZOMBIE
-          base-amount: 10
-        - entity: SKELETON
-          base-amount: 8
-
+        - {entity: SILVERFISH, base-amount: 10, value: 1}
+        - {entity: CREEPER, base-amount: 4, value: 3}
 
 # ============================================================
-#  PIRATE - Jack Sparrow
+#  PÊCHEUR — Martin (chapitre III)
+#  La pêche : poissons, encre, algues.
+#  Il vend cannes à pêche (enchantées aux rangs supérieurs), bateaux et poissons séchés.
 # ============================================================
-
-jacksparrow:
-  xp-per-stack: 5
+martin:
+  xp-per-stack: 1
   xp-per-coin: 1
-
-  level-thresholds:
-    2: 500
-    3: 1500
-    4: 3000
-    5: 5000
-
-  # ------------------------------------------------------------
-  # Revente joueur → Jack (loot marin uniquement)
-  # ------------------------------------------------------------
+  level-thresholds: {2: 300, 3: 1200, 4: 3500, 5: 8000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
   sell-prices:
-
-    COD:
-      price: 2
-      quantity: 64
-
-    SALMON:
-      price: 3
-      quantity: 64
-
-    TROPICAL_FISH:
-      price: 5
-      quantity: 32
-
-    PUFFERFISH:
-      price: 6
-      quantity: 16
-
-    KELP:
-      price: 1
-      quantity: 64
-
-    SEA_PICKLE:
-      price: 4
-      quantity: 16
-
-    NAUTILUS_SHELL:
-      price: 12
-      quantity: 1
-
-    HEART_OF_THE_SEA:
-      price: 60
-      quantity: 1
-
-    PRISMARINE_SHARD:
-      price: 5
-      quantity: 16
-
-    PRISMARINE_CRYSTALS:
-      price: 7
-      quantity: 16
-
-    GOLD_NUGGET:
-      price: 2
-      quantity: 9
-
-    GOLD_INGOT:
-      price: 18
-      quantity: 1
-
-  # ------------------------------------------------------------
-  # Boutique Jack → joueur (équipement marin)
-  # ------------------------------------------------------------
+    COD: {price: 6, quantity: 16, capacity: 1024}
+    SALMON: {price: 8, quantity: 16, capacity: 1024}
+    TROPICAL_FISH: {price: 6, quantity: 8, capacity: 256}
+    PUFFERFISH: {price: 8, quantity: 8, capacity: 256}
+    INK_SAC: {price: 8, quantity: 16, capacity: 512}
+    GLOW_INK_SAC: {price: 8, quantity: 8, capacity: 256}
+    KELP: {price: 4, quantity: 64, capacity: 2048}
+    LILY_PAD: {price: 4, quantity: 16, capacity: 256}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
   shop:
-
     1:
-      - material: FISHING_ROD
-        price: 50
-        quantity: 1
-      - material: OAK_BOAT
-        price: 40
-        quantity: 1
-      - material: BUCKET
+      - {material: FISHING_ROD, price: 3, quantity: 1, supply: {max: 4, restock-minutes: 30}}
+      - {material: COOKED_COD, price: 7, quantity: 8, requires: {COD: 8}}
+      - {material: OAK_BOAT, price: 2, quantity: 1, requires: {"bastien:OAK_LOG": 2}}
+    2:
+      - {material: COOKED_SALMON, price: 10, quantity: 8, requires: {SALMON: 8}}
+      - {material: DRIED_KELP_BLOCK, price: 11, quantity: 8, requires: {KELP: 72}}
+    3:
+      - {material: FISHING_ROD, price: 25, quantity: 1, supply: {max: 2, restock-minutes: 120}, enchantments: {lure: 2, luck_of_the_sea: 2}}
+      - {material: COD_BUCKET, price: 12, quantity: 1, requires: {COD: 1, "thorvald:IRON_INGOT": 3}}
+    4:
+      - {material: FISHING_ROD, price: 80, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {lure: 3, luck_of_the_sea: 3, unbreaking: 3}}
+      - {material: TROPICAL_FISH_BUCKET, price: 13, quantity: 1, requires: {TROPICAL_FISH: 1, "thorvald:IRON_INGOT": 3}}
+    5:
+      - {material: FISHING_ROD, price: 250, quantity: 1, supply: {max: 1, restock-minutes: 1440}, enchantments: {lure: 3, luck_of_the_sea: 3, unbreaking: 3, mending: 1}, name: "§bCanne du vieux Martin"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 20
+      objectives-count: 2
+      item-pool:
+        - {material: COD, base-amount: 32}
+        - {material: SALMON, base-amount: 24}
+        - {material: KELP, base-amount: 128}
+        - {material: INK_SAC, base-amount: 16}
+        - {material: LILY_PAD, base-amount: 12, min-level: 2}
+    special:
+      xp-reward-per-level: 50
+      objectives-count: 2
+      item-pool:
+        - {material: TROPICAL_FISH, base-amount: 12}
+        - {material: PUFFERFISH, base-amount: 6}
+        - {material: GLOW_INK_SAC, base-amount: 8, min-level: 2}
+      entity-pool:
+        - {entity: DROWNED, base-amount: 8, value: 2}
+        - {entity: GUARDIAN, base-amount: 3, value: 6, min-level: 3}
+
+# ============================================================
+#  MINEUR — Godefroy (chapitre IV)
+#  Les mines : charbon, minerais bruts, redstone, lapis et diamants.
+#  Il équipe les mineurs : torches, lanternes, rails, wagonnets.
+# ============================================================
+godefroy:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    COAL: {price: 6, quantity: 16, capacity: 1024}
+    RAW_IRON: {price: 20, quantity: 16, capacity: 768}
+    RAW_COPPER: {price: 8, quantity: 32, capacity: 1536}
+    RAW_GOLD: {price: 16, quantity: 8, capacity: 256}
+    REDSTONE: {price: 8, quantity: 32, capacity: 1536}
+    LAPIS_LAZULI: {price: 8, quantity: 16, capacity: 768}
+    DIAMOND: {price: 48, quantity: 4, capacity: 64}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: TORCH, price: 7, quantity: 32, requires: {COAL: 8}}
+      - {material: LANTERN, price: 8, quantity: 2, requires: {COAL: 2, RAW_IRON: 2}}
+    2:
+      - {material: RAIL, price: 18, quantity: 16, requires: {RAW_IRON: 6}}
+      - {material: MINECART, price: 15, quantity: 1, requires: {RAW_IRON: 5}}
+      - {material: COAL_BLOCK, price: 32, quantity: 4, requires: {COAL: 36}}
+    3:
+      - {material: POWERED_RAIL, price: 29, quantity: 6, requires: {RAW_GOLD: 6, REDSTONE: 1}}
+      - {material: DETECTOR_RAIL, price: 18, quantity: 6, requires: {RAW_IRON: 6, REDSTONE: 1}}
+      - {material: LAPIS_BLOCK, price: 11, quantity: 1, requires: {LAPIS_LAZULI: 9}}
+      - {material: REDSTONE_BLOCK, price: 6, quantity: 1, requires: {REDSTONE: 9}}
+    4:
+      - {material: IRON_PICKAXE, price: 45, quantity: 1, requires: {RAW_IRON: 3}, enchantments: {efficiency: 3, unbreaking: 2}, name: "§8Pic de la Fosse"}
+    5:
+      - {material: DIAMOND_PICKAXE, price: 300, quantity: 1, requires: {DIAMOND: 3}, supply: {max: 1, restock-minutes: 720}, enchantments: {efficiency: 4, fortune: 3, unbreaking: 3}, name: "§8Pioche de la Fosse aux Corbeaux"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: COAL, base-amount: 64}
+        - {material: RAW_IRON, base-amount: 32}
+        - {material: RAW_COPPER, base-amount: 64}
+        - {material: REDSTONE, base-amount: 64, min-level: 2}
+        - {material: LAPIS_LAZULI, base-amount: 32, min-level: 2}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: RAW_GOLD, base-amount: 16}
+        - {material: DIAMOND, base-amount: 2, min-level: 3}
+      entity-pool:
+        - {entity: CAVE_SPIDER, base-amount: 8, value: 2}
+        - {entity: CREEPER, base-amount: 5, value: 3}
+        - {entity: SKELETON, base-amount: 8, value: 2}
+
+# ============================================================
+#  TAVERNIÈRE — Rosalie (chapitre IV)
+#  La cuisine : viandes, œufs, champignons.
+#  Elle cuisine plats, pâtisseries et boissons avec les stocks d'Hélène et des chasseurs.
+# ============================================================
+rosalie:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    BEEF: {price: 10, quantity: 16, capacity: 1024}
+    PORKCHOP: {price: 10, quantity: 16, capacity: 1024}
+    MUTTON: {price: 8, quantity: 16, capacity: 1024}
+    CHICKEN: {price: 6, quantity: 16, capacity: 1024}
+    RABBIT: {price: 6, quantity: 8, capacity: 256}
+    EGG: {price: 4, quantity: 16, capacity: 512}
+    BROWN_MUSHROOM: {price: 4, quantity: 16, capacity: 512}
+    RED_MUSHROOM: {price: 4, quantity: 16, capacity: 512}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: BREAD, price: 18, quantity: 8, requires: {"helene:WHEAT": 24}}
+      - {material: COOKED_BEEF, price: 12, quantity: 8, requires: {BEEF: 8}}
+      - {material: COOKED_PORKCHOP, price: 12, quantity: 8, requires: {PORKCHOP: 8}}
+      - {material: COOKED_CHICKEN, price: 7, quantity: 8, requires: {CHICKEN: 8}}
+      - {material: MUSHROOM_STEW, price: 2, quantity: 1, requires: {BROWN_MUSHROOM: 1, RED_MUSHROOM: 1}}
+    2:
+      - {material: COOKED_MUTTON, price: 10, quantity: 8, requires: {MUTTON: 8}}
+      - {material: BAKED_POTATO, price: 10, quantity: 16, requires: {"helene:POTATO": 16}}
+      - {material: BEETROOT_SOUP, price: 6, quantity: 1, requires: {"helene:BEETROOT": 6}}
+      - {material: RABBIT_STEW, price: 4, quantity: 1, requires: {RABBIT: 1, BROWN_MUSHROOM: 1, "helene:CARROT": 1, "helene:POTATO": 1}}
+    3:
+      - {material: PUMPKIN_PIE, price: 14, quantity: 4, requires: {"helene:PUMPKIN": 4, EGG: 4, "helene:SUGAR_CANE": 4}}
+      - {material: COOKIE, price: 5, quantity: 16, requires: {"helene:WHEAT": 4, "helene:COCOA_BEANS": 2}}
+      - {material: CAKE, price: 4, quantity: 1, requires: {"helene:WHEAT": 3, "helene:SUGAR_CANE": 2, EGG: 1}}
+      - {material: COOKED_RABBIT, price: 14, quantity: 8, requires: {RABBIT: 8}}
+    4:
+      - material: POTION
         price: 25
         quantity: 1
+        requires: {"helene:WHEAT": 8}
+        supply: {max: 4, restock-minutes: 60}
+        potion: STRENGTH
+        name: "§cCervoise des braves"
+        lore:
+          - "§7Une chope qui donne du cœur au ventre."
+      - {material: GOLDEN_CARROT, price: 26, quantity: 4, requires: {"helene:CARROT": 4, "beatrice:GOLD_INGOT": 4}}
+    5:
+      - material: POTION
+        price: 35
+        quantity: 1
+        requires: {"anselme:HONEY_BOTTLE": 2}
+        supply: {max: 4, restock-minutes: 90}
+        potion: REGENERATION
+        name: "§6Hydromel du Chaudron"
+        lore:
+          - "§7Le secret de Rosalie :"
+          - "§7miel, épices et patience."
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: BEEF, base-amount: 24}
+        - {material: PORKCHOP, base-amount: 24}
+        - {material: CHICKEN, base-amount: 24}
+        - {material: MUTTON, base-amount: 24}
+        - {material: EGG, base-amount: 32}
+        - {material: BROWN_MUSHROOM, base-amount: 16, min-level: 2}
+        - {material: RED_MUSHROOM, base-amount: 16, min-level: 2}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: RABBIT, base-amount: 12}
+      entity-pool:
+        - {entity: HOGLIN, base-amount: 3, value: 5, min-level: 3}
+        - {entity: PILLAGER, base-amount: 5, value: 4, min-level: 2}
+        - {entity: WITCH, base-amount: 2, value: 5, min-level: 4}
 
+# ============================================================
+#  FORGERON — Thorvald (chapitre V)
+#  La forge : lingots de fer et de cuivre, débris de netherite.
+#  Outils, armures (dont la cotte de mailles, introuvable en artisanat), cloches.
+# ============================================================
+thorvald:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 600, 3: 2500, 4: 7000, 5: 15000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    IRON_INGOT: {price: 24, quantity: 16, capacity: 1024}
+    COPPER_INGOT: {price: 10, quantity: 32, capacity: 1024}
+    NETHERITE_SCRAP: {price: 30, quantity: 1, capacity: 32}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: BUCKET, price: 11, quantity: 1, requires: {IRON_INGOT: 3}}
+      - {material: SHEARS, price: 7, quantity: 1, requires: {IRON_INGOT: 2}}
+      - {material: IRON_SHOVEL, price: 4, quantity: 1, requires: {IRON_INGOT: 1}}
+      - {material: IRON_SWORD, price: 7, quantity: 1, requires: {IRON_INGOT: 2}}
+      - {material: IRON_AXE, price: 11, quantity: 1, requires: {IRON_INGOT: 3}}
+      - {material: IRON_PICKAXE, price: 11, quantity: 1, requires: {IRON_INGOT: 3}}
+      - {material: IRON_HOE, price: 7, quantity: 1, requires: {IRON_INGOT: 2}}
+      - {material: SHIELD, price: 5, quantity: 1, requires: {IRON_INGOT: 1, "bastien:#LOGS": 2}}
+      - {material: FLINT_AND_STEEL, price: 4, quantity: 1, requires: {IRON_INGOT: 1, "roland:FLINT": 1}}
     2:
-      - material: WATER_BUCKET
-        price: 60
+      - {material: IRON_HELMET, price: 18, quantity: 1, requires: {IRON_INGOT: 5}}
+      - {material: IRON_CHESTPLATE, price: 28, quantity: 1, requires: {IRON_INGOT: 8}}
+      - {material: IRON_LEGGINGS, price: 25, quantity: 1, requires: {IRON_INGOT: 7}}
+      - {material: IRON_BOOTS, price: 14, quantity: 1, requires: {IRON_INGOT: 4}}
+      - {material: IRON_BARS, price: 21, quantity: 16, requires: {IRON_INGOT: 6}}
+      - {material: CHAIN, price: 14, quantity: 4, requires: {IRON_INGOT: 4}}
+      - {material: CAULDRON, price: 25, quantity: 1, requires: {IRON_INGOT: 7}}
+      - {material: LIGHTNING_ROD, price: 3, quantity: 1, requires: {COPPER_INGOT: 3}}
+    3:
+      - {material: ANVIL, price: 107, quantity: 1, requires: {IRON_INGOT: 31}}
+      - {material: SMITHING_TABLE, price: 8, quantity: 1, requires: {IRON_INGOT: 2, "bastien:#LOGS": 1}}
+      - {material: CHAINMAIL_HELMET, price: 20, quantity: 1, requires: {IRON_INGOT: 5}}
+      - {material: CHAINMAIL_CHESTPLATE, price: 32, quantity: 1, requires: {IRON_INGOT: 8}}
+      - {material: CHAINMAIL_LEGGINGS, price: 28, quantity: 1, requires: {IRON_INGOT: 7}}
+      - {material: CHAINMAIL_BOOTS, price: 16, quantity: 1, requires: {IRON_INGOT: 4}}
+    4:
+      - {material: DIAMOND_SWORD, price: 56, quantity: 1, requires: {"godefroy:DIAMOND": 2}}
+      - {material: DIAMOND_PICKAXE, price: 83, quantity: 1, requires: {"godefroy:DIAMOND": 3}}
+      - {material: DIAMOND_AXE, price: 83, quantity: 1, requires: {"godefroy:DIAMOND": 3}}
+      - {material: DIAMOND_SHOVEL, price: 28, quantity: 1, requires: {"godefroy:DIAMOND": 1}}
+      - {material: DIAMOND_HELMET, price: 138, quantity: 1, requires: {"godefroy:DIAMOND": 5}}
+      - {material: DIAMOND_CHESTPLATE, price: 221, quantity: 1, requires: {"godefroy:DIAMOND": 8}}
+      - {material: DIAMOND_LEGGINGS, price: 194, quantity: 1, requires: {"godefroy:DIAMOND": 7}}
+      - {material: DIAMOND_BOOTS, price: 111, quantity: 1, requires: {"godefroy:DIAMOND": 4}}
+      - material: BELL
+        price: 34
         quantity: 1
-      - material: TURTLE_HELMET
-        price: 300
+        requires: {"beatrice:GOLD_INGOT": 4, IRON_INGOT: 2}
+        lore:
+          - "§7Coulée pour la cathédrale."
+    5:
+      - {material: NETHERITE_UPGRADE_SMITHING_TEMPLATE, price: 350, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: NETHERITE_INGOT, price: 299, quantity: 1, requires: {NETHERITE_SCRAP: 4, "beatrice:GOLD_INGOT": 4}}
+      - {material: DIAMOND_SWORD, price: 450, quantity: 1, requires: {"godefroy:DIAMOND": 2}, supply: {max: 1, restock-minutes: 1440}, enchantments: {sharpness: 5, unbreaking: 3, looting: 3}, name: "§4Lame de Valmont"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: IRON_INGOT, base-amount: 32}
+        - {material: COPPER_INGOT, base-amount: 64}
+        - {material: COAL, base-amount: 48}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: RAW_IRON, base-amount: 48, min-level: 2}
+        - {material: COAL, base-amount: 128, min-level: 2}
+        - {material: NETHERITE_SCRAP, base-amount: 1, min-level: 5}
+      entity-pool:
+        - {entity: ZOMBIE, base-amount: 10, value: 1.5}
+        - {entity: SKELETON, base-amount: 8, value: 2}
+        - {entity: WITHER_SKELETON, base-amount: 3, value: 8, min-level: 4}
+
+# ============================================================
+#  TISSERANDE & TEINTURIÈRE — Agathe (chapitre V)
+#  Le textile : laines naturelles, ficelle, fleurs tinctoriales.
+#  Teintures, laines colorées, lits, tapis, bannières et tableaux.
+# ============================================================
+agathe:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 300, 3: 1200, 4: 3500, 5: 8000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    WHITE_WOOL: {price: 8, quantity: 16, capacity: 1024}
+    BLACK_WOOL: {price: 8, quantity: 16, capacity: 256}
+    BROWN_WOOL: {price: 8, quantity: 16, capacity: 256}
+    GRAY_WOOL: {price: 8, quantity: 16, capacity: 256}
+    LIGHT_GRAY_WOOL: {price: 8, quantity: 16, capacity: 256}
+    STRING: {price: 8, quantity: 32, capacity: 1024}
+    DANDELION: {price: 4, quantity: 32, capacity: 512}
+    POPPY: {price: 4, quantity: 32, capacity: 512}
+    CORNFLOWER: {price: 4, quantity: 32, capacity: 512}
+    OXEYE_DAISY: {price: 4, quantity: 32, capacity: 256}
+    BLUE_ORCHID: {price: 8, quantity: 32, capacity: 256}
+    ALLIUM: {price: 8, quantity: 32, capacity: 256}
+    LILY_OF_THE_VALLEY: {price: 8, quantity: 32, capacity: 256}
+    SUNFLOWER: {price: 8, quantity: 32, capacity: 256}
+    CACTUS: {price: 4, quantity: 32, capacity: 512}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: WHITE_BED, price: 5, quantity: 1, requires: {WHITE_WOOL: 3, "bastien:#LOGS": 1}}
+      - {material: WHITE_CARPET, price: 13, quantity: 16, requires: {WHITE_WOOL: 11}}
+      - {material: YELLOW_DYE, price: 3, quantity: 8, requires: {DANDELION: 8}}
+      - {material: RED_DYE, price: 3, quantity: 8, requires: {POPPY: 8}}
+      - {material: BLUE_DYE, price: 3, quantity: 8, requires: {CORNFLOWER: 8}}
+      - {material: GREEN_DYE, price: 3, quantity: 8, requires: {CACTUS: 8}}
+      - {material: WHITE_DYE, price: 5, quantity: 8, requires: {LILY_OF_THE_VALLEY: 8}}
+      - {material: LOOM, price: 2, quantity: 1, requires: {STRING: 2, "bastien:#LOGS": 1}}
+    2:
+      - {material: RED_WOOL, price: 19, quantity: 16, requires: {WHITE_WOOL: 16, POPPY: 2}}
+      - {material: BLUE_WOOL, price: 19, quantity: 16, requires: {WHITE_WOOL: 16, CORNFLOWER: 2}}
+      - {material: YELLOW_WOOL, price: 19, quantity: 16, requires: {WHITE_WOOL: 16, DANDELION: 2}}
+      - {material: GREEN_WOOL, price: 19, quantity: 16, requires: {WHITE_WOOL: 16, CACTUS: 2}}
+      - {material: BLACK_DYE, price: 10, quantity: 8, requires: {"martin:INK_SAC": 8}}
+      - {material: PAINTING, price: 2, quantity: 1, requires: {WHITE_WOOL: 1, "bastien:#LOGS": 1}}
+    3:
+      - {material: WHITE_BANNER, price: 8, quantity: 1, requires: {WHITE_WOOL: 6, "bastien:#LOGS": 1}}
+      - {material: RED_BANNER, price: 8, quantity: 1, requires: {WHITE_WOOL: 6, POPPY: 1, "bastien:#LOGS": 1}}
+      - {material: BLUE_BANNER, price: 8, quantity: 1, requires: {WHITE_WOOL: 6, CORNFLOWER: 1, "bastien:#LOGS": 1}}
+      - {material: MAGENTA_DYE, price: 5, quantity: 8, requires: {ALLIUM: 8}}
+      - {material: LIGHT_BLUE_DYE, price: 5, quantity: 8, requires: {BLUE_ORCHID: 8}}
+      - {material: PURPLE_DYE, price: 3, quantity: 8, requires: {POPPY: 4, CORNFLOWER: 4}}
+    4:
+      - {material: RED_BED, price: 5, quantity: 1, requires: {WHITE_WOOL: 3, POPPY: 1, "bastien:#LOGS": 1}}
+      - {material: BLUE_BED, price: 5, quantity: 1, requires: {WHITE_WOOL: 3, CORNFLOWER: 1, "bastien:#LOGS": 1}}
+      - {material: FLOWER_BANNER_PATTERN, price: 2, quantity: 1, requires: {OXEYE_DAISY: 1, "isabeau:PAPER": 1}}
+    5:
+      - {material: LIGHT_BLUE_WOOL, price: 79, quantity: 64, requires: {WHITE_WOOL: 64, BLUE_ORCHID: 8}}
+      - {material: MAGENTA_WOOL, price: 79, quantity: 64, requires: {WHITE_WOOL: 64, ALLIUM: 8}}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 20
+      objectives-count: 2
+      item-pool:
+        - {material: WHITE_WOOL, base-amount: 32}
+        - {material: STRING, base-amount: 32}
+        - {material: DANDELION, base-amount: 24}
+        - {material: POPPY, base-amount: 24}
+        - {material: CORNFLOWER, base-amount: 16}
+        - {material: CACTUS, base-amount: 16, min-level: 2}
+    special:
+      xp-reward-per-level: 50
+      objectives-count: 2
+      item-pool:
+        - {material: BLUE_ORCHID, base-amount: 8}
+        - {material: LILY_OF_THE_VALLEY, base-amount: 8}
+        - {material: ALLIUM, base-amount: 8, min-level: 2}
+        - {material: BLACK_WOOL, base-amount: 16, min-level: 2}
+      entity-pool:
+        - {entity: SPIDER, base-amount: 8, value: 1.5}
+        - {entity: CAVE_SPIDER, base-amount: 5, value: 2, min-level: 3}
+
+# ============================================================
+#  ÉLEVEUR & PALEFRENIER — Edmond (chapitre VI)
+#  L'élevage : cuir, peaux, écailles de tatou, fourrage.
+#  Selles et bardes (introuvables en artisanat), armures de cuir, laisses, étiquettes.
+# ============================================================
+edmond:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    LEATHER: {price: 8, quantity: 8, capacity: 512}
+    RABBIT_HIDE: {price: 4, quantity: 8, capacity: 256}
+    ARMADILLO_SCUTE: {price: 8, quantity: 4, capacity: 128}
+    HAY_BLOCK: {price: 11, quantity: 4, capacity: 256}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: LEAD, price: 4, quantity: 2, supply: {max: 8, restock-minutes: 30}}
+      - {material: LEATHER_HELMET, price: 12, quantity: 1, requires: {LEATHER: 5}}
+      - {material: LEATHER_CHESTPLATE, price: 19, quantity: 1, requires: {LEATHER: 8}}
+      - {material: LEATHER_LEGGINGS, price: 17, quantity: 1, requires: {LEATHER: 7}}
+      - {material: LEATHER_BOOTS, price: 10, quantity: 1, requires: {LEATHER: 4}}
+      - {material: SADDLE, price: 20, quantity: 1, requires: {LEATHER: 6, "thorvald:IRON_INGOT": 1}}
+      - {material: ITEM_FRAME, price: 4, quantity: 1, requires: {LEATHER: 1, "bastien:#LOGS": 1}}
+    2:
+      - {material: NAME_TAG, price: 25, quantity: 1, supply: {max: 2, restock-minutes: 360}}
+      - {material: LEATHER_HORSE_ARMOR, price: 17, quantity: 1, requires: {LEATHER: 7}}
+    3:
+      - {material: IRON_HORSE_ARMOR, price: 37, quantity: 1, requires: {"thorvald:IRON_INGOT": 8, LEATHER: 2}}
+      - {material: WOLF_ARMOR, price: 28, quantity: 1, requires: {ARMADILLO_SCUTE: 6}}
+    4:
+      - {material: GOLDEN_HORSE_ARMOR, price: 58, quantity: 1, requires: {"beatrice:GOLD_INGOT": 8, LEATHER: 2}}
+      - {material: LEATHER_BOOTS, price: 90, quantity: 1, requires: {LEATHER: 4}, supply: {max: 1, restock-minutes: 360}, enchantments: {feather_falling: 4, unbreaking: 3, depth_strider: 3}, name: "§6Bottes de l'écuyer"}
+    5:
+      - {material: DIAMOND_HORSE_ARMOR, price: 255, quantity: 1, requires: {"godefroy:DIAMOND": 8, LEATHER: 2}}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: LEATHER, base-amount: 16}
+        - {material: RABBIT_HIDE, base-amount: 16}
+        - {material: HAY_BLOCK, base-amount: 8, min-level: 2}
+        - {material: WHEAT, base-amount: 64}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: ARMADILLO_SCUTE, base-amount: 6}
+        - {material: RABBIT_HIDE, base-amount: 32, min-level: 2}
+      entity-pool:
+        - {entity: SPIDER, base-amount: 6, value: 1.5}
+        - {entity: PILLAGER, base-amount: 4, value: 4, min-level: 2}
+
+# ============================================================
+#  CAPITAINE DE LA GARDE — Roland (chapitre VI)
+#  La guerre : primes sur les preuves de chasse, fournitures d'archerie.
+#  Arcs, arbalètes, flèches (y compris à effets) ; ses quêtes spéciales sont des contrats de chasse.
+# ============================================================
+roland:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    ROTTEN_FLESH: {price: 2, quantity: 32, capacity: 2048}
+    ARROW: {price: 4, quantity: 32, capacity: 1024}
+    FLINT: {price: 6, quantity: 32, capacity: 1024}
+    FEATHER: {price: 8, quantity: 32, capacity: 1024}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: ARROW, price: 9, quantity: 32, requires: {FLINT: 8, FEATHER: 8, "bastien:#LOGS": 1}}
+      - {material: BOW, price: 3, quantity: 1, requires: {"agathe:STRING": 3, "bastien:#LOGS": 1}}
+    2:
+      - {material: CROSSBOW, price: 6, quantity: 1, requires: {"agathe:STRING": 2, "thorvald:IRON_INGOT": 1, "bastien:#LOGS": 1}}
+      - {material: SPECTRAL_ARROW, price: 20, quantity: 8, requires: {ARROW: 4, "anselme:GLOWSTONE_DUST": 16}}
+    3:
+      - {material: BOW, price: 30, quantity: 1, supply: {max: 2, restock-minutes: 120}, enchantments: {power: 3, unbreaking: 2}}
+      - {material: TIPPED_ARROW, price: 15, quantity: 8, supply: {max: 4, restock-minutes: 60}, potion: SLOWNESS}
+      - {material: TIPPED_ARROW, price: 15, quantity: 8, supply: {max: 4, restock-minutes: 60}, potion: POISON}
+    4:
+      - {material: CROSSBOW, price: 60, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {quick_charge: 3, multishot: 1}}
+      - {material: BOW, price: 80, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {power: 4, punch: 1, unbreaking: 3}}
+      - {material: TIPPED_ARROW, price: 25, quantity: 8, supply: {max: 2, restock-minutes: 120}, potion: HARMING}
+    5:
+      - {material: BOW, price: 300, quantity: 1, supply: {max: 1, restock-minutes: 1440}, enchantments: {power: 5, punch: 2, flame: 1, infinity: 1, unbreaking: 3}, name: "§9Arc du capitaine"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: ROTTEN_FLESH, base-amount: 64}
+        - {material: ARROW, base-amount: 32}
+        - {material: FEATHER, base-amount: 32}
+        - {material: FLINT, base-amount: 32}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 3
+      item-pool: []
+      entity-pool:
+        - {entity: ZOMBIE, base-amount: 15, value: 1.5}
+        - {entity: SKELETON, base-amount: 12, value: 2}
+        - {entity: CREEPER, base-amount: 6, value: 3}
+        - {entity: SPIDER, base-amount: 10, value: 1.5}
+        - {entity: WITCH, base-amount: 3, value: 5, min-level: 2}
+        - {entity: PILLAGER, base-amount: 8, value: 4, min-level: 2}
+        - {entity: STRAY, base-amount: 6, value: 2, min-level: 2}
+        - {entity: VINDICATOR, base-amount: 3, value: 8, min-level: 3}
+        - {entity: PHANTOM, base-amount: 5, value: 4, min-level: 3}
+        - {entity: ENDERMAN, base-amount: 5, value: 4, min-level: 3}
+        - {entity: BOGGED, base-amount: 6, value: 3, min-level: 4}
+
+# ============================================================
+#  MOINE APOTHICAIRE — Frère Anselme (chapitre VII)
+#  L'alchimie et l'apiculture : miel, cire, herbes du Nether, ingrédients rares.
+#  Potions, chaudrons d'alchimie, bougies, ruches.
+# ============================================================
+anselme:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    HONEY_BOTTLE: {price: 8, quantity: 8, capacity: 256}
+    HONEYCOMB: {price: 6, quantity: 8, capacity: 256}
+    NETHER_WART: {price: 8, quantity: 32, capacity: 1024}
+    SPIDER_EYE: {price: 6, quantity: 16, capacity: 512}
+    GLOWSTONE_DUST: {price: 8, quantity: 16, capacity: 1024}
+    BLAZE_ROD: {price: 12, quantity: 4, capacity: 192}
+    GHAST_TEAR: {price: 8, quantity: 1, capacity: 64}
+    MAGMA_CREAM: {price: 8, quantity: 8, capacity: 256}
+    PHANTOM_MEMBRANE: {price: 6, quantity: 4, capacity: 128}
+    RABBIT_FOOT: {price: 6, quantity: 2, capacity: 64}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: GLASS_BOTTLE, price: 4, quantity: 8, supply: {max: 16, restock-minutes: 30}}
+      - {material: CANDLE, price: 10, quantity: 4, requires: {HONEYCOMB: 4, "agathe:STRING": 4}}
+      - {material: BEEHIVE, price: 7, quantity: 1, requires: {HONEYCOMB: 3, "bastien:#LOGS": 2}}
+      - {material: HONEY_BLOCK, price: 10, quantity: 1, requires: {HONEY_BOTTLE: 4}}
+    2:
+      - {material: POTION, price: 15, quantity: 1, requires: {NETHER_WART: 1, "helene:MELON_SLICE": 1}, potion: HEALING}
+      - {material: POTION, price: 12, quantity: 1, requires: {NETHER_WART: 1, "helene:SUGAR_CANE": 1}, potion: SWIFTNESS}
+      - {material: POTION, price: 12, quantity: 1, requires: {NETHER_WART: 1, "martin:PUFFERFISH": 1}, potion: WATER_BREATHING}
+      - {material: BREWING_STAND, price: 8, quantity: 1, requires: {BLAZE_ROD: 1, "brennan:COBBLESTONE": 3}}
+    3:
+      - {material: POTION, price: 15, quantity: 1, requires: {NETHER_WART: 1, MAGMA_CREAM: 1}, potion: FIRE_RESISTANCE}
+      - {material: POTION, price: 14, quantity: 1, requires: {NETHER_WART: 1, PHANTOM_MEMBRANE: 1}, potion: SLOW_FALLING}
+      - {material: POTION, price: 16, quantity: 1, requires: {NETHER_WART: 1, RABBIT_FOOT: 1}, potion: LEAPING}
+      - {material: BLAZE_POWDER, price: 14, quantity: 4, requires: {BLAZE_ROD: 2}}
+      - {material: FERMENTED_SPIDER_EYE, price: 5, quantity: 2, requires: {SPIDER_EYE: 2, "rosalie:BROWN_MUSHROOM": 2, "helene:SUGAR_CANE": 2}}
+    4:
+      - {material: POTION, price: 20, quantity: 1, requires: {NETHER_WART: 1, BLAZE_ROD: 1}, potion: STRENGTH}
+      - {material: POTION, price: 30, quantity: 1, requires: {NETHER_WART: 1, GHAST_TEAR: 1}, potion: REGENERATION}
+      - {material: POTION, price: 15, quantity: 1, requires: {NETHER_WART: 1, "helene:CARROT": 1}, potion: NIGHT_VISION}
+      - {material: SPLASH_POTION, price: 20, quantity: 1, requires: {NETHER_WART: 1, "helene:MELON_SLICE": 1}, potion: HEALING}
+    5:
+      - {material: POTION, price: 25, quantity: 1, requires: {NETHER_WART: 1, "helene:MELON_SLICE": 1, GLOWSTONE_DUST: 1}, potion: STRONG_HEALING}
+      - {material: POTION, price: 40, quantity: 1, requires: {NETHER_WART: 1, GHAST_TEAR: 1}, potion: LONG_REGENERATION}
+      - {material: POTION, price: 30, quantity: 1, requires: {NETHER_WART: 1, BLAZE_ROD: 1, GLOWSTONE_DUST: 1}, potion: STRONG_STRENGTH}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: HONEY_BOTTLE, base-amount: 8}
+        - {material: HONEYCOMB, base-amount: 12}
+        - {material: NETHER_WART, base-amount: 32}
+        - {material: SPIDER_EYE, base-amount: 16}
+        - {material: GLOWSTONE_DUST, base-amount: 32, min-level: 2}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: BLAZE_ROD, base-amount: 6}
+        - {material: GHAST_TEAR, base-amount: 2, min-level: 3}
+        - {material: MAGMA_CREAM, base-amount: 8}
+        - {material: PHANTOM_MEMBRANE, base-amount: 6, min-level: 2}
+        - {material: RABBIT_FOOT, base-amount: 2, min-level: 2}
+      entity-pool:
+        - {entity: WITCH, base-amount: 3, value: 5}
+        - {entity: BLAZE, base-amount: 6, value: 5, min-level: 2}
+        - {entity: PHANTOM, base-amount: 4, value: 4, min-level: 2}
+
+# ============================================================
+#  SCRIBE & CARTOGRAPHE — Isabeau (chapitre VII)
+#  Le savoir : papier, livres, cartes.
+#  Bibliothèques, pupitres, boussoles, cartes... et les Chroniques de Valmont (lore).
+# ============================================================
+isabeau:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    PAPER: {price: 10, quantity: 32, capacity: 1024}
+    BOOK: {price: 8, quantity: 4, capacity: 256}
+    MAP: {price: 8, quantity: 1, capacity: 64}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - material: WRITTEN_BOOK
+        price: 5
         quantity: 1
-      - material: LEAD
+        supply: {max: 10, restock-minutes: 10}
+        name: "§3Chroniques de Valmont §7(tome I)"
+        book:
+          title: "Chroniques de Valmont I"
+          author: "Isabeau"
+          pages:
+            - "§lChroniques de Valmont§r\n\nRecueillies par Isabeau, archiviste de la Grande Bibliothèque.\n\n§oTome I : la Nuit Noire"
+            - "Valmont fut la perle des Marches. Ses guildes forgeaient, tissaient et taillaient la pierre ; sa cathédrale portait une rosace que l'on disait plus claire que l'aube."
+            - "En l'an trois cent douze, les mages de la Tour cherchèrent une Porte décrite dans des grimoires interdits : un passage vers le Néant, que seuls des yeux de feu et d'ombre pouvaient ouvrir."
+            - "La nuit où ils l'ouvrirent, le ciel se déchira. Un dragon noir surgit du Néant. Les portes de Thorvald tinrent une heure. Puis Valmont brûla."
+            - "Les survivants se dispersèrent dans les terres sauvages. L'intendant Alderic sauva la Charte de la ville et jura qu'un jour, Valmont renaîtrait."
+      - {material: WRITABLE_BOOK, price: 7, quantity: 1, requires: {BOOK: 1, "martin:INK_SAC": 1, "roland:FEATHER": 1}}
+      - {material: LECTERN, price: 16, quantity: 1, requires: {BOOK: 3, "bastien:#LOGS": 2}}
+      - {material: BOOKSHELF, price: 16, quantity: 1, requires: {BOOK: 3, "bastien:#LOGS": 2}}
+      - {material: CARTOGRAPHY_TABLE, price: 3, quantity: 1, requires: {PAPER: 2, "bastien:#LOGS": 1}}
+    2:
+      - {material: COMPASS, price: 15, quantity: 1, requires: {"thorvald:IRON_INGOT": 4, "godefroy:REDSTONE": 1}}
+      - {material: MAP, price: 21, quantity: 1, requires: {PAPER: 8, "thorvald:IRON_INGOT": 4, "godefroy:REDSTONE": 1}}
+      - {material: CHISELED_BOOKSHELF, price: 2, quantity: 1, requires: {"bastien:#LOGS": 2}}
+    3:
+      - material: WRITTEN_BOOK
+        price: 8
+        quantity: 1
+        supply: {max: 10, restock-minutes: 10}
+        name: "§3Chroniques de Valmont §7(tome II)"
+        book:
+          title: "Chroniques de Valmont II"
+          author: "Isabeau"
+          pages:
+            - "§lChroniques de Valmont§r\n\n§oTome II : les dispersés"
+            - "Les registres nomment ceux qui survécurent : un charbonnier des bois, une fermière des plaines, le maître maçon, le passeur de la rivière, le maître de la Fosse aux Corbeaux..."
+            - "...la tavernière du Chaudron Doré, le forgeron du nord, une apprentie teinturière, le maître des écuries, un sergent de la garde, un moine de Saint-Clair, le fils du verrier et la fille du maître de la Monnaie."
+            - "Chacun emporta un savoir que Valmont croyait perdu. Les réunir, c'est rebâtir la ville pierre après pierre, métier après métier."
+            - "On murmure aussi que la renommée de Valmont renaissante attire des voyageurs de légende : archers, pirates, archéologues, inventeurs, magiciens... et même un dompteur de dragons."
+      - {material: GLOBE_BANNER_PATTERN, price: 12, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+      - {material: CLOCK, price: 24, quantity: 1, requires: {"beatrice:GOLD_INGOT": 4, "godefroy:REDSTONE": 1}}
+    4:
+      - material: ENCHANTED_BOOK
+        price: 45
+        quantity: 1
+        supply: {max: 1, restock-minutes: 180}
+        enchantments: {efficiency: 3}
+        lore:
+          - "§7Copié des archives de Valmont."
+      - material: ENCHANTED_BOOK
+        price: 45
+        quantity: 1
+        supply: {max: 1, restock-minutes: 180}
+        enchantments: {protection: 3}
+        lore:
+          - "§7Copié des archives de Valmont."
+    5:
+      - material: WRITTEN_BOOK
+        price: 10
+        quantity: 1
+        supply: {max: 10, restock-minutes: 10}
+        name: "§3Chroniques de Valmont §7(tome III)"
+        book:
+          title: "Chroniques de Valmont III"
+          author: "Isabeau"
+          pages:
+            - "§lChroniques de Valmont§r\n\n§oTome III : la Porte du Néant"
+            - "J'ai enfin déchiffré les notes des mages. La Porte n'est pas un mythe : elle dort dans une forteresse enfouie sous les terres des Marches."
+            - "Pour l'ouvrir, il faut douze yeux : des perles du Néant ravivées par la poudre des gardiens de feu, ces créatures qui hantent les forteresses du Nether."
+            - "Le dragon vit toujours, de l'autre côté. Tant qu'il vivra, aucune ville ne sera à l'abri. Valmont ne sera vengée que lorsqu'il tombera."
+            - "Que celui qui lira ces lignes rassemble les clés, franchisse la Porte et rende aux Marches leur paix.\n\n— I."
+      - material: ENCHANTED_BOOK
+        price: 250
+        quantity: 1
+        supply: {max: 1, restock-minutes: 1440}
+        enchantments: {mending: 1}
+        lore:
+          - "§7Le plus précieux des registres"
+          - "§7sauvés de la Grande Bibliothèque."
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: PAPER, base-amount: 32}
+        - {material: BOOK, base-amount: 6}
+        - {material: FEATHER, base-amount: 16}
+        - {material: INK_SAC, base-amount: 8}
+        - {material: MAP, base-amount: 2, min-level: 2}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: GLOW_INK_SAC, base-amount: 6}
+        - {material: LEATHER, base-amount: 8}
+        - {material: INK_SAC, base-amount: 24, min-level: 2}
+      entity-pool:
+        - {entity: PILLAGER, base-amount: 4, value: 4, min-level: 3}
+
+# ============================================================
+#  VERRIER & TUILIER — Léon (chapitre VIII)
+#  Le verre et la terre cuite : sable, sable rouge, argile, gravier.
+#  Verre, vitraux teints, briques, terres cuites (émaillées), pots décorés.
+# ============================================================
+leon:
+  xp-per-stack: 2
+  xp-per-coin: 1
+  level-thresholds: {2: 200, 3: 800, 4: 2500, 5: 6000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    SAND: {price: 4, quantity: 64, capacity: 2048}
+    RED_SAND: {price: 6, quantity: 64, capacity: 1024}
+    CLAY_BALL: {price: 8, quantity: 32, capacity: 1024}
+    GRAVEL: {price: 3, quantity: 64, capacity: 2048}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: GLASS, price: 5, quantity: 32, requires: {SAND: 32}}
+      - {material: GLASS_PANE, price: 2, quantity: 32, requires: {SAND: 12}}
+      - {material: BRICKS, price: 37, quantity: 16, requires: {CLAY_BALL: 64}}
+      - {material: FLOWER_POT, price: 7, quantity: 4, requires: {CLAY_BALL: 12}}
+      - {material: TERRACOTTA, price: 37, quantity: 16, requires: {CLAY_BALL: 64}}
+    2:
+      - {material: WHITE_STAINED_GLASS, price: 4, quantity: 16, requires: {SAND: 16, "agathe:LILY_OF_THE_VALLEY": 2}}
+      - {material: RED_STAINED_GLASS, price: 3, quantity: 16, requires: {SAND: 16, "agathe:POPPY": 2}}
+      - {material: BLUE_STAINED_GLASS, price: 3, quantity: 16, requires: {SAND: 16, "agathe:CORNFLOWER": 2}}
+      - {material: YELLOW_STAINED_GLASS, price: 3, quantity: 16, requires: {SAND: 16, "agathe:DANDELION": 2}}
+      - {material: GREEN_STAINED_GLASS, price: 3, quantity: 16, requires: {SAND: 16, "agathe:CACTUS": 2}}
+    3:
+      - {material: PURPLE_STAINED_GLASS, price: 3, quantity: 16, requires: {SAND: 16, "agathe:POPPY": 1, "agathe:CORNFLOWER": 1}}
+      - {material: MAGENTA_STAINED_GLASS, price: 4, quantity: 16, requires: {SAND: 16, "agathe:ALLIUM": 2}}
+      - {material: LIGHT_BLUE_STAINED_GLASS, price: 4, quantity: 16, requires: {SAND: 16, "agathe:BLUE_ORCHID": 2}}
+      - {material: RED_TERRACOTTA, price: 38, quantity: 16, requires: {CLAY_BALL: 64, "agathe:POPPY": 2}}
+      - {material: DECORATED_POT, price: 10, quantity: 1, requires: {CLAY_BALL: 16}}
+    4:
+      - {material: WHITE_GLAZED_TERRACOTTA, price: 19, quantity: 8, requires: {CLAY_BALL: 32, "agathe:LILY_OF_THE_VALLEY": 1}}
+      - {material: BLUE_GLAZED_TERRACOTTA, price: 19, quantity: 8, requires: {CLAY_BALL: 32, "agathe:CORNFLOWER": 1}}
+      - {material: TINTED_GLASS, price: 5, quantity: 2, requires: {"beatrice:AMETHYST_SHARD": 4, SAND: 1}}
+    5:
+      - {material: TINTED_GLASS, price: 38, quantity: 16, requires: {"beatrice:AMETHYST_SHARD": 32, SAND: 8}}
+      - material: RED_STAINED_GLASS
+        price: 30
+        quantity: 1
+        supply: {max: 1, restock-minutes: 1440}
+        name: "§cÉclat de la Rose de Valmont"
+        lore:
+          - "§7Un fragment de la grande rosace,"
+          - "§7soufflé par le père de Léon."
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 20
+      objectives-count: 2
+      item-pool:
+        - {material: SAND, base-amount: 128}
+        - {material: RED_SAND, base-amount: 64}
+        - {material: CLAY_BALL, base-amount: 64}
+        - {material: GRAVEL, base-amount: 128}
+    special:
+      xp-reward-per-level: 50
+      objectives-count: 2
+      item-pool:
+        - {material: CLAY_BALL, base-amount: 160, min-level: 2}
+        - {material: AMETHYST_SHARD, base-amount: 16, min-level: 3}
+      entity-pool:
+        - {entity: HUSK, base-amount: 8, value: 1.5}
+
+# ============================================================
+#  ORFÈVRE — Béatrice (chapitre VIII)
+#  Les métaux et pierres précieux : or, émeraudes, améthystes.
+#  Pommes et carottes dorées, horloges, longues-vues, couronne, gabarits d'ornement.
+# ============================================================
+beatrice:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 800, 3: 3000, 4: 8000, 5: 18000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    GOLD_INGOT: {price: 20, quantity: 8, capacity: 512}
+    EMERALD: {price: 16, quantity: 8, capacity: 256}
+    AMETHYST_SHARD: {price: 8, quantity: 16, capacity: 512}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: GOLDEN_APPLE, price: 49, quantity: 1, requires: {GOLD_INGOT: 8, "helene:APPLE": 1}}
+      - {material: CLOCK, price: 24, quantity: 1, requires: {GOLD_INGOT: 4, "godefroy:REDSTONE": 1}}
+      - {material: GLISTERING_MELON_SLICE, price: 25, quantity: 4, requires: {GOLD_INGOT: 4, "helene:MELON_SLICE": 4}}
+      - {material: SPYGLASS, price: 3, quantity: 1, requires: {AMETHYST_SHARD: 1, "thorvald:COPPER_INGOT": 2}}
+    2:
+      - {material: GOLDEN_CARROT, price: 51, quantity: 8, requires: {GOLD_INGOT: 8, "helene:CARROT": 8}}
+      - {material: AMETHYST_BLOCK, price: 19, quantity: 4, requires: {AMETHYST_SHARD: 16}}
+    3:
+      - material: GOLDEN_HELMET
         price: 80
         quantity: 1
-
-    3:
-      - material: MAP
-        price: 150
-        quantity: 1
-      - material: COMPASS
-        price: 120
-        quantity: 1
-      - material: SPYGLASS
-        price: 200
-        quantity: 1
-
+        requires: {GOLD_INGOT: 5}
+        supply: {max: 1, restock-minutes: 360}
+        enchantments: {protection: 3, unbreaking: 3}
+        name: "§eCouronne de Valmont"
+        lore:
+          - "§7La couronne des maîtres de la Monnaie."
+      - {material: WILD_ARMOR_TRIM_SMITHING_TEMPLATE, price: 60, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: COAST_ARMOR_TRIM_SMITHING_TEMPLATE, price: 60, quantity: 1, supply: {max: 1, restock-minutes: 240}}
     4:
-      - material: ENCHANTED_BOOK
-        price: 900
-        quantity: 1
-
+      - {material: ENCHANTED_GOLDEN_APPLE, price: 450, quantity: 1, requires: {GOLD_INGOT: 72, "helene:APPLE": 1}, supply: {max: 1, restock-minutes: 1440}}
+      - {material: SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE, price: 80, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: DUNE_ARMOR_TRIM_SMITHING_TEMPLATE, price: 80, quantity: 1, supply: {max: 1, restock-minutes: 240}}
     5:
-      - material: CUSTOM_PIRATE_BANNER
-        price: 2500
-        quantity: 1
-
-  # ------------------------------------------------------------
-  # Quêtes
-  # ------------------------------------------------------------
+      - {material: SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE, price: 300, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
   quests:
-
-    quantity-multiplier:
-      1: 1.0
-      2: 1.5
-      3: 2.0
-      4: 2.5
-      5: 3.0
-
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
     main:
-      xp-reward-per-level: 50
-      reward-per-level: 100
+      xp-reward-per-level: 30
       objectives-count: 2
-
       item-pool:
-        - material: COD
-          base-amount: 64
-        - material: SALMON
-          base-amount: 32
-        - material: TROPICAL_FISH
-          base-amount: 16
-        - material: PRISMARINE_SHARD
-          base-amount: 32
-
+        - {material: GOLD_INGOT, base-amount: 16}
+        - {material: EMERALD, base-amount: 8}
+        - {material: AMETHYST_SHARD, base-amount: 16}
     special:
-      xp-reward-per-level: 75
-      reward-per-level: 300
+      xp-reward-per-level: 70
       objectives-count: 2
-
       item-pool:
-        - material: NAUTILUS_SHELL
-          base-amount: 5
-        - material: HEART_OF_THE_SEA
-          base-amount: 1
-
+        - {material: EMERALD, base-amount: 24, min-level: 2}
+        - {material: DIAMOND, base-amount: 3, min-level: 2}
+        - {material: ECHO_SHARD, base-amount: 1, min-level: 4}
       entity-pool:
-        - entity: DROWNED
-          base-amount: 10
-        - entity: GUARDIAN
-          base-amount: 5
+        - {entity: VINDICATOR, base-amount: 3, value: 8}
+        - {entity: EVOKER, base-amount: 1, value: 20, min-level: 3}
+        - {entity: PIGLIN_BRUTE, base-amount: 2, value: 12, min-level: 4}
 
 # ============================================================
-#  MAGE - Gandalf
+#  ★ ROBIN DES BOIS — hors-la-loi (bonus, chapitre II)
+#  Il « redistribue » le butin des pillards : marchandises de seconde main
+#  nettement moins chères, mais en quantité limitée. Il rachète les fioles des capitaines pillards.
 # ============================================================
-
-gandalf:
-  xp-per-stack: 6
+robin:
+  xp-per-stack: 1
   xp-per-coin: 1
-
-  level-thresholds:
-    2: 800
-    3: 2000
-    4: 4000
-    5: 7000
-
-  # ------------------------------------------------------------
-  # Il achète uniquement des objets mystiques / magiques
-  # ------------------------------------------------------------
+  level-thresholds: {2: 400, 3: 1500, 4: 4500, 5: 10000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
   sell-prices:
-
-    BOOK:
-      price: 2
-      quantity: 16
-
-    ENDER_PEARL:
-      price: 5
-      quantity: 4
-
-    BLAZE_ROD:
-      price: 12
-      quantity: 4
-
-    GHAST_TEAR:
-      price: 20
-      quantity: 1
-
-    EXPERIENCE_BOTTLE:
-      price: 8
-      quantity: 1
-
-    NETHER_STAR:
-      price: 250
-      quantity: 1
-
-  # ------------------------------------------------------------
-  # Boutique du Mage
-  # ------------------------------------------------------------
-  shop:
-
-    1:
-      - material: BOOK
-        price: 30
-        quantity: 8
-      - material: LANTERN
-        price: 40
-        quantity: 2
-
-    2:
-      - material: ENCHANTING_TABLE
-        price: 500
-        quantity: 1
-      - material: BREWING_STAND
-        price: 350
-        quantity: 1
-
-    3:
-      - material: ENDER_EYE
-        price: 150
-        quantity: 2
-      - material: BLAZE_POWDER
-        price: 120
-        quantity: 4
-
-    4:
-      - material: ENCHANTED_BOOK
-        price: 1200
-        quantity: 1
-
-    5:
-      - material: TOTEM_OF_UNDYING
-        price: 5000
-        quantity: 1
-
-  # ------------------------------------------------------------
-  # Quêtes procédurales
-  # ------------------------------------------------------------
-  quests:
-
-    quantity-multiplier:
-      1: 1.0
-      2: 1.5
-      3: 2.0
-      4: 2.5
-      5: 3.0
-
-    main:
-      xp-reward-per-level: 80
-      reward-per-level: 150
-      objectives-count: 2
-
-      item-pool:
-        - material: BOOK
-          base-amount: 16
-        - material: BLAZE_ROD
-          base-amount: 8
-        - material: ENDER_PEARL
-          base-amount: 8
-
-    special:
-      xp-reward-per-level: 120
-      reward-per-level: 400
-      objectives-count: 2
-
-      item-pool:
-        - material: GHAST_TEAR
-          base-amount: 4
-        - material: EXPERIENCE_BOTTLE
-          base-amount: 8
-
-      entity-pool:
-        - entity: WITHER
-          base-amount: 1
-        - entity: ENDER_DRAGON
-          base-amount: 1
-
-# ============================================================
-#  GERALDE
-# ============================================================
-geralde:
-  xp-per-stack: 10
-  xp-per-coin: 1
-  level-thresholds:
-    2: 500
-    3: 1500
-    4: 3000
-    5: 5000
-  sell-prices:
-    COBBLESTONE:
-      price: 2
-      quantity: 64
-    STONE:
-      price: 3
-      quantity: 64
-    GRANITE:
-      price: 4
-      quantity: 64
-    DIORITE:
-      price: 4
-      quantity: 64
-    ANDESITE:
-      price: 4
-      quantity: 64
-    GRAVEL:
-      price: 2
-      quantity: 64
-    SAND:
-      price: 2
-      quantity: 64
-    SANDSTONE:
-      price: 3
-      quantity: 64
-    DEEPSLATE:
-      price: 5
-      quantity: 64
-    OBSIDIAN:
-      price: 20
-      quantity: 16
+    OMINOUS_BOTTLE: {price: 10, quantity: 1, capacity: 16}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
   shop:
     1:
-      - material: STONE_PICKAXE
-        price: 50
-        quantity: 1
-      - material: STONE_SHOVEL
-        price: 30
-        quantity: 1
+      - {material: BREAD, price: 20, quantity: 16, supply: {max: 3, restock-minutes: 60}}
+      - {material: COOKED_BEEF, price: 8, quantity: 8, supply: {max: 2, restock-minutes: 60}}
+      - {material: LEATHER_CHESTPLATE, price: 11, quantity: 1, supply: {max: 1, restock-minutes: 120}}
+      - {material: BOW, price: 2, quantity: 1, supply: {max: 1, restock-minutes: 120}}
     2:
-      - material: IRON_PICKAXE
-        price: 150
-        quantity: 1
-      - material: IRON_SHOVEL
-        price: 100
-        quantity: 1
-      - material: CHISELED_STONE_BRICKS
-        price: 20
-        quantity: 16
+      - {material: IRON_SWORD, price: 5, quantity: 1, supply: {max: 1, restock-minutes: 180}}
+      - {material: IRON_CHESTPLATE, price: 17, quantity: 1, supply: {max: 1, restock-minutes: 360}}
+      - {material: ARROW, price: 6, quantity: 32, supply: {max: 2, restock-minutes: 120}}
     3:
-      - material: DIAMOND_PICKAXE
-        price: 500
-        quantity: 1
-      - material: SMOOTH_STONE
-        price: 10
-        quantity: 32
-      - material: POLISHED_GRANITE
+      - {material: GOLDEN_APPLE, price: 30, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: IRON_HORSE_ARMOR, price: 22, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: SADDLE, price: 12, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+    4:
+      - {material: BOW, price: 12, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {power: 2, unbreaking: 1}}
+      - {material: CROSSBOW, price: 25, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {piercing: 3}}
+    5:
+      - {material: BOW, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 1440}, enchantments: {power: 4, punch: 1, unbreaking: 3}, name: "§2Arc de Sherwood"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: LEATHER, base-amount: 8}
+        - {material: RABBIT, base-amount: 8}
+        - {material: WHEAT, base-amount: 64}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: OMINOUS_BOTTLE, base-amount: 1, min-level: 2}
+      entity-pool:
+        - {entity: PILLAGER, base-amount: 8, value: 4}
+        - {entity: VINDICATOR, base-amount: 3, value: 8, min-level: 2}
+        - {entity: EVOKER, base-amount: 1, value: 20, min-level: 4}
+        - {entity: RAVAGER, base-amount: 1, value: 25, min-level: 5}
+
+# ============================================================
+#  ★ JACK SPARROW — pirate (bonus, chapitre III)
+#  Requiert le mod Tax' Ocean Villager (voir mod-integrations) : navires pirates,
+#  vaisseaux de la Marine, navires maudits et roi pirate illageois.
+#  Les trésors de la mer et le butin des navires ; tridents, rhum... et un navire.
+#  Objets du mod notés « taxov:… » : ignorés si le mod est absent.
+# ============================================================
+jacksparrow:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    NAUTILUS_SHELL: {price: 24, quantity: 4, capacity: 64}
+    HEART_OF_THE_SEA: {price: 60, quantity: 1, capacity: 8}
+    PRISMARINE_SHARD: {price: 6, quantity: 16, capacity: 1024}
+    PRISMARINE_CRYSTALS: {price: 6, quantity: 8, capacity: 512}
+    SPONGE: {price: 8, quantity: 2, capacity: 64}
+    WET_SPONGE: {price: 7, quantity: 2, capacity: 64}
+    TURTLE_SCUTE: {price: 8, quantity: 2, capacity: 64}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: SPYGLASS, price: 8, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - material: POTION
         price: 15
-        quantity: 32
-    4:
-      - material: NETHERITE_PICKAXE
-        price: 2000
         quantity: 1
-      - material: DEEPSLATE_BRICKS
-        price: 25
-        quantity: 32
-      - material: SCULK
-        price: 50
-        quantity: 16
+        supply: {max: 3, restock-minutes: 60}
+        potion: WATER_BREATHING
+        name: "§6Rhum de Tortuga"
+        lore:
+          - "§7Ça brûle, ça pique..."
+          - "§7et on respire sous l'eau."
+      - {material: COMPASS, price: 18, quantity: 1, supply: {max: 1, restock-minutes: 120}}
+      - {material: MAP, price: 24, quantity: 1, supply: {max: 1, restock-minutes: 120}}
+      - {material: BLACK_BANNER, price: 6, quantity: 1, supply: {max: 3, restock-minutes: 60}, name: "§8Pavillon noir", lore: ["§7À hisser sur un navire de la Marine.", "§7Réquisitionner : terme nautique."]}
+    2:
+      - {material: PRISMARINE, price: 56, quantity: 16, requires: {PRISMARINE_SHARD: 64}}
+      - {material: SEA_LANTERN, price: 49, quantity: 4, requires: {PRISMARINE_SHARD: 16, PRISMARINE_CRYSTALS: 20}}
+      - {material: TURTLE_HELMET, price: 46, quantity: 1, requires: {TURTLE_SCUTE: 5}}
+      - {material: PRISMARINE_BRICKS, price: 63, quantity: 8, requires: {PRISMARINE_SHARD: 72}}
+      - {material: "taxov:disc_pirate", price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+    3:
+      - {material: TRIDENT, price: 180, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: POTION, price: 25, quantity: 1, supply: {max: 2, restock-minutes: 120}, potion: LONG_WATER_BREATHING, name: "§6Rhum vieilli de Tortuga"}
+      - {material: DARK_PRISMARINE, price: 57, quantity: 8, requires: {PRISMARINE_SHARD: 64, "martin:INK_SAC": 1}}
+      - {material: "taxov:armor_pirate_helmet", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+    4:
+      - {material: CONDUIT, price: 249, quantity: 1, requires: {HEART_OF_THE_SEA: 1, NAUTILUS_SHELL: 8}}
+      - {material: TRIDENT, price: 320, quantity: 1, supply: {max: 1, restock-minutes: 720}, enchantments: {loyalty: 3, impaling: 3}}
+      - {material: "taxov:pirate_sword", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+    5:
+      - {material: TRIDENT, price: 550, quantity: 1, supply: {max: 1, restock-minutes: 1440}, enchantments: {channeling: 1, loyalty: 3, impaling: 5, unbreaking: 3}, name: "§3Le Trident du Capitaine"}
+      - material: COMPASS
+        price: 60
+        quantity: 1
+        supply: {max: 1, restock-minutes: 1440}
+        name: "§3Boussole de Jack"
+        lore:
+          - "§7Elle n'indique jamais le nord."
+          - "§7Jack jure qu'elle a raison."
+      # Un navire pirate entier (objet du mod qui le fait apparaître) : une fois par semaine
+      - {material: "taxov:ship_pirate", price: 2500, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
   quests:
-    quantity-multiplier:
-      1: 1
-      2: 1.5
-      3: 2
-      4: 2.5
-      5: 3
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
     main:
-      xp-reward-per-level: 50
-      reward-per-level: 100
+      xp-reward-per-level: 25
       objectives-count: 2
       item-pool:
-        - material: COBBLESTONE
-          base-amount: 64
-        - material: STONE
-          base-amount: 32
-        - material: GRAVEL
-          base-amount: 64
-        - material: SAND
-          base-amount: 64
-        - material: DEEPSLATE
-          base-amount: 32
+        - {material: PRISMARINE_SHARD, base-amount: 32}
+        - {material: PRISMARINE_CRYSTALS, base-amount: 16}
+        - {material: COD, base-amount: 32}
+        - {material: GUNPOWDER, base-amount: 12, min-level: 2}
+        - {material: GOLD_INGOT, base-amount: 6, min-level: 2}
     special:
-      xp-reward-per-level: 50
-      reward-per-level: 300
-      objectives-count: 3
+      xp-reward-per-level: 60
+      objectives-count: 2
       item-pool:
-        - material: OBSIDIAN
-          base-amount: 16
-        - material: GRANITE
-          base-amount: 64
-        - material: ANDESITE
-          base-amount: 64
+        - {material: NAUTILUS_SHELL, base-amount: 3}
+        - {material: WET_SPONGE, base-amount: 4, min-level: 2}
+        - {material: TURTLE_SCUTE, base-amount: 4, min-level: 2}
+        - {material: "taxov:armor_pirate_chestplate", base-amount: 1, value: 30, min-level: 2}
+        - {material: "taxov:disc_marine", base-amount: 1, value: 40, min-level: 3}
+        - {material: HEART_OF_THE_SEA, base-amount: 1, min-level: 4}
       entity-pool:
-        - entity: CREEPER
-          base-amount: 5
-        - entity: ZOMBIE
-          base-amount: 10
-        - entity: SKELETON
-          base-amount: 8
+        - {entity: DROWNED, base-amount: 10, value: 2}
+        - {entity: GUARDIAN, base-amount: 5, value: 6, min-level: 2}
+        - {entity: PILLAGER, base-amount: 6, value: 3, min-level: 3}
+        - {entity: ELDER_GUARDIAN, base-amount: 1, value: 120, min-level: 5}
 
+# ============================================================
+#  ★ INDIANA JONES — archéologue aventurier (bonus, chapitre V)
+#  Les curiosités du monde : tessons, disques, cornes, clés des épreuves, froglights.
+#  Plantes et créatures rapportées de ses expéditions (dont l'œuf de renifleur).
+# ============================================================
+indiana:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    ANGLER_POTTERY_SHERD: {price: 6, quantity: 1, capacity: 16}
+    ARCHER_POTTERY_SHERD: {price: 6, quantity: 1, capacity: 16}
+    ARMS_UP_POTTERY_SHERD: {price: 6, quantity: 1, capacity: 16}
+    PRIZE_POTTERY_SHERD: {price: 6, quantity: 1, capacity: 16}
+    SKULL_POTTERY_SHERD: {price: 6, quantity: 1, capacity: 16}
+    SHELTER_POTTERY_SHERD: {price: 6, quantity: 1, capacity: 16}
+    MUSIC_DISC_13: {price: 15, quantity: 1, capacity: 8}
+    MUSIC_DISC_CAT: {price: 15, quantity: 1, capacity: 8}
+    GOAT_HORN: {price: 8, quantity: 1, capacity: 16}
+    TRIAL_KEY: {price: 5, quantity: 1, capacity: 32}
+    BREEZE_ROD: {price: 12, quantity: 4, capacity: 128}
+    OCHRE_FROGLIGHT: {price: 12, quantity: 4, capacity: 64}
+    VERDANT_FROGLIGHT: {price: 12, quantity: 4, capacity: 64}
+    PEARLESCENT_FROGLIGHT: {price: 12, quantity: 4, capacity: 64}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: BAMBOO, price: 4, quantity: 16, supply: {max: 8, restock-minutes: 20}}
+      - {material: CACTUS, price: 3, quantity: 8, supply: {max: 8, restock-minutes: 20}}
+      - {material: COCOA_BEANS, price: 6, quantity: 8, supply: {max: 8, restock-minutes: 30}}
+      - {material: SUGAR_CANE, price: 4, quantity: 8, supply: {max: 8, restock-minutes: 20}}
+    2:
+      - {material: SEA_PICKLE, price: 6, quantity: 4, supply: {max: 6, restock-minutes: 60}}
+      - {material: PINK_PETALS, price: 5, quantity: 8, supply: {max: 6, restock-minutes: 60}}
+      - {material: MOSS_BLOCK, price: 6, quantity: 8, supply: {max: 6, restock-minutes: 60}}
+      - {material: BIG_DRIPLEAF, price: 6, quantity: 2, supply: {max: 4, restock-minutes: 60}}
+    3:
+      - {material: TROPICAL_FISH_BUCKET, price: 15, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: AXOLOTL_BUCKET, price: 25, quantity: 1, supply: {max: 2, restock-minutes: 180}}
+      - {material: SPORE_BLOSSOM, price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: GLOW_LICHEN, price: 5, quantity: 8, supply: {max: 4, restock-minutes: 60}}
+    4:
+      - {material: SNIFFER_EGG, price: 200, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: TADPOLE_BUCKET, price: 20, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+    5:
+      - material: WRITTEN_BOOK
+        price: 15
+        quantity: 1
+        supply: {max: 5, restock-minutes: 60}
+        name: "§6Le carnet du Graal"
+        book:
+          title: "Le carnet du Graal"
+          author: "Henry Jones"
+          pages:
+            - "§lLe carnet du Graal§r\n\nnotes de Henry Jones, recopiées par son fils"
+            - "Les temples de la jungle cachent leurs trésors derrière des leviers et des flèches. Ne jamais marcher là où le sol semble neuf."
+            - "Dans les déserts, les pyramides gardent leurs secrets sous une plaque de pression. Creuser par le côté, jamais par le haut."
+            - "Les tessons racontent des histoires : chaque motif est la page d'un livre que personne n'a fini de lire."
+            - "Mais de toutes les découvertes, la plus rare reste une ville que l'on rebâtit sur des cendres. Elle mérite son musée."
+      - material: COBWEB
+        price: 12
+        quantity: 4
+        supply: {max: 4, restock-minutes: 120}
+        name: "§fToile du temple oublié"
+        lore:
+          - "§7Récoltée au fond d'un temple."
+          - "§7« Pourquoi faut-il toujours des araignées ? »"
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: CHERRY_LOG, base-amount: 32}
+        - {material: MANGROVE_LOG, base-amount: 32}
+        - {material: COCOA_BEANS, base-amount: 32}
+        - {material: SWEET_BERRIES, base-amount: 64}
+        - {material: GLOW_BERRIES, base-amount: 24, min-level: 2}
+        - {material: AMETHYST_SHARD, base-amount: 16, min-level: 2}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: TRIAL_KEY, base-amount: 3}
+        - {material: BREEZE_ROD, base-amount: 6, min-level: 2}
+        - {material: OCHRE_FROGLIGHT, base-amount: 4, min-level: 3}
+        - {material: GOAT_HORN, base-amount: 1, min-level: 2}
+        - {material: ARCHER_POTTERY_SHERD, base-amount: 1, min-level: 3}
+      entity-pool:
+        - {entity: BREEZE, base-amount: 4, value: 5}
+
+# ============================================================
+#  ★ DOC BROWN — inventeur (bonus, chapitre VII)
+#  Les mécanismes (redstone) : quartz, boules de slime, poudre à canon.
+#  Pistons, observateurs, comparateurs, entonnoirs, TNT, fusées... et ses ailes volantes.
+# ============================================================
+docbrown:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    QUARTZ: {price: 12, quantity: 32, capacity: 1024}
+    SLIME_BALL: {price: 8, quantity: 16, capacity: 512}
+    GUNPOWDER: {price: 8, quantity: 16, capacity: 1024}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: REDSTONE_TORCH, price: 5, quantity: 8, requires: {"godefroy:REDSTONE": 8}}
+      - {material: LEVER, price: 1, quantity: 4, requires: {"brennan:COBBLESTONE": 4}}
+      - {material: REPEATER, price: 5, quantity: 2, requires: {"godefroy:REDSTONE": 6, "brennan:STONE": 6}}
+      - {material: PISTON, price: 11, quantity: 2, requires: {"thorvald:IRON_INGOT": 2, "godefroy:REDSTONE": 2, "brennan:COBBLESTONE": 8, "bastien:#LOGS": 2}}
+      - {material: NOTE_BLOCK, price: 3, quantity: 1, requires: {"godefroy:REDSTONE": 1, "bastien:#LOGS": 2}}
+    2:
+      - {material: STICKY_PISTON, price: 13, quantity: 2, requires: {"thorvald:IRON_INGOT": 2, "godefroy:REDSTONE": 2, "brennan:COBBLESTONE": 8, "bastien:#LOGS": 2, SLIME_BALL: 2}}
+      - {material: HOPPER, price: 19, quantity: 1, requires: {"thorvald:IRON_INGOT": 5, "bastien:#LOGS": 2}}
+      - {material: DISPENSER, price: 4, quantity: 1, requires: {"brennan:COBBLESTONE": 7, "godefroy:REDSTONE": 1, "agathe:STRING": 3}}
+      - {material: DROPPER, price: 2, quantity: 1, requires: {"brennan:COBBLESTONE": 7, "godefroy:REDSTONE": 1}}
+      - {material: OBSERVER, price: 6, quantity: 2, requires: {QUARTZ: 2, "godefroy:REDSTONE": 4, "brennan:COBBLESTONE": 12}}
+    3:
+      - {material: COMPARATOR, price: 7, quantity: 2, requires: {QUARTZ: 2, "godefroy:REDSTONE": 6, "brennan:STONE": 6}}
+      - {material: DAYLIGHT_DETECTOR, price: 4, quantity: 1, requires: {QUARTZ: 3, "bastien:#LOGS": 1}}
+      - {material: REDSTONE_LAMP, price: 28, quantity: 4, requires: {"godefroy:REDSTONE": 16, "anselme:GLOWSTONE_DUST": 16}}
+      - {material: TNT, price: 26, quantity: 4, requires: {GUNPOWDER: 20, "leon:SAND": 16}}
+      - {material: FIREWORK_ROCKET, price: 12, quantity: 16, requires: {GUNPOWDER: 6, "isabeau:PAPER": 6}}
+      - {material: SLIME_BLOCK, price: 11, quantity: 1, requires: {SLIME_BALL: 9}}
+    4:
+      - {material: CRAFTER, price: 20, quantity: 1, requires: {"thorvald:IRON_INGOT": 5, "godefroy:REDSTONE": 3, "brennan:COBBLESTONE": 7}}
+      - {material: TARGET, price: 9, quantity: 1, requires: {"helene:WHEAT": 9, "godefroy:REDSTONE": 4}}
+    5:
+      - material: ELYTRA
+        price: 1500
+        quantity: 1
+        supply: {max: 1, restock-minutes: 2880}
+        name: "§eAiles du Doc"
+        lore:
+          - "§7« Des routes ? Là où on va,"
+          - "§7on n'a pas besoin de routes ! »"
+      - {material: FIREWORK_ROCKET, price: 42, quantity: 64, requires: {GUNPOWDER: 22, "isabeau:PAPER": 22}}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: QUARTZ, base-amount: 32}
+        - {material: SLIME_BALL, base-amount: 8}
+        - {material: GUNPOWDER, base-amount: 16}
+        - {material: REDSTONE, base-amount: 64}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: PHANTOM_MEMBRANE, base-amount: 6}
+        - {material: FEATHER, base-amount: 64}
+        - {material: HONEYCOMB, base-amount: 8, min-level: 2}
+      entity-pool:
+        - {entity: PHANTOM, base-amount: 5, value: 4}
+        - {entity: CREEPER, base-amount: 6, value: 3}
+
+# ============================================================
+#  ★ GANDALF — mage (bonus, chapitre VIII)
+#  La magie et le Néant : perles de l'Ender, chorus, carapaces de shulker, échos, étoiles du Nether.
+#  Livres enchantés, yeux de l'Ender, tables d'enchantement, balises, totems.
+# ============================================================
+gandalf:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 800, 3: 3000, 4: 8000, 5: 18000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    ENDER_PEARL: {price: 6, quantity: 4, capacity: 256}
+    CHORUS_FRUIT: {price: 8, quantity: 32, capacity: 512}
+    SHULKER_SHELL: {price: 24, quantity: 2, capacity: 32}
+    ECHO_SHARD: {price: 10, quantity: 1, capacity: 32}
+    DRAGON_BREATH: {price: 8, quantity: 2, capacity: 32}
+    NETHER_STAR: {price: 150, quantity: 1, capacity: 4}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: ENDER_EYE, price: 14, quantity: 2, requires: {ENDER_PEARL: 2, "anselme:BLAZE_ROD": 1}}
+      - {material: EXPERIENCE_BOTTLE, price: 12, quantity: 4, supply: {max: 8, restock-minutes: 60}}
+      - {material: ENCHANTING_TABLE, price: 74, quantity: 1, requires: {"brennan:OBSIDIAN": 4, "isabeau:BOOK": 1, "godefroy:DIAMOND": 2}}
+    2:
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {protection: 3}}
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {efficiency: 3}}
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {sharpness: 3}}
+      - {material: ENCHANTED_BOOK, price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {unbreaking: 2}}
+      - {material: ENCHANTED_BOOK, price: 35, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {feather_falling: 3}}
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {power: 3}}
+    3:
+      - {material: ENCHANTED_BOOK, price: 70, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {fortune: 2}}
+      - {material: ENCHANTED_BOOK, price: 70, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {looting: 2}}
+      - {material: ENCHANTED_BOOK, price: 80, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {silk_touch: 1}}
+      - {material: ENCHANTED_BOOK, price: 50, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {respiration: 3}}
+      - {material: ENDER_CHEST, price: 38, quantity: 1, requires: {"brennan:OBSIDIAN": 8, ENDER_PEARL: 1, "anselme:BLAZE_ROD": 1}}
+      - {material: RECOVERY_COMPASS, price: 199, quantity: 1, requires: {ECHO_SHARD: 8, "thorvald:IRON_INGOT": 4, "godefroy:REDSTONE": 1}}
+    4:
+      - {material: ENCHANTED_BOOK, price: 100, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {protection: 4}}
+      - {material: ENCHANTED_BOOK, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {efficiency: 5}}
+      - {material: ENCHANTED_BOOK, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {sharpness: 5}}
+      - {material: ENCHANTED_BOOK, price: 150, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {fortune: 3}}
+      - {material: ENCHANTED_BOOK, price: 90, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {unbreaking: 3}}
+      - {material: SHULKER_BOX, price: 57, quantity: 1, requires: {SHULKER_SHELL: 2, "bastien:#LOGS": 2}}
+      - {material: BEACON, price: 357, quantity: 1, requires: {NETHER_STAR: 1, "brennan:OBSIDIAN": 3, "leon:SAND": 5}}
+    5:
+      - {material: ENCHANTED_BOOK, price: 250, quantity: 1, supply: {max: 1, restock-minutes: 720}, enchantments: {mending: 1}}
+      - {material: TOTEM_OF_UNDYING, price: 400, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: END_CRYSTAL, price: 106, quantity: 4, requires: {"leon:SAND": 28, ENDER_PEARL: 4, "anselme:BLAZE_ROD": 2, "anselme:GHAST_TEAR": 4}}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 30
+      objectives-count: 2
+      item-pool:
+        - {material: ENDER_PEARL, base-amount: 8}
+        - {material: CHORUS_FRUIT, base-amount: 32}
+        - {material: BLAZE_ROD, base-amount: 4}
+        - {material: LAPIS_LAZULI, base-amount: 32}
+    special:
+      xp-reward-per-level: 70
+      objectives-count: 2
+      item-pool:
+        - {material: SHULKER_SHELL, base-amount: 2, min-level: 2}
+        - {material: ECHO_SHARD, base-amount: 2, min-level: 3}
+        - {material: DRAGON_BREATH, base-amount: 4, min-level: 3}
+        - {material: NETHER_STAR, base-amount: 1, min-level: 5}
+      entity-pool:
+        - {entity: ENDERMAN, base-amount: 8, value: 4}
+        - {entity: SHULKER, base-amount: 4, value: 8, min-level: 3}
+        - {entity: WITHER_SKELETON, base-amount: 4, value: 8, min-level: 2}
+
+# ============================================================
+#  ★ GERALT DE RIV — sorceleur (bonus, chapitre X)
+#  Les trophées de monstres : têtes et crânes.
+#  Potions de sorceleur, lames contre les monstres ; ses quêtes sont des contrats de boss.
+# ============================================================
+geralt:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 800, 3: 3000, 4: 8000, 5: 18000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    ZOMBIE_HEAD: {price: 20, quantity: 1, capacity: 8}
+    SKELETON_SKULL: {price: 20, quantity: 1, capacity: 8}
+    CREEPER_HEAD: {price: 25, quantity: 1, capacity: 8}
+    PIGLIN_HEAD: {price: 25, quantity: 1, capacity: 8}
+    WITHER_SKELETON_SKULL: {price: 60, quantity: 1, capacity: 16}
+    DRAGON_HEAD: {price: 100, quantity: 1, capacity: 4}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - material: POTION
+        price: 25
+        quantity: 1
+        supply: {max: 3, restock-minutes: 120}
+        potion: REGENERATION
+        name: "§7Hirondelle"
+        lore:
+          - "§7Décoction de sorceleur. Amère."
+      - material: POTION
+        price: 15
+        quantity: 1
+        supply: {max: 3, restock-minutes: 120}
+        potion: NIGHT_VISION
+        name: "§7Chat"
+        lore:
+          - "§7Voir dans le noir, comme un chat."
+      - material: IRON_SWORD
+        price: 70
+        quantity: 1
+        supply: {max: 1, restock-minutes: 360}
+        enchantments: {smite: 5, unbreaking: 3}
+        name: "§7Épée d'argent"
+        lore:
+          - "§7L'argent, c'est pour les monstres."
+    2:
+      - {material: POTION, price: 30, quantity: 1, supply: {max: 3, restock-minutes: 120}, potion: STRENGTH, name: "§7Tonnerre"}
+      - material: SPLASH_POTION
+        price: 30
+        quantity: 1
+        supply: {max: 3, restock-minutes: 120}
+        potion: HARMING
+        name: "§7Danse du Diable"
+        lore:
+          - "§7Bombe de sorceleur."
+      - material: SPLASH_POTION
+        price: 25
+        quantity: 1
+        supply: {max: 3, restock-minutes: 120}
+        potion: HEALING
+        name: "§7Huile contre les spectres"
+        lore:
+          - "§7Brûle les morts-vivants."
+    3:
+      - material: DIAMOND_SWORD
+        price: 300
+        quantity: 1
+        supply: {max: 1, restock-minutes: 720}
+        enchantments: {sharpness: 5, unbreaking: 3}
+        name: "§7Épée d'acier"
+        lore:
+          - "§7L'acier, c'est pour les hommes."
+      - {material: POTION, price: 40, quantity: 1, supply: {max: 2, restock-minutes: 240}, potion: STRONG_HEALING, name: "§7Raffard le Blanc"}
+    4:
+      - {material: POTION, price: 20, quantity: 1, supply: {max: 2, restock-minutes: 240}, potion: FIRE_RESISTANCE, name: "§7Signe de Quen"}
+      - {material: CROSSBOW, price: 90, quantity: 1, supply: {max: 1, restock-minutes: 720}, enchantments: {quick_charge: 2, piercing: 4}, name: "§7Arbalète de sorceleur"}
+    5:
+      - {material: NETHERITE_SWORD, price: 1200, quantity: 1, supply: {max: 1, restock-minutes: 1440}, enchantments: {smite: 5, looting: 3, unbreaking: 3, mending: 1}, name: "§7Épée d'argent de maître"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 30
+      objectives-count: 2
+      item-pool:
+        - {material: BLAZE_ROD, base-amount: 6}
+        - {material: ENDER_PEARL, base-amount: 8}
+        - {material: PHANTOM_MEMBRANE, base-amount: 6}
+        - {material: SPIDER_EYE, base-amount: 16}
+        - {material: GHAST_TEAR, base-amount: 2, min-level: 3}
+    special:
+      xp-reward-per-level: 70
+      objectives-count: 2
+      item-pool:
+        - {material: ZOMBIE_HEAD, base-amount: 1, min-level: 3}
+        - {material: WITHER_SKELETON_SKULL, base-amount: 1, min-level: 2}
+      entity-pool:
+        - {entity: WITHER_SKELETON, base-amount: 6, value: 8}
+        - {entity: BLAZE, base-amount: 8, value: 5}
+        - {entity: GHAST, base-amount: 3, value: 10, min-level: 2}
+        - {entity: PIGLIN_BRUTE, base-amount: 2, value: 12, min-level: 3}
+        - {entity: EVOKER, base-amount: 2, value: 20, min-level: 4}
+        - {entity: RAVAGER, base-amount: 1, value: 25, min-level: 4}
+
+# ============================================================
+#  ★ HAROLD — dresseur de dragons (bonus, chapitre X)
+#  Requiert le mod Dragon Mounts Remastered (voir mod-integrations).
+#  Objets du mod notés « dmr:… » : ignorés si le mod est absent.
+#  Rachète poisson, cuir et membranes ; vend selles, sifflets, œufs vierges.
+# ============================================================
+harold:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 600, 3: 2400, 4: 6000, 5: 13000}
+  # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
+  sell-prices:
+    COD: {price: 6, quantity: 16, capacity: 512}
+    SALMON: {price: 8, quantity: 16, capacity: 512}
+    TROPICAL_FISH: {price: 6, quantity: 8, capacity: 128}
+    PUFFERFISH: {price: 8, quantity: 8, capacity: 128}
+    PHANTOM_MEMBRANE: {price: 6, quantity: 4, capacity: 64}
+    LEATHER: {price: 8, quantity: 8, capacity: 256}
+  # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
+  #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
+  shop:
+    1:
+      - {material: SADDLE, price: 24, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - material: WRITTEN_BOOK
+        price: 10
+        quantity: 1
+        supply: {max: 5, restock-minutes: 60}
+        name: "§cLe manuel du dragonnier"
+        book:
+          title: "Le manuel du dragonnier"
+          author: "Harold de Beurk"
+          pages:
+            - "§lLe manuel du dragonnier§r\n\npar Harold, fils de Stoïck, de Beurk.\n\nTout ce qu'on m'a appris sur les dragons était faux. Voici ce que j'ai appris ensuite."
+            - "§lLes œufs§r\n\nOn les trouve dans les coffres : temples du désert (feu) et de la jungle (forêt), igloos (glace), trésors enfouis (eau), bastions et forteresses du Nether."
+            - "Mais aussi : mines abandonnées (fantôme), donjons (éther), forts de l'End (améthyste, End), cités antiques (sculk), manoirs des bois (luxuriant)."
+            - "§lL'éclosion§r\n\nPosez l'œuf, clic droit, et patientez. Le lieu compte : lave, neige, eau ou jungle décident de ce qui sortira de la coquille."
+            - "§lL'apprivoisement§r\n\nUn dragon n'aime ni les cris ni les armes. Il aime le poisson. Beaucoup de poisson."
+            - "§lLe vol§r\n\nUne selle sur le dos, et en avant ! Un sifflet (fer, planches, teinture) le rappelle de loin. Et surtout : ne regardez pas en bas."
+            - "§lAu bout du monde§r\n\nDepuis la chute du dragon du Néant, des portails mènent aux îles extérieures de l'End. Les plus vieux dragons y nicheraient."
+    2:
+      - {material: "dmr:dragon_whistle.black", price: 30, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: "dmr:dragon_whistle.red", price: 30, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: "dmr:dragon_whistle.blue", price: 30, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: "dmr:dragon_whistle.green", price: 30, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: NAME_TAG, price: 25, quantity: 1, supply: {max: 2, restock-minutes: 360}}
+    3:
+      - material: POTION
+        price: 16
+        quantity: 1
+        requires: {"anselme:NETHER_WART": 1, PHANTOM_MEMBRANE: 1}
+        potion: SLOW_FALLING
+        name: "§bPotion du vol plané"
+        lore:
+          - "§7Pour ceux qui tombent de leur dragon."
+          - "§7(Ça arrive à tout le monde.)"
+    4:
+      - material: POTION
+        price: 18
+        quantity: 1
+        requires: {"anselme:NETHER_WART": 1, "anselme:MAGMA_CREAM": 1}
+        potion: FIRE_RESISTANCE
+        name: "§6Écaille de Furie"
+        lore:
+          - "§7Le souffle d'un dragon de feu"
+          - "§7ne vous fera plus rien."
+    5:
+      - {material: "dmr:blank_egg", price: 600, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 30
+      objectives-count: 2
+      item-pool:
+        - {material: COD, base-amount: 32}
+        - {material: SALMON, base-amount: 24}
+        - {material: LEATHER, base-amount: 12}
+        - {material: TROPICAL_FISH, base-amount: 8, min-level: 2}
+        - {material: PHANTOM_MEMBRANE, base-amount: 4, min-level: 2}
+        - {material: MAGMA_BLOCK, base-amount: 12, value: 1.5, min-level: 3}
+        - {material: PACKED_ICE, base-amount: 16, value: 1, min-level: 3}
+    special:
+      xp-reward-per-level: 70
+      objectives-count: 2
+      item-pool:
+        - {material: CHORUS_FRUIT, base-amount: 32}
+        - {material: SHULKER_SHELL, base-amount: 2, min-level: 2}
+        - {material: DRAGON_BREATH, base-amount: 2, min-level: 3}
+        - {material: "dmr:dragon_egg", base-amount: 1, value: 200, min-level: 3}
+        - {material: ECHO_SHARD, base-amount: 2, min-level: 4}
+      entity-pool:
+        - {entity: PHANTOM, base-amount: 8, value: 4}
+        - {entity: ENDERMAN, base-amount: 6, value: 4, min-level: 2}
+        - {entity: SHULKER, base-amount: 4, value: 8, min-level: 3}
 
 # ============================================================
 #  SOMMET — Summit Listener

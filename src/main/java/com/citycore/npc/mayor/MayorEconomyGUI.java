@@ -26,6 +26,11 @@ public class MayorEconomyGUI {
     private final CityManager cityManager;
     private final Economy     economy;
     private final CityQuestManager cityQuestManager;
+    private com.citycore.ui.screens.MayorScreens themed;
+
+    void setThemed(com.citycore.ui.screens.MayorScreens themed) {
+        this.themed = themed;
+    }
 
     public MayorEconomyGUI(CityManager cityManager, Economy economy, CityQuestManager cityQuestManager) {
         this.cityManager = cityManager;
@@ -34,6 +39,7 @@ public class MayorEconomyGUI {
     }
 
     public void open(Player player) {
+        if (themed != null && themed.openTreasury(player)) return;
         int cityCoins   = cityManager.getCityCoins();
         int playerCoins = (int) economy.getBalance(player);
 
@@ -84,7 +90,15 @@ public class MayorEconomyGUI {
         if (slot == SLOT_BACK) return false;
 
         if (slot == SLOT_DEPOSIT) {
-            int playerCoins = (int) economy.getBalance(player);
+            promptDeposit(player);
+            return true;
+        }
+        return true;
+    }
+
+    /** Demande au joueur, dans le chat, le montant à déposer dans la caisse. */
+    public void promptDeposit(Player player) {
+        {
             ChatInputManager.prompt(
                     player,
                     "§6⬆ §7Combien de coins voulez-vous §edéposer §7dans la caisse ?",
@@ -116,9 +130,7 @@ public class MayorEconomyGUI {
                         open(player);
                     }
             );
-            return true;
         }
-        return true;
     }
 
     private ItemStack makeItem(Material mat, String name, List<String> lore) {

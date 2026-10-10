@@ -11,7 +11,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -25,6 +27,14 @@ public class NPCPersonalQuestGUI {
     private final CityNPC                npc;
     private final NPCDataManager         dataManager;
     private final NPCPersonalQuestManager questManager;
+    /** Écrans illustrés « Valmont » (null = menu classique uniquement). */
+    private com.citycore.ui.screens.QuestScreens themed;
+    /** Retour vers le journal de quêtes, par joueur, quand les récits y ont été ouverts. */
+    private final Map<UUID, Runnable> journalBack = new HashMap<>();
+
+    public void setThemed(com.citycore.ui.screens.QuestScreens themed) {
+        this.themed = themed;
+    }
 
     public NPCPersonalQuestGUI(CityNPC npc,
                                NPCDataManager dataManager,
@@ -42,9 +52,33 @@ public class NPCPersonalQuestGUI {
        OUVERTURE
        ========================= */
 
+    /** Ouvre les récits depuis le journal de quêtes : le bouton retour y ramène. */
+    public void openFromJournal(Player player, Runnable back) {
+        journalBack.put(player.getUniqueId(), back);
+        open(player);
+    }
+
+    /** Ouvre les récits depuis le menu du personnage : le bouton retour mène à ses quêtes. */
+    public void openFromNpc(Player player) {
+        journalBack.remove(player.getUniqueId());
+        open(player);
+    }
+
+    /** Action du bouton retour quand les récits viennent du journal de quêtes (sinon null). */
+    public Runnable journalBack(Player player) {
+        return journalBack.get(player.getUniqueId());
+    }
+
+    /** Oublie le joueur (déconnexion). */
+    public void forget(UUID uuid) {
+        journalBack.remove(uuid);
+    }
+
+    /** Ouvre (ou rafraîchit) les récits, en gardant l'origine : journal ou menu du personnage. */
     public void open(Player player) {
+        if (themed != null && themed.openPersonal(player, this)) return; // joueur équipé du pack
         int npcLevel = dataManager.getLevel(npc);
-        List<NPCPersonalQuest> quests = npc.getPersonalQuestsForLevel(npcLevel);
+        List<CityNPC.RankedQuest> quests = npc.getAllPersonalQuests();
 
         // Taille : 9 slots par rangée, minimum 2 rangées (18), max 54
         int rows = Math.max(2, (int) Math.ceil((quests.size() + 1) / 9.0) + 1);
@@ -57,14 +91,18 @@ public class NPCPersonalQuestGUI {
         ItemStack filler = makeItem(Material.PURPLE_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < size; i++) inv.setItem(i, filler);
 
-        // ── Quêtes ───────────────────────────────────────────────
+        // ── Quêtes : débloquées d'abord, puis celles d'un rang supérieur (verrouillées) ──
         UUID uuid = player.getUniqueId();
         for (int i = 0; i < Math.min(quests.size(), size - 9); i++) {
-            inv.setItem(i, buildQuestItem(uuid, quests.get(i)));
+            CityNPC.RankedQuest ranked = quests.get(i);
+            inv.setItem(i, ranked.level() <= npcLevel
+                    ? buildQuestItem(uuid, ranked.quest())
+                    : buildLockedItem(ranked.quest(), ranked.level()));
         }
 
         // ── Bouton retour (dernière rangée, slot 0) ──────────────
-        inv.setItem(size - 9, makeItem(Material.ARROW, "§7← Retour", List.of()));
+        inv.setItem(size - 9, makeItem(Material.ARROW,
+                journalBack(player) != null ? "§7← Journal de quêtes" : "§7← Retour", List.of()));
 
         player.openInventory(inv);
     }
@@ -104,7 +142,7 @@ public class NPCPersonalQuestGUI {
        CONSTRUCTION ITEM
        ========================= */
 
-    private ItemStack buildQuestItem(UUID uuid, NPCPersonalQuest quest) {
+    public ItemStack buildQuestItem(UUID uuid, NPCPersonalQuest quest) {
         boolean completed = questManager.isCompleted(uuid, npc, quest.id());
         int progress      = questManager.getProgress(uuid, npc, quest.id());
         int target        = quest.targetAmount();
@@ -137,6 +175,14 @@ public class NPCPersonalQuestGUI {
                 : (progress > 0 ? "§e⏳ " : "§f") + quest.displayName();
 
         return makeItem(icon, name, lore);
+    }
+
+    /** Récit verrouillé : titre illisible, rang requis. */
+    private ItemStack buildLockedItem(NPCPersonalQuest quest, int rank) {
+        return makeItem(Material.GRAY_DYE, "§8🔒 §7Récit verrouillé", List.of(
+                "§8§k" + org.bukkit.ChatColor.stripColor(quest.displayName()), "",
+                "§7Se débloque quand " + npc.displayName,
+                "§7atteint le rang " + com.citycore.npc.villager.VillagerGUI.getLevelName(rank) + "§7."));
     }
 
     /* =========================

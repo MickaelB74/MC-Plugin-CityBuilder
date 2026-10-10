@@ -31,6 +31,12 @@ public class QuestGUI {
     private final QuestManager        questManager;
     private final NPCDataManager      dataManager;
     private final NPCPersonalQuestGUI personalQuestGUI; // null si le NPC n'en a pas
+    /** Écrans illustrés « Valmont » (null = menu classique uniquement). */
+    private com.citycore.ui.screens.QuestScreens themed;
+
+    public void setThemed(com.citycore.ui.screens.QuestScreens themed) {
+        this.themed = themed;
+    }
 
     public QuestGUI(CityNPC npcType, QuestConfig questConfig,
                     QuestManager questManager, NPCDataManager dataManager,
@@ -47,6 +53,7 @@ public class QuestGUI {
        ========================= */
 
     public void open(Player player) {
+        if (themed != null && themed.openQuests(player, this)) return; // joueur équipé du pack
         Inventory inv = Bukkit.createInventory(null, 9, titleQuests(npcType));
         UUID uuid    = player.getUniqueId();
         int npcLevel = dataManager.getLevel(npcType);
@@ -71,19 +78,53 @@ public class QuestGUI {
         player.openInventory(inv);
     }
 
-    private boolean hasPersonalQuests(int npcLevel) {
+    public boolean hasPersonalQuests(int npcLevel) {
         return personalQuestGUI != null
                 && !npcType.getPersonalQuestsForLevel(npcLevel).isEmpty();
     }
 
     private ItemStack buildPersonalQuestButton(int npcLevel) {
         int count = npcType.getPersonalQuestsForLevel(npcLevel).size();
+        int total = npcType.getAllPersonalQuests().size();
         List<String> lore = new ArrayList<>();
-        lore.add("§7" + count + " quête" + (count > 1 ? "s" : "")
-                + " disponible" + (count > 1 ? "s" : ""));
+        lore.add("§7" + count + " récit" + (count > 1 ? "s" : "") + " débloqué" + (count > 1 ? "s" : "")
+                + " sur " + total);
         lore.add("");
         lore.add("§a▶ Cliquez pour consulter");
         return makeItem(Material.COMPASS, "§5✦ Quêtes Personnelles", lore);
+    }
+
+    /* =========================
+       ÉTAT D'UNE COMMANDE (partagé avec les écrans illustrés)
+       ========================= */
+
+    /**
+     * État d'une quête de PNJ pour un joueur.
+     * @param quest      quête active ou proposée (null : en repos ou aucune)
+     * @param cooldownMs délai avant la prochaine quête (0 sinon)
+     */
+    public record Card(QuestDefinition quest, boolean active, boolean ready,
+                       Map<String, Integer> progress, long cooldownMs) {}
+
+    /** Quête active, sinon proposée (générée au besoin, comme le menu classique), sinon repos. */
+    public Card card(Player player, boolean isSpecial) {
+        UUID uuid = player.getUniqueId();
+        QuestDefinition active = questManager.getActiveQuest(uuid, npcType, isSpecial);
+        if (active != null) {
+            return new Card(active, true, questManager.isReadyToValidate(uuid, npcType, isSpecial),
+                    questManager.getProgress(uuid, npcType, isSpecial), 0);
+        }
+        QuestDefinition pending = questManager.getPendingQuest(uuid, npcType, isSpecial);
+        if (pending != null) return new Card(pending, false, false, Map.of(), 0);
+        long remaining = questManager.getCooldownRemaining(uuid, npcType, isSpecial);
+        if (remaining > 0) return new Card(null, false, false, Map.of(), remaining);
+        int npcLevel = dataManager.getLevel(npcType);
+        QuestDefinition generated = isSpecial
+                ? questConfig.generateSpecial(npcLevel)
+                : questConfig.generateMain(npcLevel);
+        if (generated == null) return new Card(null, false, false, Map.of(), 0);
+        questManager.setPendingQuest(uuid, npcType, generated);
+        return new Card(generated, false, false, Map.of(), 0);
     }
 
     /* =========================
@@ -98,9 +139,26 @@ public class QuestGUI {
         QuestDefinition pending = questManager.getPendingQuest(uuid, npcType, isSpecial);
         if (pending != null) return buildQuestItem(player, pending, icon, false);
 
+        // Délai entre deux quêtes du même type
+        long remaining = questManager.getCooldownRemaining(uuid, npcType, isSpecial);
+        if (remaining > 0) {
+            long minutes = Math.max(1, (remaining + 59_999) / 60_000);
+            return makeItem(Material.CLOCK,
+                    isSpecial ? "§d✦ Quête Spéciale" : "§9📖 Quête Principale",
+                    List.of("§7" + npcType.displayName + " §7prépare",
+                            "§7sa prochaine quête.",
+                            "",
+                            "§eDisponible dans " + minutes + " min"));
+        }
+
         QuestDefinition generated = isSpecial
                 ? questConfig.generateSpecial(npcLevel)
                 : questConfig.generateMain(npcLevel);
+        if (generated == null) {
+            return makeItem(Material.BARRIER,
+                    isSpecial ? "§d✦ Quête Spéciale" : "§9📖 Quête Principale",
+                    List.of("§7Aucune quête de ce type", "§7pour le moment."));
+        }
         questManager.setPendingQuest(uuid, npcType, generated);
         return buildQuestItem(player, generated, icon, false);
     }
@@ -139,6 +197,9 @@ public class QuestGUI {
 
         lore.add("");
         lore.add("§7Récompense : §6" + quest.reward().coins() + " coins");
+        if (quest.objectives().stream().anyMatch(QuestObjective::isMaterialObjective)) {
+            lore.add("§8Les items achetés à un PNJ ne comptent pas.");
+        }
         lore.add("");
 
         if (!isActive) {
@@ -163,7 +224,7 @@ public class QuestGUI {
        LABEL D'OBJECTIF
        ========================= */
 
-    private String buildObjectiveLabel(QuestObjective obj) {
+    public String buildObjectiveLabel(QuestObjective obj) {
         if (obj.isMaterialObjective()) {
             return "§f" + formatName(obj.material().name());
         } else if (obj.isEntityObjective()) {

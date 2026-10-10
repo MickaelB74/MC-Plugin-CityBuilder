@@ -6,6 +6,10 @@ import com.citycore.util.DatabaseManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -41,7 +45,7 @@ public class NPCPersonalQuestManager {
 
     private void createTable() {
         try {
-            db.getConnection().createStatement().execute("""
+            db.execute("""
                 CREATE TABLE IF NOT EXISTS npc_personal_quest_progress (
                     player_uuid TEXT NOT NULL,
                     npc_tag     TEXT NOT NULL,
@@ -99,11 +103,72 @@ public class NPCPersonalQuestManager {
     }
 
     public boolean isActive(UUID playerUUID, CityNPC npc, String questId) {
-        return getState(playerUUID, npc, questId) == 1;
+        return getActiveEntries(playerUUID).contains(cacheKey(npc, questId));
+    }
+
+    /* =========================
+       CACHE DES QUÊTES ACTIVES
+       Les validators MOVE sont évalués à chaque déplacement : on évite
+       d'interroger la base pour chaque PNJ et chaque quête.
+       ========================= */
+
+    private final Map<UUID, Set<String>> activeCache = new HashMap<>();
+
+    /** Entrées "npc_tag|quest_id" des quêtes actives d'un joueur. */
+    public Set<String> getActiveEntries(UUID playerUUID) {
+        return activeCache.computeIfAbsent(playerUUID, this::loadActive);
+    }
+
+    /** Libère le cache d'un joueur (déconnexion). */
+    public void evict(UUID playerUUID) {
+        activeCache.remove(playerUUID);
+    }
+
+    public static String cacheKey(CityNPC npc, String questId) {
+        return npc.tag + "|" + questId;
+    }
+
+    private Set<String> loadActive(UUID playerUUID) {
+        Set<String> set = new HashSet<>();
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+                SELECT npc_tag, quest_id FROM npc_personal_quest_progress
+                WHERE player_uuid = ? AND state = 1
+            """);
+            ps.setString(1, playerUUID.toString());
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) set.add(rs.getString("npc_tag") + "|" + rs.getString("quest_id"));
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return set;
     }
 
     public boolean isCompleted(UUID playerUUID, CityNPC npc, String questId) {
         return getState(playerUUID, npc, questId) == 2;
+    }
+
+    /**
+     * Tous les récits d'un joueur en une requête (journal des récits) :
+     * "npc_tag|quest_id" → {progression, état (0 | 1 | 2)}.
+     */
+    public Map<String, int[]> snapshot(UUID playerUUID) {
+        Map<String, int[]> map = new HashMap<>();
+        try (PreparedStatement ps = db.getConnection().prepareStatement("""
+                SELECT npc_tag, quest_id, progress, state FROM npc_personal_quest_progress
+                WHERE player_uuid = ?
+            """)) {
+            ps.setString(1, playerUUID.toString());
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                map.put(rs.getString("npc_tag") + "|" + rs.getString("quest_id"),
+                        new int[]{rs.getInt("progress"), rs.getInt("state")});
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return map;
     }
 
     /* =========================
@@ -129,6 +194,7 @@ public class NPCPersonalQuestManager {
             ps.setString(3, questId);
             ps.executeUpdate();
             ps.close();
+            getActiveEntries(playerUUID).add(cacheKey(npc, questId));
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -145,10 +211,15 @@ public class NPCPersonalQuestManager {
      * @return true si la quête est maintenant complétée
      */
     public boolean increment(UUID playerUUID, CityNPC npc, NPCPersonalQuest quest) {
+        return increment(playerUUID, npc, quest, 1);
+    }
+
+    /** Incrémente de {@code amount} (ex : plusieurs fabrications d'un coup). */
+    public boolean increment(UUID playerUUID, CityNPC npc, NPCPersonalQuest quest, int amount) {
         if (!isActive(playerUUID, npc, quest.id())) return false;
 
         int current = getProgress(playerUUID, npc, quest.id());
-        int newVal  = Math.min(current + 1, quest.targetAmount());
+        int newVal  = Math.min(current + Math.max(1, amount), quest.targetAmount());
         boolean done = newVal >= quest.targetAmount();
 
         try {
@@ -164,6 +235,7 @@ public class NPCPersonalQuestManager {
             ps.setString(5, quest.id());
             ps.executeUpdate();
             ps.close();
+            if (done) getActiveEntries(playerUUID).remove(cacheKey(npc, quest.id()));
         } catch (SQLException e) {
             e.printStackTrace();
         }

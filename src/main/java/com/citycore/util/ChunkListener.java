@@ -49,16 +49,16 @@ public class ChunkListener implements Listener {
         if (!wasInCity && isInCity) {
             City city = cityManager.getCity();
             String name = (city != null) ? city.getName() : "la Ville";
-            player.sendActionBar("§a🏰 Territoire de §e" + name);
+            com.citycore.util.TypewriterUtil.actionBar(player, "§a🏰 Territoire de §e" + name);
         }
 
         // Sortie de la ville alors qu'Alderic suit le joueur
         if (wasInCity && !isInCity && npcManager.isFollowing(player, CityNPC.MAYOR)) {
             npcManager.stopFollowing(player, CityNPC.MAYOR);
             player.sendMessage("§6" + CityNPC.MAYOR.displayName + " §7: §o\"Je vous attends là, je dois surveiller la ville...\"");
-            player.sendActionBar("§c🌲 " + CityNPC.MAYOR.displayName + " ne peut pas quitter la ville.");
+            com.citycore.util.TypewriterUtil.actionBar(player, "§c🌲 " + CityNPC.MAYOR.displayName + " ne peut pas quitter la ville.");
         } else if (wasInCity && !isInCity) {
-            player.sendActionBar("§c🌲 Quitter le territoire de la ville");
+            com.citycore.util.TypewriterUtil.actionBar(player, "§c🌲 Quitter le territoire de la ville");
         }
     }
 

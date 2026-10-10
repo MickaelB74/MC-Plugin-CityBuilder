@@ -22,9 +22,13 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.citycore.progress.CityAdvancements;
+import com.citycore.quest.city.CityQuestManager;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import static org.bukkit.Bukkit.getServer;
 
@@ -43,6 +47,36 @@ public class CityCommand implements CommandExecutor {
     private final NPCNotificationManager notificationManager;
     private final PlayerDataManager      playerDataManager;
     private final CityQuestSelectionGUI  questSelectionGUI;
+    private Supplier<List<String>>       economyCheck;
+    private CityQuestManager             cityQuestManager;
+    private CityAdvancements             cityAdvancements;
+    private com.citycore.ui.UiPack       uiPack;
+    private com.citycore.ui.screens.QuestTrackingScreen questTracking;
+    /** Nom de la ville : Valmont, rebâtie sur ses cendres (voir CityTier). */
+    public static final String CITY_NAME = "Valmont";
+
+    public void setUiPack(com.citycore.ui.UiPack uiPack) {
+        this.uiPack = uiPack;
+    }
+
+    /** Menu illustré « Quêtes suivies » (/city quests). */
+    public void setQuestTracking(com.citycore.ui.screens.QuestTrackingScreen questTracking) {
+        this.questTracking = questTracking;
+    }
+
+    /** Arbre de progression (/city progression). */
+    public void setCityAdvancements(CityAdvancements cityAdvancements) {
+        this.cityAdvancements = cityAdvancements;
+    }
+
+    /** Contrôle anti-arbitrage (/city eco check). */
+    public void setEconomyCheck(Supplier<List<String>> economyCheck) {
+        this.economyCheck = economyCheck;
+    }
+
+    public void setCityQuestManager(CityQuestManager cityQuestManager) {
+        this.cityQuestManager = cityQuestManager;
+    }
 
     public CityCommand(CityManager cityManager, NPCManager npcManager,
                        JavaPlugin plugin, NPCDataManager npcDataManager,
@@ -95,16 +129,12 @@ public class CityCommand implements CommandExecutor {
                         player.sendMessage("§c❌ La ville existe déjà.");
                         return true;
                     }
-                    if (args.length < 2) {
-                        player.sendMessage("§cUsage : /city " + CitySubCommand.CREATE.usage);
-                        return true;
-                    }
-                    String cityName = String.join(" ",
-                            Arrays.copyOfRange(args, 1, args.length));
+                    // La ville est Valmont, qui renaît de ses cendres : pas de nom à saisir
+                    String cityName = CITY_NAME;
                     cityManager.initializeCity(cityName);
                     cityManager.claimChunk(player.getLocation().getChunk());
                     npcManager.spawnMayor(player);
-                    player.sendMessage("§6🏰 Ville §e" + cityName + " §6fondée !");
+                    player.sendMessage("§6🏰 §e" + cityName + " §6renaît de ses cendres !");
                     player.sendMessage("§a📍 Chunk de départ claim.");
                     player.sendMessage("§7👴 Le §6Maire §7est apparu devant vous.");
                 }
@@ -215,6 +245,7 @@ public class CityCommand implements CommandExecutor {
                     }
                     economy.withdrawPlayer(player, amount);
                     int newBalance = cityManager.addCityCoins(amount);
+                    if (cityQuestManager != null) cityQuestManager.onCoinsDeposited(amount);
                     player.sendMessage("§a✅ §6" + amount
                             + " coins §adéposés dans la caisse.");
                     player.sendMessage("§7Caisse : §6" + newBalance
@@ -252,7 +283,66 @@ public class CityCommand implements CommandExecutor {
 
                 // ── /city quests ─────────────────────────────────
                 case QUESTS -> {
-                    questSelectionGUI.open(player);
+                    // /city quests toggle : affiche ou masque le suivi ; /city quests recits : onglet
+                    // des récits ; sinon onglet du suivi (menu illustré, ou classique sans le pack)
+                    String option = args.length > 1 ? args[1].toLowerCase(java.util.Locale.ROOT) : "";
+                    switch (option) {
+                        case "toggle" -> questHUD.toggle(player);
+                        case "recits", "récits" -> {
+                            if (questTracking == null || !questTracking.openStories(player)) questSelectionGUI.openStories(player);
+                        }
+                        default -> {
+                            if (questTracking == null || !questTracking.open(player)) questSelectionGUI.open(player);
+                        }
+                    }
+                }
+
+                // ── /city progression ────────────────────────────
+                case PROGRESSION -> {
+                    // La vue d'ensemble est l'onglet de progrès Minecraft : on le présélectionne
+                    // et on rappelle la touche (affichée selon les réglages du joueur)
+                    if (cityAdvancements != null) cityAdvancements.selectTab(player);
+                    player.sendMessage(net.kyori.adventure.text.Component.text("📜 Progression de la ville : ouvrez le menu Progrès (", net.kyori.adventure.text.format.NamedTextColor.GOLD)
+                            .append(net.kyori.adventure.text.Component.keybind("key.advancements", net.kyori.adventure.text.format.NamedTextColor.YELLOW))
+                            .append(net.kyori.adventure.text.Component.text("), onglet « La Renaissance de Valmont ».", net.kyori.adventure.text.format.NamedTextColor.GOLD)));
+                }
+
+                // ── /city eco check ──────────────────────────────
+                // ── /city ui [valmont|classique] ─────────────────
+                case UI -> {
+                    if (uiPack == null) return true;
+                    String mode = args.length > 1 ? args[1].toLowerCase(java.util.Locale.ROOT) : "";
+                    boolean classic = switch (mode) {
+                        case "classique", "classic" -> true;
+                        case "valmont", "illustre", "illustré" -> false;
+                        default -> !uiPack.prefersClassic(player); // bascule
+                    };
+                    uiPack.setClassic(player, classic);
+                    if (classic) {
+                        player.sendMessage("§7Menus des habitants : §fclassiques§7. §8(/city ui valmont pour revenir)");
+                    } else if (!uiPack.enabled()) {
+                        player.sendMessage("§cLe pack d'interface n'est pas disponible sur ce serveur (voir la console).");
+                    } else {
+                        player.sendMessage("§6Menus des habitants : §fillustrés (Valmont)§6.");
+                        if (!uiPack.isLoaded(player)) uiPack.send(player);
+                    }
+                }
+
+                case ECO -> {
+                    if (!player.isOp()) {
+                        player.sendMessage("§c❌ Réservé aux admins.");
+                        return true;
+                    }
+                    if (economyCheck == null) return true;
+                    List<String> warnings = economyCheck.get();
+                    if (warnings.isEmpty()) {
+                        player.sendMessage("§a✅ Économie saine : aucun arbitrage achat → craft → revente.");
+                    } else {
+                        player.sendMessage("§6⚠ " + warnings.size() + " alerte(s) économiques :");
+                        warnings.stream().limit(15).forEach(w -> player.sendMessage("§7- §e" + w));
+                        if (warnings.size() > 15) player.sendMessage("§8… voir la console pour la suite.");
+                        warnings.forEach(w -> plugin.getLogger().warning("⚠ [Économie] " + w));
+                    }
                 }
 
                 // ── /city npc ────────────────────────────────────

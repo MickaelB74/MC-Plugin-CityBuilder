@@ -271,6 +271,28 @@ public class BuildingManager {
         }
     }
 
+    /**
+     * Libère les bâtiments assignés à un PNJ qui n'existe plus (PNJ de test supprimé…).
+     * @return nombre de bâtiments libérés
+     */
+    public int releaseUnknownNpcTags(java.util.Set<String> knownTags) {
+        if (knownTags.isEmpty()) return 0;
+        String placeholders = String.join(",", java.util.Collections.nCopies(knownTags.size(), "?"));
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement(
+                    "UPDATE buildings SET npc_tag = NULL WHERE npc_tag IS NOT NULL AND npc_tag NOT IN ("
+                            + placeholders + ")");
+            int i = 1;
+            for (String tag : knownTags) ps.setString(i++, tag);
+            int affected = ps.executeUpdate();
+            ps.close();
+            return affected;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
     public void unassignNPCByTag(String npcTag) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement(

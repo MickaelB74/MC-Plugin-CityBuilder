@@ -1,35 +1,47 @@
 package com.citycore.command;
 
+import java.util.List;
+
 public enum CitySubCommand {
 
-    CREATE("create",   "create <nom>",                    "Fonder une nouvelle ville"),
+    CREATE("create",   "create",                          "Faire renaître Valmont ici (fondation)"),
     CLAIM("claim",     "claim",                           "Claim le chunk actuel"),
     UNCLAIM("unclaim", "unclaim",                         "Retire le claim du chunk actuel"),
     EXPAND("expand",   "expand",                          "Agrandir la capacité de chunks"),
     DEPOSIT("deposit", "deposit <montant>",               "Déposer des coins dans la caisse"),
     INFO("info",       "info",                            "Afficher les infos de la ville"),
     MAP("map",         "map",                             "Afficher les bordures de chunks"),
+    PROGRESSION("progression", "progression",             "Progrès de la ville : onglet du menu Progrès (touche L)",
+            "progres", "avancement", "chroniques"),
     NPC("npc",         "npc <type> <spawn|levelUp|levelDown>", "Gérer les NPCs"),
-    QUESTS("quests", "quests toggle", "Afficher/masquer le HUD des quêtes"),
+    QUESTS("quests", "quests [toggle|recits]", "Journal de quêtes : suivi, récits des habitants, afficher/masquer le panneau"),
     BUILD("build", "build [new <nom>|show|remove <nom|all>]",
             "Gérer les bâtiments de la ville"),
     JOB("job", "job <joueur> <npc|clear>", "Gérer le job d'un joueur (op)"),
-    PLAYER("player", "player <joueur> <levelUp|levelDown|setLevel>", "Gérer le niveau d'un joueur (op)");
+    PLAYER("player", "player <joueur> <levelUp|levelDown|setLevel>", "Gérer le niveau d'un joueur (op)"),
+    ECO("eco", "eco check", "Contrôler l'économie des PNJ : arbitrages (op)"),
+    UI("ui", "ui [valmont|classique]", "Style des menus des habitants (illustrés ou classiques)",
+            "interface", "menus");
 
 
     public final String label;
     public final String usage;
     public final String description;
+    public final List<String> aliases;
 
-    CitySubCommand(String label, String usage, String description) {
+    CitySubCommand(String label, String usage, String description, String... aliases) {
         this.label       = label;
         this.usage       = usage;
         this.description = description;
+        this.aliases     = List.of(aliases);
     }
 
     public static CitySubCommand fromLabel(String label) {
         for (CitySubCommand cmd : values()) {
             if (cmd.label.equalsIgnoreCase(label)) return cmd;
+            for (String alias : cmd.aliases) {
+                if (alias.equalsIgnoreCase(label)) return cmd;
+            }
         }
         return null;
     }

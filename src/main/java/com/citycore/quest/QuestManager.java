@@ -23,6 +23,66 @@ public class QuestManager {
     public QuestManager(DatabaseManager db, JavaPlugin plugin) {
         this.db = db;
         this.plugin = plugin;
+        createCooldownTable();
+    }
+
+    /* =========================
+       DÉLAI ENTRE DEUX COMMANDES
+       ========================= */
+
+    private void createCooldownTable() {
+        try {
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS quest_cooldowns (
+                    player_uuid  TEXT    NOT NULL,
+                    npc_tag      TEXT    NOT NULL,
+                    is_special   INTEGER NOT NULL,
+                    available_at INTEGER NOT NULL,
+                    PRIMARY KEY (player_uuid, npc_tag, is_special)
+                )
+            """);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /** Millisecondes avant la prochaine quête (0 = disponible). */
+    public long getCooldownRemaining(UUID playerUUID, CityNPC npc, boolean isSpecial) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+                SELECT available_at FROM quest_cooldowns
+                WHERE player_uuid = ? AND npc_tag = ? AND is_special = ?
+            """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, isSpecial ? 1 : 0);
+            ResultSet rs = ps.executeQuery();
+            long at = rs.next() ? rs.getLong("available_at") : 0;
+            ps.close();
+            return Math.max(0, at - System.currentTimeMillis());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    public void setCooldown(UUID playerUUID, CityNPC npc, boolean isSpecial, long durationMs) {
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+                INSERT INTO quest_cooldowns (player_uuid, npc_tag, is_special, available_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(player_uuid, npc_tag, is_special)
+                DO UPDATE SET available_at = excluded.available_at
+            """);
+            ps.setString(1, playerUUID.toString());
+            ps.setString(2, npc.tag);
+            ps.setInt(3, isSpecial ? 1 : 0);
+            ps.setLong(4, System.currentTimeMillis() + durationMs);
+            ps.executeUpdate();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     /* =========================
@@ -51,6 +111,31 @@ public class QuestManager {
     /* =========================
        LECTURE
        ========================= */
+
+    /**
+     * Clés "npc_tag:is_special" des quêtes actives (acceptées) d'un joueur, en une requête.
+     * Évite d'interroger la base pour chaque PNJ à chaque événement.
+     */
+    public Set<String> getActiveQuestKeys(UUID playerUUID) {
+        Set<String> keys = new HashSet<>();
+        try {
+            PreparedStatement ps = db.getConnection().prepareStatement("""
+                SELECT npc_tag, is_special FROM quest_progress
+                WHERE player_uuid = ? AND completed != 2
+            """);
+            ps.setString(1, playerUUID.toString());
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) keys.add(rs.getString("npc_tag") + ":" + rs.getInt("is_special"));
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return keys;
+    }
+
+    public static String activeKey(CityNPC npc, boolean isSpecial) {
+        return npc.tag + ":" + (isSpecial ? 1 : 0);
+    }
 
     public QuestDefinition getActiveQuest(UUID playerUUID, CityNPC npc,
                                           boolean isSpecial) {
@@ -371,8 +456,15 @@ public class QuestManager {
                 int amount = Integer.parseInt(o[2]);
 
                 switch (o[0]) {
-                    case "M" -> objectives.add(
-                            QuestObjective.ofMaterial(Material.valueOf(o[1]), amount));
+                    case "M" -> {
+                        Material mat = Material.getMaterial(o[1]);
+                        if (mat == null) {
+                            plugin.getLogger().warning("Quête « " + id + " » ignorée : objet " + o[1]
+                                    + " introuvable (mod désinstallé ?).");
+                            return null;
+                        }
+                        objectives.add(QuestObjective.ofMaterial(mat, amount));
+                    }
 
                     case "E" -> objectives.add(
                             QuestObjective.ofEntity(EntityType.valueOf(o[1]), amount));
@@ -429,7 +521,7 @@ public class QuestManager {
             } else {
                 Map<String, Integer> prog = getProgress(player.getUniqueId(), npc, isSpecial);
                 int cur = prog.getOrDefault(obj.id(), 0);
-                player.sendActionBar("§e🗺 Biome découvert §7(§f" + cur
+                com.citycore.util.TypewriterUtil.actionBar(player, "§e🗺 Biome découvert §7(§f" + cur
                         + "§7/§f" + obj.amount() + "§7)");
             }
             break; // un seul objectif biome par quête explore
@@ -476,7 +568,7 @@ public class QuestManager {
             } else {
                 Map<String, Integer> prog = getProgress(player.getUniqueId(), npc, isSpecial);
                 int cur = prog.getOrDefault(obj.id(), 0);
-                player.sendActionBar("§d✦ " + def.displayName()
+                com.citycore.util.TypewriterUtil.actionBar(player, "§d✦ " + def.displayName()
                         + " §7(§f" + cur + "§7/§f" + obj.amount() + "§7)");
             }
         }

@@ -5,6 +5,7 @@ import com.citycore.city.CityManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.player.PlayerDataManager;
 import com.citycore.quest.city.CityQuestManager;
+import com.citycore.ui.UiHud;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.milkbowl.vault.economy.Economy;
@@ -12,6 +13,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static com.citycore.ui.UiLayout.*;
 
 public class CityCoreHUD {
 
@@ -21,6 +27,12 @@ public class CityCoreHUD {
     private final PlayerDataManager  playerDataManager;
     private final CityQuestManager   cityQuestManager; // ← AJOUT
     private BukkitTask task;
+    /** Interfaces illustrées « Valmont » (null tant qu'elles ne sont pas prêtes). */
+    private com.citycore.ui.UiKit ui;
+
+    public void setUi(com.citycore.ui.UiKit ui) {
+        this.ui = ui;
+    }
 
     public CityCoreHUD(JavaPlugin plugin, CityManager cityManager, Economy economy,
                        PlayerDataManager playerDataManager, CityQuestManager cityQuestManager) {
@@ -33,8 +45,10 @@ public class CityCoreHUD {
 
     public void start() {
         task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (Bukkit.getOnlinePlayers().isEmpty()) return;
+            int cityLevel = cityQuestManager.getCityLevel(); // une requête par passage
             for (Player player : Bukkit.getOnlinePlayers()) {
-                updatePlayer(player);
+                updatePlayer(player, cityLevel);
             }
         }, 0L, 40L); // toutes les 2 secondes
     }
@@ -44,6 +58,10 @@ public class CityCoreHUD {
     }
 
     public void updatePlayer(Player player) {
+        updatePlayer(player, cityQuestManager.getCityLevel());
+    }
+
+    private void updatePlayer(Player player, int cityLevelValue) {
         // ── Données joueur ───────────────────────────────────────
         int    coins       = (int) economy.getBalance(player);
         int    playerLevel = playerDataManager.getLevel(player.getUniqueId());
@@ -58,10 +76,17 @@ public class CityCoreHUD {
         City   city      = cityManager.isCityInitialized() ? cityManager.getCity() : null;
         // CORRECTION : le niveau de la ville provient de city_level (CityQuestManager),
         // pas de la table city — c'est lui qui est mis à jour lors du level-up via le GUI maire.
-        String cityLevel = String.valueOf(cityQuestManager.getCityLevel());
+        String cityLevel = String.valueOf(cityLevelValue);
         String cityCoins = city != null ? String.valueOf(city.getCoins())          : "—";
         String cityPop   = city != null ? String.valueOf(city.getResidentCount())  : "—";
         String citySize  = city != null ? city.getClaimedChunks() + "/" + city.getMaxChunks() : "—";
+
+        // Joueur équipé du pack : panneaux dessinés de part et d'autre de la liste des joueurs
+        if (ui != null && ui.active(player)) {
+            player.sendPlayerListHeaderAndFooter(pixelHeader(player.getName(), playerLevel, playerXP, xpRequired,
+                    coins, job == null ? null : jobName, city, cityLevelValue), Component.empty());
+            return;
+        }
 
         Component header = Component.text()
                 .append(Component.newline())
@@ -102,6 +127,66 @@ public class CityCoreHUD {
                 .build();
 
         player.sendPlayerListHeaderAndFooter(header, Component.empty());
+    }
+
+    /* =========================
+       EN-TÊTE ILLUSTRÉ (pack « Valmont »)
+       ========================= */
+
+    /** Titre de la plaque centrale. */
+    private static final String SERVER_TITLE = "MyCivilisation";
+
+    /**
+     * En-tête de la liste des joueurs : une seule ligne d'avance nulle porte la plaque du titre
+     * (centre), le panneau de la cité (à gauche) et celui du joueur (à droite) ; la ligne vide
+     * suivante réserve la hauteur de la plaque. Les joueurs connectés restent listés au milieu,
+     * entre les deux panneaux.
+     */
+    private Component pixelHeader(String playerName, int level, int xp, int xpRequired, int coins,
+                                  String jobName, City city, int cityLevel) {
+        com.citycore.ui.UiCanvas c = ui.canvas(0);
+        UiHud.panel(c, -HUD_W / 2, 0, TAB_OFFSET, SERVER_TITLE, List.of(), 0);
+
+        // Cité : palier et niveau, habitants, trésor, parcelles
+        List<UiHud.Row> cityRows = new ArrayList<>();
+        String cityTitle;
+        if (city == null) {
+            cityTitle = "La cité";
+            cityRows.add(UiHud.Row.plain("Pas encore fondée", UiHud.CREAM));
+        } else {
+            cityTitle = city.getName();
+            String tier = com.citycore.quest.city.CityTier.fromLevel(cityLevel).tierName.replaceAll("§.", "");
+            cityRows.add(new UiHud.Row(UiHud.Kind.HEAD, tier, UiHud.CREAM, "Niv. " + cityLevel, UiHud.GOLD, 0, false));
+            cityRows.add(UiHud.Row.value("Habitants", String.valueOf(city.getResidentCount()), UiHud.CREAM));
+            cityRows.add(UiHud.Row.value("Trésor", fmt(city.getCoins()), UiHud.GOLD));
+            int max = Math.max(1, city.getMaxChunks());
+            cityRows.add(UiHud.Row.bar("Parcelles", UiHud.MUTED, city.getClaimedChunks() + "/" + city.getMaxChunks(),
+                    UiHud.CREAM, city.getClaimedChunks() / (double) max, false));
+        }
+        UiHud.panel(c, -TAB_GAP - HUD_W, 0, TAB_OFFSET, cityTitle, cityRows, TAB_ROWS);
+
+        // Joueur : niveau, expérience, bourse, métier
+        List<UiHud.Row> playerRows = List.of(
+                new UiHud.Row(UiHud.Kind.HEAD, "Niveau", UiHud.CREAM, String.valueOf(level), UiHud.GOLD, 0, false),
+                UiHud.Row.bar("XP", UiHud.MUTED, xp + "/" + xpRequired, UiHud.CREAM,
+                        xp / (double) Math.max(1, xpRequired), true),
+                UiHud.Row.value("Bourse", fmt(coins), UiHud.GOLD),
+                UiHud.Row.value("Métier", jobName == null ? "Aucun" : jobName, UiHud.CREAM));
+        UiHud.panel(c, TAB_GAP, 0, TAB_OFFSET, playerName, playerRows, TAB_ROWS);
+
+        c.end(0); // avance nulle : la ligne reste centrée et ne repousse pas la liste des joueurs
+        return Component.text().append(c.build())
+                .append(Component.text("\n".repeat(TAB_EXTRA_LINES))).build();
+    }
+
+    private static String fmt(long n) {
+        String s = Long.toString(Math.abs(n));
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            if (i > 0 && (s.length() - i) % 3 == 0) sb.append(' ');
+            sb.append(s.charAt(i));
+        }
+        return (n < 0 ? "-" : "") + sb;
     }
 
     public void clearPlayer(Player player) {

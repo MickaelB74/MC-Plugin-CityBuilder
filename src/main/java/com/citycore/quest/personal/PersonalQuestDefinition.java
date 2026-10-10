@@ -27,11 +27,15 @@ public record PersonalQuestDefinition(
      * et appelle validator.validate() pour chaque quête PERSONAL active.
      */
     public enum TriggerType {
-        MOVE,        // PlayerMoveEvent (position, altitude, biome…)
-        KILL,        // EntityDeathEvent (entité tuée par le joueur)
-        COLLECT,     // PlayerPickupItemEvent / InventoryCloseEvent
-        CRAFT,       // CraftItemEvent
+        MOVE,        // PlayerMoveEvent (position, altitude, biome…) — contexte : null
+        KILL,        // EntityDeathEvent (entité tuée par le joueur) — contexte : Entity
+        COLLECT,     // (réservé)
+        CRAFT,       // CraftItemEvent — contexte : ItemStack résultat
         SUMMIT,      // Déclenché directement par SummitListener (event externe)
-        ADVANCEMENT  // AdvancementDoneEvent — pour des conditions Minecraft natives
+        ADVANCEMENT, // PlayerAdvancementDoneEvent — validé aussi à l'acceptation si déjà obtenu
+        FISH,        // PlayerFishEvent (prise) — contexte : ItemStack pêché
+        BREED,       // EntityBreedEvent — contexte : Entity (le petit)
+        TRADE,       // PlayerTradeEvent (échange avec un villageois) — contexte : AbstractVillager
+        PLACE        // BlockPlaceEvent — contexte : Block posé
     }
 }

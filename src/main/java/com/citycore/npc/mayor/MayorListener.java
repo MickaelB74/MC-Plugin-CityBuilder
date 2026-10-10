@@ -48,14 +48,18 @@ public class MayorListener implements Listener {
             TypewriterUtil.play(plugin, player, type.getDialogue("first_meeting"), () -> {
                 if (!player.isOnline()) return;
 
-                // ── Récompenses première rencontre (MAYOR uniquement) ──
-                if (type == CityNPC.MAYOR) {
-                    cityManager.addMaxChunks(cityManager.getFreeChunks());
-                    cityManager.addCityCoins(100);
+                // ── Récompenses première rencontre : une seule fois pour la ville ──
+                // (avant : à chaque nouveau joueur → +chunks et +coins illimités)
+                if (type == CityNPC.MAYOR && !cityManager.isMayorGiftGiven()) {
+                    cityManager.markMayorGiftGiven();
+                    int chunks = cityManager.getFreeChunks();
+                    int coins  = plugin.getConfig().getInt("city-expand.first-meeting-coins", 100);
+                    cityManager.addBonusChunks(chunks);
+                    cityManager.addCityCoins(coins);
                     player.sendMessage("§6" + CityNPC.MAYOR.displayName
                             + " §f: §o« Voici de quoi commencer... »");
-                    player.sendMessage("§a✅ La ville a gagné §f+8 slots de chunk"
-                            + " §aet §6+100 coins§a.");
+                    player.sendMessage("§a✅ La ville a gagné §f+" + chunks + " emplacements de chunk"
+                            + " §aet §6+" + coins + " coins§a.");
                 }
 
                 gui.open(player);
@@ -83,22 +87,26 @@ public class MayorListener implements Listener {
         boolean isBuildingGui = title.equals(MayorBuildingGUI.GUI_TITLE);
         boolean isDeleteGui   = title.equals(MayorBuildingGUI.GUI_TITLE_DELETE);
         boolean isEconomyGui  = title.equals(MayorEconomyGUI.GUI_TITLE);
-        boolean isQuestGui    = mg != null && title.equals(
-                MayorQuestGUI.title(
-                        CityTier.fromLevel(mg.getCityQuestManager().getCityLevel())));
+        // Préfixe indépendant du niveau : un menu resté ouvert pendant une montée de palier
+        // reste protégé (sinon ses icônes deviendraient récupérables)
+        boolean isQuestGui    = title.startsWith(MayorQuestGUI.TITLE_PREFIX);
 
         if (!isMayorGui && !isBuildingGui && !isDeleteGui
                 && !isEconomyGui && !isQuestGui) return;
 
         event.setCancelled(true);
+        // Les clics dans l'inventaire du joueur ne déclenchent rien
+        if (event.getClickedInventory() != event.getView().getTopInventory()) return;
         if (event.getCurrentItem() == null) return;
 
-        int slot = event.getSlot();
+        int slot = event.getRawSlot();
 
         // ── Sous-menu quêtes ──────────────────────────────────────
         if (isQuestGui) {
             if (mg == null) return;
-            boolean handled = mg.getQuestGUI().handleClick(player, slot);
+            boolean shiftRight = event.isShiftClick() && event.isRightClick();
+            boolean handled = mg.getQuestGUI().handleClick(player, slot, shiftRight,
+                    event.getCurrentItem(), event.getView().getTopInventory().getSize());
             if (!handled) mg.open(player);
             return;
         }

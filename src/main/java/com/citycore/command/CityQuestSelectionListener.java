@@ -6,7 +6,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 
 /**
- * Listener dédié au GUI de sélection des quêtes (/city quests).
+ * Listener dédié au journal de quêtes classique (/city quests) : onglets « Suivi » et « Récits ».
  * À enregistrer dans CityCore.onEnable().
  */
 public class CityQuestSelectionListener implements Listener {
@@ -20,11 +20,15 @@ public class CityQuestSelectionListener implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!event.getView().getTitle().equals(CityQuestSelectionGUI.GUI_TITLE)) return;
+        String title = event.getView().getTitle();
+        boolean tracking = title.equals(CityQuestSelectionGUI.GUI_TITLE);
+        if (!tracking && !title.equals(CityQuestSelectionGUI.STORIES_TITLE)) return;
 
         event.setCancelled(true);
         if (event.getCurrentItem() == null) return;
+        if (event.getClickedInventory() != event.getView().getTopInventory()) return;
 
-        gui.handleClick(player, event.getCurrentItem());
+        if (tracking) gui.handleClick(player, event.getCurrentItem());
+        else gui.handleStoriesClick(player, event.getCurrentItem());
     }
 }

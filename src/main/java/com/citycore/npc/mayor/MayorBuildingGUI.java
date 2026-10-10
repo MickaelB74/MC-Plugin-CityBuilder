@@ -30,6 +30,11 @@ public class MayorBuildingGUI {
 
     private final BuildingManager buildingManager;
     private final JavaPlugin      plugin;
+    private com.citycore.ui.screens.MayorScreens themed;
+
+    void setThemed(com.citycore.ui.screens.MayorScreens themed) {
+        this.themed = themed;
+    }
 
     public MayorBuildingGUI(BuildingManager buildingManager, JavaPlugin plugin) {
         this.buildingManager = buildingManager;
@@ -39,6 +44,7 @@ public class MayorBuildingGUI {
     // ── Menu principal : liste des bâtiments ─────────────────────────────────
 
     public void open(Player player) {
+        if (themed != null && themed.openBuildings(player)) return;
         List<Building> buildings = buildingManager.getAllBuildings();
 
         Inventory inv = Bukkit.createInventory(null, 36, GUI_TITLE);
@@ -92,6 +98,7 @@ public class MayorBuildingGUI {
     // ── Sous-menu suppression ─────────────────────────────────────────────────
 
     public void openDelete(Player player) {
+        if (themed != null && themed.openDelete(player)) return;
         List<Building> buildings = buildingManager.getAllBuildings();
 
         Inventory inv = Bukkit.createInventory(null, 36, GUI_TITLE_DELETE);
@@ -133,32 +140,12 @@ public class MayorBuildingGUI {
         // ── Clic sur un bâtiment de la liste (slots 0 à 26) ──────
         if (slot < 27) {
             List<Building> buildings = buildingManager.getAllBuildings();
-            if (slot < buildings.size()) {
-                Building b = buildings.get(slot);
-                // Ferme au tick suivant pour éviter le bug Bukkit
-                plugin.getServer().getScheduler().runTask(plugin, () -> {
-                    player.closeInventory();
-                    new BuildingParticleTask(plugin, player, b).runForSeconds(5);
-                    player.sendMessage("§b🏛 §7Bordures de §f" + b.name()
-                            + " §7affichées pendant §f5 secondes§7.");
-                });
-            }
+            if (slot < buildings.size()) showBorders(player, buildings.get(slot));
             return true;
         }
 
         if (slot == 27 + SLOT_ADD) {
-            ChatInputManager.prompt(
-                    player,
-                    "§a➕ §7Entrez le §enom §7du nouveau bâtiment :",
-                    name -> {
-                        if (buildingManager.nameExists(name)) {
-                            player.sendMessage("§c❌ Un bâtiment nommé §e" + name + " §cexiste déjà.");
-                            open(player);
-                            return;
-                        }
-                        player.performCommand("city build new " + name);
-                    }
-            );
+            promptAdd(player);
             return true;
         }
         if (slot == 27 + SLOT_DELETE) {
@@ -171,6 +158,35 @@ public class MayorBuildingGUI {
         return true;
     }
 
+    /** Affiche les bordures d'un bâtiment pendant 5 secondes. */
+    public void showBorders(Player player, Building b) {
+        // Ferme au tick suivant pour éviter le bug Bukkit
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            player.closeInventory();
+            new BuildingParticleTask(plugin, player, b).runForSeconds(5);
+            player.sendMessage("§b🏛 §7Bordures de §f" + b.name()
+                    + " §7affichées pendant §f5 secondes§7.");
+        });
+    }
+
+    /** Demande le nom d'un nouveau bâtiment dans le chat, puis lance la sélection WorldEdit. */
+    public void promptAdd(Player player) {
+        {
+            ChatInputManager.prompt(
+                    player,
+                    "§a➕ §7Entrez le §enom §7du nouveau bâtiment :",
+                    name -> {
+                        if (buildingManager.nameExists(name)) {
+                            player.sendMessage("§c❌ Un bâtiment nommé §e" + name + " §cexiste déjà.");
+                            open(player);
+                            return;
+                        }
+                        player.performCommand("city build new " + name);
+                    }
+            );
+        }
+    }
+
     /**
      * @return true si géré
      */
@@ -181,19 +197,26 @@ public class MayorBuildingGUI {
         }
         if (slot < 27) {
             List<Building> buildings = buildingManager.getAllBuildings();
-            if (slot < buildings.size()) {
-                Building b = buildings.get(slot);
-                boolean removed = buildingManager.removeByName(b.name());
-                if (removed) {
-                    player.sendMessage("§a✅ Bâtiment §e" + b.name() + " §asupprimé.");
-                } else {
-                    player.sendMessage("§c❌ Erreur lors de la suppression.");
-                }
-                openDelete(player);
-            }
+            if (slot < buildings.size()) delete(player, buildings.get(slot));
             return true;
         }
         return true;
+    }
+
+    /** Supprime un bâtiment puis rouvre la liste de suppression. */
+    public void delete(Player player, Building b) {
+        boolean removed = buildingManager.removeByName(b.name());
+        if (removed) {
+            player.sendMessage("§a✅ Bâtiment §e" + b.name() + " §asupprimé.");
+        } else {
+            player.sendMessage("§c❌ Erreur lors de la suppression.");
+        }
+        openDelete(player);
+    }
+
+    /** Nom du PNJ installé dans un bâtiment (ou « Aucun »). */
+    public String occupant(Building b) {
+        return npcDisplayName(b);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
