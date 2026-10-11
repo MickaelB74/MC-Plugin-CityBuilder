@@ -116,6 +116,7 @@ public final class SiegeManager implements Listener {
     private final Map<UUID, Mob> alive = new LinkedHashMap<>();
     private final Map<String, Integer> playerKills = new HashMap<>();
     private int guardKills, civiliansLost, guardsLost;
+    private java.util.function.BiConsumer<Boolean, Integer> resultListener; // (victoire, palier) : sécurité (phase 6)
 
     public SiegeManager(JavaPlugin plugin, CityManager city, BuildingManager buildings, InhabitantManager inhabitants,
                         NPCDataManager npcData, MarketService market, IntSupplier cityLevel) {
@@ -159,6 +160,11 @@ public final class SiegeManager implements Listener {
 
     public SiegeConfig config() {
         return config;
+    }
+
+    /** Prévenu de l'issue de chaque siège mené jusqu'au bout : (victoire, palier). */
+    public void setResultListener(java.util.function.BiConsumer<Boolean, Integer> listener) {
+        this.resultListener = listener;
     }
 
     /** Relit les réglages des sièges (et les uniformes ennemis). */
@@ -432,7 +438,10 @@ public final class SiegeManager implements Listener {
             case STOPPED -> Bukkit.broadcastMessage("§7⚔ Le siège est interrompu.");
             case ABANDONED -> plugin.getLogger().info("Siège abandonné : plus aucun joueur connecté.");
         }
-        if (result == Result.VICTORY || result == Result.DEFEAT) summary();
+        if (result == Result.VICTORY || result == Result.DEFEAT) {
+            summary();
+            if (resultListener != null) resultListener.accept(result == Result.VICTORY, tier);
+        }
     }
 
     /** Bilan : meilleurs défenseurs, ennemis abattus par la garde, pertes. */

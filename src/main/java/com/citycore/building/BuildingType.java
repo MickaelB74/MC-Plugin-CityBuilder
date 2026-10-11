@@ -18,6 +18,8 @@ public enum BuildingType {
             List.of("Maison des habitants de la ville.", "Lits, porte, éclairage et toit.")),
     ATELIER("Atelier", "§6", Material.CRAFTING_TABLE,
             List.of("Logis et commerce d'un artisan.", "Peut être réservé à un personnage.")),
+    ANNEXE("Annexe", "§3", Material.SCAFFOLDING,
+            List.of("Lieu de travail des employés d'un artisan.", "Se crée depuis ses Actions.")),
     MAIRIE("Mairie", "§e", Material.BELL,
             List.of("Siège d'Alderic et de la Charte.", "Une seule par ville.")),
     DIVERS("Divers", "§7", Material.BRICKS,
@@ -54,5 +56,15 @@ public enum BuildingType {
             if (type.name().equals(plain)) return type;
         }
         return null;
+    }
+
+    /** Type rattaché à un artisan (atelier réservé, annexe de travail). */
+    public boolean hasArtisan() {
+        return this == ATELIER || this == ANNEXE;
+    }
+
+    /** Types proposés à la création et au changement de type (l'annexe se crée depuis les Actions de l'artisan). */
+    public static List<BuildingType> choosable() {
+        return java.util.Arrays.stream(values()).filter(t -> t != ANNEXE).toList();
     }
 }

@@ -1515,6 +1515,9 @@ public class ValmontArt {
         ribs.put("rib_actions",   ribbon(RED,    "ACTIONS"));
         ribs.put("rib_garde",     ribbon(RED,    "LA GARDE"));
         ribs.put("rib_role",      ribbon(RED,    "RÔLE"));
+        ribs.put("rib_population", ribbon(GOLD,  "POPULATION"));
+        ribs.put("rib_employes",  ribbon(BLUE,   "EMPLOYÉS"));
+        ribs.put("rib_annexe",    ribbon(TEAL,   "SON ANNEXE"));
         for (var e : ribs.entrySet()) save(e.getValue(), e.getKey());
 
         // ── États des cases, pastilles, étoiles, barres ─────

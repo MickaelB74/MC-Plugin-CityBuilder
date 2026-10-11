@@ -1,0 +1,36 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "All rights reserved"
+
+[[mods]]
+modId = "citycore_journeymap"
+version = "${version}"
+displayName = "CityCore — JourneyMap"
+description = '''
+Dessine les bordures de la ville CityCore (plugin du serveur) sur la carte JourneyMap des joueurs.
+Mod côté serveur : les joueurs n'ont besoin que de JourneyMap.
+'''
+# Mod du serveur seulement : un client qui ne l'a pas peut se connecter
+displayTest = "IGNORE_SERVER_VERSION"
+
+[[dependencies.citycore_journeymap]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.citycore_journeymap]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.21.2)"
+ordering = "NONE"
+side = "BOTH"
+
+# JourneyMap facultatif : sans lui, le mod ne fait rien (et le serveur démarre quand même)
+[[dependencies.citycore_journeymap]]
+modId = "journeymap"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"

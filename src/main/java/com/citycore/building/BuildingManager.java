@@ -72,7 +72,7 @@ public class BuildingManager {
             }
             BuildingType t = type != null ? type : BuildingType.DIVERS;
             ps.setString(11, t.name());
-            ps.setString(12, t == BuildingType.ATELIER ? reservedFor : null);
+            ps.setString(12, t.hasArtisan() ? reservedFor : null);
             setNullableInt(ps, 13, yMin);
             setNullableInt(ps, 14, yMax);
             setNullableInt(ps, 15, refY);
@@ -412,7 +412,7 @@ public class BuildingManager {
         try (PreparedStatement ps = db.getConnection().prepareStatement(
                 "UPDATE buildings SET type = ?, reserved_for = ? WHERE id = ?")) {
             ps.setString(1, type.name());
-            ps.setString(2, type == BuildingType.ATELIER ? reservedFor : null);
+            ps.setString(2, type.hasArtisan() ? reservedFor : null);
             ps.setInt(3, buildingId);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -448,7 +448,14 @@ public class BuildingManager {
     public Building findReservedFor(String npcTag, int excludeId) {
         return getAllBuildings().stream()
                 .filter(b -> b.id() != excludeId)
-                .filter(b -> npcTag.equals(b.reservedFor()) || npcTag.equals(b.npcTag()))
+                .filter(b -> (b.type() == BuildingType.ATELIER && npcTag.equals(b.reservedFor())) || npcTag.equals(b.npcTag()))
+                .findFirst().orElse(null);
+    }
+
+    /** Annexe de travail de cet artisan (hors excludeId), ou null : une seule par artisan. */
+    public Building findAnnex(String npcTag, int excludeId) {
+        return getAllBuildings().stream()
+                .filter(b -> b.id() != excludeId && b.type() == BuildingType.ANNEXE && npcTag.equals(b.reservedFor()))
                 .findFirst().orElse(null);
     }
 

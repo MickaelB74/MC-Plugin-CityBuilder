@@ -69,7 +69,8 @@ public final class UiLayout {
     // tombe en 10 + Y - 6. Plaque du titre au centre, panneau « cité » à gauche, « joueur » à
     // droite ; l'avance de la ligne est nulle, donc la liste des joueurs reste au milieu, entre les
     // deux panneaux (TAB_GAP px de part et d'autre du centre).
-    public static final int TAB_OFFSET = 6, TAB_ROWS = 4, TAB_GAP = 72, TAB_EXTRA_LINES = 1;
+    // 5 lignes : le panneau de la cité a gagné « Satisfaction » (phase 6) ; celui du joueur en garde 4
+    public static final int TAB_OFFSET = 6, TAB_ROWS = 5, TAB_GAP = 72, TAB_EXTRA_LINES = 1;
 
     /** Déclare au registre toutes les combinaisons image / hauteur utilisées par les écrans. */
     public static void declare(UiAtlas a) {
@@ -84,7 +85,8 @@ public final class UiLayout {
                 "ic_job", "ic_job_quit", "ic_job_locked", "ic_story", "ic_purse"}) a.sprite(s, row0);
         for (String s : new String[]{"rib_vendre", "rib_entrepot", "rib_boutique", "rib_quetes_pnj",
                 "rib_recits", "rib_logis", "rib_batiments", "rib_supprimer", "rib_quetes",
-                "rib_atelier", "rib_actions", "rib_garde", "rib_role"}) a.sprite(s, row0);
+                "rib_atelier", "rib_actions", "rib_garde", "rib_role", "rib_population", "rib_employes",
+                "rib_annexe"}) a.sprite(s, row0);
         // Pied de page : pagination et gros boutons
         for (String s : new String[]{"ic_prev", "ic_next", "ic_prev_off", "ic_next_off"}) a.sprite(s, row5);
         for (String s : new String[]{"fb_ajouter", "fb_supprimer", "fb_retour", "fb_recit", "fb_charte",

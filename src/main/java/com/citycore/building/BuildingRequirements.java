@@ -54,6 +54,8 @@ public final class BuildingRequirements {
 
     private Spec habitation, mairie, divers, freeAtelier;
     private final Map<String, Spec> ateliers = new HashMap<>();
+    private final Map<String, Spec> annexes = new HashMap<>(); // annexes de travail propres à un artisan
+    private Spec annexBase = new Spec("annexe", List.of(), List.of(), 0, 1, 0);
     private final NavigableMap<Integer, Integer> levels = new TreeMap<>(); // niveau → points requis
     private final Set<Material> decorations = new HashSet<>();
     private final Set<Material> terrain = new HashSet<>();
@@ -139,6 +141,19 @@ public final class BuildingRequirements {
         freeAtelier = new Spec("atelier", List.of(), List.of(), doors, lights, roof);
         divers      = new Spec("divers", List.of(), List.of(), 0, 0, 0); // ni exigence ni contrôle : niveau au détail
 
+        // Annexes de travail (emplois) : règles communes, puis exigences propres à un artisan (facultatif)
+        ConfigurationSection ax = root.getConfigurationSection("annexe");
+        annexBase = new Spec("annexe", List.of(), List.of(), ax == null ? 0 : ax.getInt("porte", 0),
+                ax == null ? 1 : ax.getInt("lumiere", 1), ax == null ? 0 : ax.getInt("toit", 0));
+        annexes.clear();
+        ConfigurationSection axs = root.getConfigurationSection("annexes");
+        if (axs != null) {
+            for (String key : axs.getKeys(false)) {
+                annexes.put(key.toLowerCase(Locale.ROOT), spec("annexe:" + key, axs.getConfigurationSection(key),
+                        annexBase.doors(), annexBase.lights(), annexBase.roofPercent()));
+            }
+        }
+
         ateliers.clear();
         ConfigurationSection at = root.getConfigurationSection("ateliers");
         if (at != null) {
@@ -213,6 +228,7 @@ public final class BuildingRequirements {
             case MAIRIE     -> mairie;
             case DIVERS     -> divers;
             case ATELIER    -> b.reservedNpc() != null ? specFor(b.reservedNpc()) : freeAtelier;
+            case ANNEXE     -> b.reservedNpc() != null ? annexSpec(b.reservedNpc()) : annexBase;
         };
     }
 
@@ -223,7 +239,24 @@ public final class BuildingRequirements {
             case MAIRIE     -> mairie;
             case DIVERS     -> divers;
             case ATELIER    -> freeAtelier;
+            case ANNEXE     -> annexBase;
         };
+    }
+
+    /**
+     * Exigences de l'annexe de travail d'un artisan : sa section batiments.annexes.&lt;artisan&gt;
+     * si elle existe ; sinon les « bonus du métier » de son atelier (les outils du métier :
+     * cultures et ruche exigées, four à pain en bonus pour Hélène…), plus les règles communes
+     * des annexes (batiments.annexe : lumière, pas de toit ni de porte exigés).
+     */
+    public Spec annexSpec(CityNPC npc) {
+        Spec own = annexes.get(npc.skinId.toLowerCase(Locale.ROOT));
+        if (own != null) return own;
+        // Les deux premiers outils exigés, les suivants en bonus : une annexe reste à la portée de tous
+        // (l'atelier d'Harold demande en bonus une tête de dragon : elle ne bloque pas son annexe)
+        List<Need> tools = new ArrayList<>(), extra = new ArrayList<>();
+        for (Need n : specFor(npc).bonus()) (tools.size() < 2 ? tools : extra).add(new Need(n.name(), n.plural(), n.materials(), 1));
+        return new Spec("annexe:" + npc.skinId, tools, extra, annexBase.doors(), annexBase.lights(), annexBase.roofPercent());
     }
 
     /** Exigences de l'atelier d'un artisan (communes seulement s'il n'a pas de section). */

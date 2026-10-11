@@ -67,8 +67,12 @@ public class CityTabCompleter implements TabCompleter {
                 case "ui"       -> List.of("valmont", "classique");
                 case "eco"      -> player.isOp() ? List.of("check") : new ArrayList<>();
                 case "habitants", "population" -> player.isOp()
-                        ? List.of("list", "arrivee", "kill", "impot", "deuil", "recharger")
+                        ? List.of("list", "besoins", "arrivee", "kill", "impot", "aube", "deuil", "recharger")
                         : List.of("list");
+                case "emplois", "jobs", "travail" -> player.isOp()
+                        ? List.of("list", "produire", "recharger")
+                        : List.of("list");
+                case "carte", "journeymap" -> player.isOp() ? List.of("recharger") : new ArrayList<>();
                 case "garde", "guard" -> player.isOp()
                         ? List.of("list", "former", "renvoyer", "fin", "kill", "test")
                         : List.of("list", "former", "renvoyer");
@@ -165,9 +169,10 @@ public class CityTabCompleter implements TabCompleter {
                             .collect(Collectors.toList());
                     // /city build new atelier <artisan|libre> (puis le nom)
                     case "new" -> {
-                        if (BuildingType.parse(args[2]) != BuildingType.ATELIER) yield List.of("<nom>");
+                        BuildingType t = BuildingType.parse(args[2]);
+                        if (t == null || !t.hasArtisan()) yield List.of("<nom>");
                         List<String> keys = new ArrayList<>(foundArtisans(args[3]));
-                        if ("libre".startsWith(args[3].toLowerCase())) keys.add(0, "libre");
+                        if (t == BuildingType.ATELIER && "libre".startsWith(args[3].toLowerCase())) keys.add(0, "libre");
                         yield keys;
                     }
                     case "type" -> Arrays.stream(BuildingType.values())
@@ -202,7 +207,7 @@ public class CityTabCompleter implements TabCompleter {
             return foundArtisans(args[4]);
         }
         if (args.length == 5 && args[0].equalsIgnoreCase("build") && args[1].equalsIgnoreCase("new")
-                && BuildingType.parse(args[2]) == BuildingType.ATELIER) {
+                && BuildingType.parse(args[2]) != null && BuildingType.parse(args[2]).hasArtisan()) {
             return List.of("<nom>");
         }
         if (args.length == 5 && args[0].equalsIgnoreCase("build") && args[1].equalsIgnoreCase("hauteur")) {

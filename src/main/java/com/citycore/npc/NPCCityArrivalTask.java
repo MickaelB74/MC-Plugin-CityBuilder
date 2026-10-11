@@ -178,6 +178,7 @@ public class NPCCityArrivalTask {
                         dest.setPitch(0f);
                         npc.getNavigator().cancelNavigation();
                         npc.teleport(dest, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN);
+                        Bukkit.getScheduler().runTaskLater(plugin, () -> face(npc, getFacingYaw(building)), 2L);
                     }
                 }));
             }
@@ -202,7 +203,13 @@ public class NPCCityArrivalTask {
         }
 
         if (target == null) return;
-        if (npcLoc.distanceSquared(target) < 0.1) return;
+        if (npcLoc.distanceSquared(target) < 0.1) {
+            // À son poste : il reprend l'orientation choisie (après une conversation, par exemple)
+            float yaw = getFacingYaw(building);
+            if (building.npcYaw() != null && !npc.getNavigator().isNavigating() && !playerNear(npc, 5)
+                    && angleGap(npcLoc.getYaw(), yaw) > 15) face(npc, yaw);
+            return;
+        }
 
         // ✅ Téléportation si très proche
         if (npcLoc.distanceSquared(target) < 1) {
@@ -214,13 +221,7 @@ public class NPCCityArrivalTask {
             npc.getNavigator().cancelNavigation();
             npc.getEntity().teleport(finalTarget);
 
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (!npc.isSpawned()) return;
-                Location loc = npc.getEntity().getLocation().clone();
-                loc.setYaw(yaw);
-                loc.setPitch(0);
-                npc.getEntity().teleport(loc);
-            }, 5L);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> face(npc, yaw), 5L);
             return;
         }
 
@@ -231,13 +232,7 @@ public class NPCCityArrivalTask {
         SafeNavigation.Result result = SafeNavigation.walkTo(npc, target, 0.5f, true);
         if (result == SafeNavigation.Result.TELEPORTED) {
             float yaw = getFacingYaw(building);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (!npc.isSpawned()) return;
-                Location loc = npc.getEntity().getLocation().clone();
-                loc.setYaw(yaw);
-                loc.setPitch(0);
-                npc.getEntity().teleport(loc);
-            }, 2L);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> face(npc, yaw), 2L);
             return;
         }
         if (result != SafeNavigation.Result.WALKING) return;
@@ -256,6 +251,7 @@ public class NPCCityArrivalTask {
 
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         if (npc.isSpawned()) npc.getEntity().teleport(finalLoc);
+                        face(npc, yaw);
                     }, 2L);
                 });
     }
@@ -274,14 +270,39 @@ public class NPCCityArrivalTask {
         return true;
     }
 
+    /**
+     * Orientation du poste : exactement celle du joueur au clic du point PNJ (avant, elle était
+     * arrondie au point cardinal le plus proche).
+     */
     private float getFacingYaw(Building building) {
         if (building.npcYaw() == null) return 0f;
         float yaw = ((building.npcYaw() % 360) + 360) % 360;
-        if (yaw > 180) yaw -= 360;
-        if (yaw >= -45  && yaw < 45)   return 0f;
-        if (yaw >= 45   && yaw < 135)  return 90f;
-        if (yaw >= 135  || yaw < -135) return 180f;
-        return -90f;
+        return yaw > 180 ? yaw - 360 : yaw;
+    }
+
+    /**
+     * Tourne le PNJ (tête et corps) vers l'orientation de son poste. Une simple téléportation
+     * avec un angle ne tourne pas la tête d'un PNJ de type joueur : on le fait regarder un point
+     * situé devant lui dans cette direction.
+     */
+    private static void face(NPC npc, float yaw) {
+        if (!npc.isSpawned()) return;
+        double rad = Math.toRadians(yaw);
+        Location eye = npc.getEntity().getLocation().add(0, 1.6, 0);
+        npc.faceLocation(eye.add(-Math.sin(rad) * 4, 0, Math.cos(rad) * 4));
+    }
+
+    /** Écart entre deux angles (0 à 180°). */
+    private static float angleGap(float a, float b) {
+        return Math.abs(((a - b) % 360 + 540) % 360 - 180);
+    }
+
+    /** Un joueur (non PNJ) à moins de radius blocs : on le laisse regarder son interlocuteur. */
+    private static boolean playerNear(NPC npc, double radius) {
+        for (org.bukkit.entity.Entity e : npc.getEntity().getNearbyEntities(radius, radius, radius)) {
+            if (e instanceof org.bukkit.entity.Player p && !p.hasMetadata("NPC")) return true;
+        }
+        return false;
     }
 
     private boolean isAccessible(World world, Location loc) {

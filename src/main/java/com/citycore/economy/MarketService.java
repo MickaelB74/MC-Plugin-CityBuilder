@@ -370,6 +370,17 @@ public class MarketService {
        CONSOMMATION DES STOCKS
        ========================= */
 
+    /** Consommation abstraite propre à certains artisans (% par heure), sinon null : réglage commun. */
+    private java.util.function.Function<CityNPC, Double> consumptionOverride;
+
+    /**
+     * Besoins des habitants (phase 6) : Hélène, Rosalie et Frère Anselme sont surtout vidés par les
+     * repas et les soins de l'aube ; leur consommation abstraite est réduite d'autant.
+     */
+    public void setConsumptionOverride(java.util.function.Function<CityNPC, Double> override) {
+        this.consumptionOverride = override;
+    }
+
     /**
      * Toutes les 5 minutes, tant qu'au moins un joueur est connecté, chaque PNJ consomme
      * une fraction de sa capacité (travail, exportations). Cela recrée de la demande et
@@ -379,13 +390,20 @@ public class MarketService {
         if (cfg.consumptionPercentPerHour() <= 0) return;
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (Bukkit.getOnlinePlayers().isEmpty()) return;
-            double perPeriod = cfg.consumptionPercentPerHour() / 100.0 / 12.0;
             for (Map.Entry<CityNPC, VillagerConfig> e : configs.entrySet()) {
+                // Artisans qui nourrissent ou soignent les habitants (phase 6) : consommation propre
+                Double override = consumptionOverride == null ? null : consumptionOverride.apply(e.getKey());
+                double perPeriod = (override != null ? override : cfg.consumptionPercentPerHour()) / 100.0 / 12.0;
+                if (perPeriod <= 0) continue;
                 for (Map.Entry<Material, SellPrice> sp : e.getValue().getSellPrices().entrySet()) {
                     int capacity = sp.getValue().capacity();
                     if (capacity <= 0) continue;
+                    // Jamais sous le plancher : ce qui reste nourrit les habitants et reflète le travail des employés
+                    int floor = (int) Math.floor(capacity * cfg.consumptionFloorPercent() / 100.0);
+                    int above = dataManager.getInventoryAmount(e.getKey(), sp.getKey()) - floor;
+                    if (above <= 0) continue;
                     dataManager.removeUpTo(e.getKey(), sp.getKey(),
-                            (int) Math.ceil(capacity * perPeriod));
+                            Math.min(above, (int) Math.ceil(capacity * perPeriod)));
                 }
             }
         }, CONSUMPTION_PERIOD_TICKS, CONSUMPTION_PERIOD_TICKS);

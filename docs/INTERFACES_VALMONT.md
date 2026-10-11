@@ -17,13 +17,17 @@ Aperçus : `docs/ui-previews/*.png` (agrandis 3 fois).
 | Nouveau bâtiment (`/city build new`) | Choix du type (habitation, atelier, mairie, divers), puis de l'artisan pour un atelier (atelier libre ou réservé ; cadenas = personnage pas encore trouvé) ; chaque type et chaque personnage affiche ses prérequis dans sa bulle ; le nom est ensuite demandé dans le chat avec un nom proposé. Sans le pack, boutons cliquables dans le chat (prérequis au survol) |
 | Artisan installé | Portrait, rang (étoiles), barre d'expérience, travail, suivi, Vendre, Entrepôt, Boutique, Quêtes ; un clic sur le portrait ouvre la gestion du bâtiment |
 | Gestion du bâtiment (clic sur le portrait) | Variante de l'accueil (cadre turquoise, médaillon « maison ») : Logis → « Son atelier » (exigences ✔/✘, bonus du métier, points de détail, ce qu'il faut pour le niveau suivant), Actions, Son histoire ; barre = progression de l'atelier ; clic sur le portrait = retour au commerce |
-| Actions | « La garde » chez Roland ; « Aucune action pour l'instant » chez les autres artisans |
+| Actions | Chez tout artisan installé : « Employés » et « Créer son annexe de travail » (ou « Son annexe » une fois créée) ; chez Roland, en plus, « La garde » |
+| Employés | Liste commune des habitants civils : ses employés (anneau violet, Maj + clic droit pour renvoyer), sans emploi (vert, clic pour embaucher), employés ailleurs (ambre), plus de place (gris) ; pied de page « EMPLOYÉS 1/2 · CYCLE 4:00 » |
+| Son annexe | Comme « Son atelier » : outils du métier exigés, bonus, points de détail ; la bulle d'information donne le cycle de travail de chaque niveau |
 | La garde (Roland) | Liste commune à tous les joueurs : gardes (anneau violet), recrues en formation (ambre, temps restant), habitants à former (vert ; gris s'il n'y a plus de place), têtes au skin de chacun ; pied de page « GARDE x/y · FORMATION a/b » ; clic sur un habitant → Rôle ; Maj + clic droit sur un garde ou une recrue → retour à la vie civile |
 | Rôle d'une recrue | Rôles de `soldats.roles` (combat, vie, durée de formation, équipement) ; cadenas sur ceux d'un rang de Roland pas encore atteint ; un clic lance la formation |
 | Vendre / Entrepôt / Boutique | Grille 9 × 4 avec pagination, cadres de couleur (prix plein, prix réduit, entrepôt plein, rupture, cadenas pour les articles d'un rang supérieur), bourse du joueur |
 | Quêtes d'un artisan | Cartes « principale » et « spéciale » : récompense ou temps de repos, objectifs avec progression, bouton Accepter / Valider / En cours / En repos, accès aux récits |
 | Récits (quêtes personnelles) | Les cinq récits, un par rang : progression et état (accompli, en cours, à accepter) ; ceux d'un rang pas encore atteint sont verrouillés (cadenas, titre illisible, rang requis) |
-| Alderic (maire) | Accueil (palier, parcelles, quêtes, bâtiments, trésor, agrandir), quêtes de la cité avec récit et charte, bâtiments (liste rangée par type, clic droit pour changer le type, suppression), trésor (caisse, bourse, dépôt) |
+| Alderic (maire) | Accueil (palier, parcelles, quêtes, bâtiments, trésor, agrandir), quêtes de la cité avec récit et charte, bâtiments (liste rangée par type, clic droit pour changer le type, suppression), trésor (caisse, bourse, dépôt) ; un clic sur son portrait ouvre « Population » |
+| Population (clic sur le portrait d'Alderic) | Rangée 1 : nourriture, sécurité, santé, confort (anneau vert ≥ 70 %, ambre ≥ 40 %, rouge en dessous, gris = artisan pas installé), satisfaction, arrivées, impôt de l'aube, départs ; rangée 2 : habitants, places, gardes, recrues, deuils ; rangées 3-4 : chaque habitation (niveau, habitants, confort) ; pied de page « SATISFACTION 72 % · 16 HABITANTS ». Menu classique : case « Population » (bilan dans le chat) |
+| Panneau Tab de la cité | Palier, Habitants, **Satisfaction** (barre et pourcentage, phase 6), Trésor, Parcelles |
 | Journal de quêtes (`/city quests`), onglet « Suivi » | Habitants ayant une quête en cours (anneau vert = suivi, gris = masqué), position du panneau (Bord, Marge, Près), panneau affiché / masqué, « Tous » pour tout suivre. Aperçu : `docs/ui-previews/quetes_suivies.png` |
 | Journal de quêtes, onglet « Récits » (`/city quests recits`) | Tous les personnages à récits, dans l'ordre de la trame : survivants (rangées 1 et 2), légendes (rangée 3). Cadenas = pas encore à Valmont ; anneau doré = récit à accepter, ambre = récit en cours, vert = à jour, gris = en ville sans atelier, rouge = mod absent. La bulle liste ses cinq récits (✔ accompli, ● en cours avec avancement, ! à accepter, cadenas et rang requis). Un clic sur un personnage installé ouvre l'écran de ses récits (le même que chez lui, retour vers le journal). Rangée 4 : bilan (à accepter, en cours) ; rangée 5 : récits accomplis, tous personnages. Aperçu : `docs/ui-previews/journal_recits.png` |
 
@@ -62,6 +66,12 @@ en petites capitales, barre de progression fine sous les objectifs.
     invisible. Les barres de boss **blanches** d'autres plugins perdent donc leur barre (leur titre
     reste affiché) ; les barres des boss du jeu (dragon, Wither, raids) ne sont pas concernées, mais
     elles s'affichent sous la barre invisible du panneau (19 pixels plus bas qu'à l'habitude).
+
+Hors du pack de ressources : les **bordures de la ville sur la carte JourneyMap** (plein écran
+et minicarte) — zone teintée d'or (#F1CF5E), contour, nom de la ville, bulle au survol avec les
+parcelles et les habitants. Envoyées par le serveur (plugin + mod `citycore_journeymap`) ;
+réglages dans la section `carte`, état avec `/city carte`. Détails et installation :
+`docs/PLAN_VILLE_VIVANTE.md`, « Bordures de la ville sur les cartes ».
 
 ## Fonctionnement
 

@@ -122,6 +122,8 @@ public class InhabitantManager implements Listener {
         public long trainingLeft;   // ms de formation restantes
         public int uniform = -1;    // numéro du skin d'uniforme (soldats.skins)
         public boolean test;        // garde de test (commande op) : sans lit, jamais enregistré
+        public String employer;     // emploi : artisan pour qui il travaille (tag), null = sans emploi
+        public long workLeft;       // ms avant la fin de son cycle de travail en cours
 
         Inhabitant(int id, String name, int skin, int buildingId, String world, int bx, int by, int bz,
                    State state, long arrivedAt, Long diedAt) {
@@ -183,6 +185,13 @@ public class InhabitantManager implements Listener {
     private Map<Integer, Building> homes = new HashMap<>();             // bâtiments par id (relus toutes les 5 s)
     private Building rolandBuilding;                                     // atelier de Roland (formation)
     private java.util.function.Supplier<SiegeFront> siegeFront;          // front d'un siège en cours (phase 4), sinon null
+    private Runnable dawnListener;                                       // besoins (phase 6) : repas et soins de l'aube
+    private WorkPlace workPlace;                                         // emplois : annexes de travail des artisans
+    private final Map<Integer, String> lastGain = new HashMap<>();       // employé → « +11 objets » (affiché un instant)
+    private final Map<Integer, Long> lastGainAt = new HashMap<>();
+    private int workSaves;                                               // enregistrement des cycles toutes les 30 s
+    private java.util.function.DoubleSupplier taxMultiplier = () -> 1.0;  // impôt selon la satisfaction
+    private java.util.function.DoubleSupplier arrivalFactor = () -> 1.0;  // délai d'arrivée selon la satisfaction (0 = aucune)
     private java.util.function.Predicate<Entity> hostileNpc;             // soldat d'une armée ennemie (siège « bannière »)
     private java.util.function.BooleanSupplier siegeAssault;             // vague en cours : la garde sort combattre
     private java.util.function.Supplier<List<LivingEntity>> siegeAttackers; // assaillants du siège en cours
@@ -285,6 +294,8 @@ public class InhabitantManager implements Listener {
                 inh.role = rs.getString("role");
                 inh.trainingLeft = rs.getLong("training_left");
                 inh.uniform = rs.getInt("uniform");
+                inh.employer = rs.getString("employer");
+                inh.workLeft = rs.getLong("work_left");
                 all.put(inh.id, inh);
             }
         } catch (SQLException e) {
@@ -325,6 +336,20 @@ public class InhabitantManager implements Listener {
                 "UPDATE inhabitants SET state = 'MORT', died_at = ? WHERE id = ?")) {
             ps.setLong(1, inh.diedAt);
             ps.setInt(2, inh.id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /** Emploi : artisan employeur et cycle de travail en cours. */
+    private void saveJob(Inhabitant inh) {
+        if (inh.test) return;
+        try (PreparedStatement ps = db.getConnection().prepareStatement(
+                "UPDATE inhabitants SET employer = ?, work_left = ? WHERE id = ?")) {
+            ps.setString(1, inh.employer);
+            ps.setLong(2, inh.workLeft);
+            ps.setInt(3, inh.id);
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -425,10 +450,16 @@ public class InhabitantManager implements Listener {
         endMourning(false);
         tickTax();
         tickTraining(elapsed);
+        tickWork(elapsed);
         tickVisibility();
         if (now >= nextArrivalAt && !Bukkit.getOnlinePlayers().isEmpty()) {
-            nextArrivalAt = now + arrivalMs;
-            arrive();
+            double factor = arrivalFactor.getAsDouble();
+            if (factor <= 0) {
+                nextArrivalAt = now + 60_000; // trop mécontents : plus personne ne vient (on revérifie dans 1 min)
+            } else {
+                nextArrivalAt = now + Math.round(arrivalMs * factor);
+                arrive();
+            }
         }
     }
 
@@ -485,18 +516,35 @@ public class InhabitantManager implements Listener {
         if (lastTaxDay < 0) { lastTaxDay = day; return; }
         if (day <= lastTaxDay) return;
         lastTaxDay = day; // un seul versement même si le temps a sauté de plusieurs jours
-        payTax();
+        dawn();
+    }
+
+    /** L'aube : repas et soins (besoins, phase 6), puis impôt selon la satisfaction. */
+    public int dawn() {
+        if (dawnListener != null) dawnListener.run();
+        return payTax();
     }
 
     /** Verse l'impôt des habitants civils (les gardes et les recrues servent la ville) ; renvoie le montant. */
     public int payTax() {
-        int n = civilians().size();
+        int n = (int) civilians().stream().filter(i -> !i.test).count();
         if (n == 0 || tax == 0) return 0;
-        int amount = n * tax;
+        double factor = Math.max(0, taxMultiplier.getAsDouble());
+        int amount = (int) Math.round(n * tax * factor);
+        if (amount <= 0) {
+            Bukkit.broadcastMessage("§6💰 Impôt de l'aube : §cles habitants ne paient rien §7(trop mécontents).");
+            return 0;
+        }
         int total = city.addCityCoins(amount);
         Bukkit.broadcastMessage("§6💰 Impôt de l'aube : §f" + n + " habitant" + (n > 1 ? "s" : "") + " §6→ §f+"
-                + amount + " coins §7(caisse : " + total + ")");
+                + amount + " coins §7(caisse : " + total + ")" + (factor != 1.0 ? " §8(satisfaction : ×"
+                + String.format(java.util.Locale.FRANCE, "%.1f", factor) + ")" : ""));
         return amount;
+    }
+
+    /** Impôt de base par habitant civil (habitants.impot). */
+    public int taxPerInhabitant() {
+        return tax;
     }
 
     private World cityWorld() {
@@ -668,6 +716,11 @@ public class InhabitantManager implements Listener {
         if (role == null) return "Rôle inconnu.";
         if (role.rank() > rank) return role.name() + " : Roland doit être au rang " + role.rank() + ".";
         inh.state = State.FORMATION;
+        if (inh.employer != null) { // une recrue quitte son emploi
+            inh.employer = null;
+            inh.workLeft = 0;
+            saveJob(inh);
+        }
         inh.role = role.key();
         inh.trainingLeft = role.trainingMs();
         saveGuard(inh);
@@ -904,6 +957,10 @@ public class InhabitantManager implements Listener {
             else skins.apply(npc, skins.size() == 0 || inh.skin < 0 ? -1 : Math.floorMod(inh.skin, skins.size()));
             if (inh.state == State.SOLDAT) equip(npc, guard.role(inh.role)); // un habitant n'a pas d'équipement
             if (inh.state == State.FORMATION) trainingGear(npc, guard.role(inh.role));
+            if (inh.state == State.HABITANT && inh.employer != null && workPlace != null) { // outil du métier
+                CityNPC boss = CityNPC.fromTag(inh.employer);
+                if (boss != null) npc.getOrAddTrait(Equipment.class).set(Equipment.EquipmentSlot.HAND, new ItemStack(workPlace.tool(boss)));
+            }
             npcs.put(inh.id, npc);
         }
         if (!npc.isSpawned()) {
@@ -965,14 +1022,18 @@ public class InhabitantManager implements Listener {
             switch (inh.state) {
                 case SOLDAT    -> guardBehaviour(inh, npc, now);
                 case FORMATION -> traineeBehaviour(inh, npc, now);
-                default        -> civilianBehaviour(inh, npc, now);
+                default        -> {
+                    if (inh.employer != null && workPlace != null) workerBehaviour(inh, npc, now);
+                    else civilianBehaviour(inh, npc, now);
+                }
             }
         }
         // Minuteurs dont la recrue n'est plus en formation ou plus affichée
         for (Integer id : new ArrayList<>(timers.keySet())) {
             Inhabitant inh = all.get(id);
             NPC npc = npcs.get(id);
-            if (inh == null || inh.state != State.FORMATION || npc == null || !npc.isSpawned()) removeTimer(id);
+            boolean keeps = inh != null && (inh.state == State.FORMATION || (inh.state == State.HABITANT && inh.employer != null));
+            if (!keeps || npc == null || !npc.isSpawned()) removeTimer(id);
         }
         // Toutes les 2 secondes, la nuit : les monstres proches s'en prennent aux habitants
         if (nightAttacks && ticks % 4 == 0) provokeMonsters();
@@ -1706,7 +1767,8 @@ public class InhabitantManager implements Listener {
             for (Inhabitant inh : all.values()) {
                 if (inh.buildingId != b.id()) continue;
                 names.add(!inh.alive() ? "§8☠ " + inh.name + " (" + Math.max(0, (mourningMs - (t - inh.diedAt)) / 60_000) + " min)"
-                        : inh.state == State.HABITANT ? "§f" + inh.name : "§9" + label(inh));
+                        : inh.state == State.HABITANT ? "§f" + inh.name + (employerOf(inh) != null
+                        ? " §3(⚒ " + plainName(employerOf(inh)) + ")" : "") : "§9" + label(inh));
             }
             Integer beds = bedsByBuilding.get(b.id());
             player.sendMessage("§7• §e" + b.name() + " §7(" + (beds == null ? "?" : beds) + " lits"
@@ -1803,6 +1865,293 @@ public class InhabitantManager implements Listener {
             if (inh != null && inh.alive() && npc.isSpawned() && npc.getEntity() instanceof LivingEntity body) list.add(body);
         }
         return list;
+    }
+
+    /* =========================
+       EMPLOIS : LES HABITANTS TRAVAILLENT POUR LES ARTISANS
+       Le jour, un employé se rend à l'annexe de travail de son artisan et y travaille : à chaque
+       cycle (selon le niveau de l'annexe), l'entrepôt de l'artisan se remplit (JobsManager). La
+       nuit, il rentre dormir. Un minuteur au-dessus de sa tête montre le prochain gain.
+       ========================= */
+
+    public void setWorkPlace(WorkPlace workPlace) {
+        this.workPlace = workPlace;
+    }
+
+    /** Artisan employeur d'un habitant, ou null. */
+    public CityNPC employerOf(Inhabitant inh) {
+        return inh.employer == null ? null : CityNPC.fromTag(inh.employer);
+    }
+
+    /** Employés d'un artisan (habitants civils). */
+    public List<Inhabitant> employees(CityNPC boss) {
+        return all.values().stream()
+                .filter(i -> i.state == State.HABITANT && !i.test && boss.tag.equals(i.employer)).toList();
+    }
+
+    /**
+     * Embauche (boss non nul) ou renvoi (boss null) d'un habitant civil ; les limites (nombre
+     * d'employés…) sont vérifiées par JobsManager. @return null si c'est fait, sinon la raison
+     */
+    public String setEmployer(int inhabitantId, CityNPC boss) {
+        Inhabitant inh = all.get(inhabitantId);
+        if (inh == null || inh.state != State.HABITANT || inh.test) return "Cet habitant n'est plus disponible.";
+        inh.employer = boss == null ? null : boss.tag;
+        inh.workLeft = 0;
+        saveJob(inh);
+        lastGain.remove(inh.id);
+        removeTimer(inh.id);
+        refreshNpc(inh); // outil du métier en main (ou rangé)
+        return null;
+    }
+
+    /** Fin immédiate des cycles de travail en cours (test) ; renvoie le nombre d'objets produits. */
+    public int finishWorkNow() {
+        if (workPlace == null) return 0;
+        int total = 0;
+        for (Inhabitant inh : civilians()) {
+            CityNPC boss = employerOf(inh);
+            if (boss == null || inh.test || workPlace.cycleMs(boss) <= 0) continue;
+            int made = workPlace.produce(boss);
+            total += made;
+            showGain(inh, made);
+            inh.workLeft = workPlace.cycleMs(boss);
+            saveJob(inh);
+        }
+        return total;
+    }
+
+    /**
+     * Cycles de travail (toutes les 5 s) : seulement le jour, quand un joueur est connecté, que
+     * l'artisan a son atelier et une annexe conforme, et que l'employé est sur place (un employé
+     * non affiché — plafond d'affichage — est censé y être). Fin d'un cycle : production.
+     */
+    private void tickWork(long elapsed) {
+        if (workPlace == null || Bukkit.getOnlinePlayers().isEmpty()) return;
+        boolean save = ++workSaves % 6 == 0;
+        for (Inhabitant inh : civilians()) {
+            CityNPC boss = employerOf(inh);
+            if (boss == null || inh.test) continue;
+            long cycle = workPlace.cycleMs(boss);
+            Location bed = inh.bed();
+            if (cycle <= 0 || bed == null || isNight(bed.getWorld()) || !atWork(inh, boss)) continue;
+            if (inh.workLeft <= 0 || inh.workLeft > cycle) inh.workLeft = cycle; // début, ou annexe améliorée
+            inh.workLeft -= elapsed;
+            if (inh.workLeft <= 0) {
+                showGain(inh, workPlace.produce(boss));
+                inh.workLeft += cycle;
+                saveJob(inh);
+            } else if (save) {
+                saveJob(inh);
+            }
+        }
+    }
+
+    /** L'employé est-il à son poste ? Affiché : dans l'annexe (ou tout près) ; non affiché : oui. */
+    private boolean atWork(Inhabitant inh, CityNPC boss) {
+        NPC npc = npcs.get(inh.id);
+        if (npc == null || !npc.isSpawned()) return true;
+        Building annex = workPlace.annex(boss);
+        if (annex == null) return false;
+        Location at = npc.getEntity().getLocation();
+        return at.getWorld().getName().equals(annex.world())
+                && at.getBlockX() >= annex.x1() - 2 && at.getBlockX() <= annex.x2() + 2
+                && at.getBlockZ() >= annex.z1() - 2 && at.getBlockZ() <= annex.z2() + 2;
+    }
+
+    private void showGain(Inhabitant inh, int made) {
+        lastGain.put(inh.id, made > 0 ? "§a✔ +" + made + " objet" + (made > 1 ? "s" : "") + " à l'entrepôt"
+                : "§7✔ entrepôt plein pour l'instant");
+        lastGainAt.put(inh.id, System.currentTimeMillis());
+    }
+
+    /**
+     * Employé, le jour : il se rend à sa place dans l'annexe de son artisan et y travaille
+     * (gestes d'outil, particules du métier, sans son), minuteur au-dessus de la tête. Sans annexe,
+     * il vit comme un habitant ordinaire ; la nuit, il rentre dormir.
+     */
+    private void workerBehaviour(Inhabitant inh, NPC npc, long now) {
+        Location bed = inh.bed();
+        CityNPC boss = employerOf(inh);
+        Building annex = boss == null ? null : workPlace.annex(boss);
+        if (bed == null || annex == null || isNight(bed.getWorld())) {
+            removeTimer(inh.id);
+            civilianBehaviour(inh, npc, now);
+            return;
+        }
+        wake(inh, npc);
+        Location spot = workSpot(inh, annex, boss);
+        if (spot == null) { // annexe dans une zone non chargée : vie ordinaire en attendant
+            removeTimer(inh.id);
+            civilianBehaviour(inh, npc, now);
+            return;
+        }
+        String blocked = workPlace.blocked(boss);
+        showWorkTimer(inh, npc, boss, blocked, now);
+        Entity body = npc.getEntity();
+        if (!body.getWorld().equals(spot.getWorld()) || body.getLocation().distanceSquared(spot) > 1.0) {
+            long away = awaySince.computeIfAbsent(inh.id, k -> now);
+            if (now - away > 25_000) {
+                // Chemin introuvable (porte, clôture, rivière) depuis 25 s : il rejoint sa place
+                npc.getNavigator().cancelNavigation();
+                npc.teleport(spot, PlayerTeleportEvent.TeleportCause.PLUGIN);
+                awaySince.remove(inh.id);
+            } else if (!npc.getNavigator().isNavigating()
+                    && SafeNavigation.walkTo(npc, spot, walkSpeed, true) == SafeNavigation.Result.WALKING) {
+                npc.getNavigator().getLocalParameters().distanceMargin(0.4);
+            }
+            return;
+        }
+        awaySince.remove(inh.id);
+        if (npc.getNavigator().isNavigating()) npc.getNavigator().cancelNavigation();
+        Location point = workPoint(annex);
+        if (point != null && ticks % 4 == 0) npc.faceLocation(point.clone().add(0, -0.3, 0)); // tourné vers le point de travail
+        if (blocked != null) return; // à son poste, mais à l'arrêt (annexe incomplète…)
+        // Travail : un geste d'outil toutes les 1,5 s environ, des éclats de la matière du métier
+        if (Math.floorMod(ticks + inh.id, 3) != 0) return;
+        LivingEntity living = (LivingEntity) body;
+        living.swingMainHand();
+        Material mat = workPlace.workMaterial(boss);
+        Location front = living.getEyeLocation().add(living.getEyeLocation().getDirection().setY(0).normalize().multiply(0.8))
+                .subtract(0, 1.0, 0);
+        World w = body.getWorld();
+        if (mat.isBlock()) w.spawnParticle(Particle.BLOCK, front, 8, 0.25, 0.15, 0.25, 0, mat.createBlockData());
+        else w.spawnParticle(Particle.ITEM, front, 6, 0.2, 0.15, 0.2, 0.02, new ItemStack(mat));
+    }
+
+    /** Point de travail de l'annexe (cliqué à sa création, sinon le centre de la zone), au niveau du sol. */
+    private Location workPoint(Building annex) {
+        World w = Bukkit.getWorld(annex.world());
+        if (w == null) return null;
+        int cx = annex.hasNpcPoint() ? (int) Math.floor(annex.npcX()) : (annex.x1() + annex.x2()) / 2;
+        int cz = annex.hasNpcPoint() ? (int) Math.floor(annex.npcZ()) : (annex.z1() + annex.z2()) / 2;
+        if (!w.isChunkLoaded(cx >> 4, cz >> 4)) return null;
+        double cy = annex.hasNpcPoint() ? annex.npcY()
+                : annex.refY() != null ? annex.refY() + 1 : w.getHighestBlockYAt(cx, cz) + 1;
+        return new Location(w, cx + 0.5, cy, cz + 0.5);
+    }
+
+    /**
+     * Place d'un employé : sur un cercle d'environ 2 blocs autour du point de travail, les
+     * employés répartis à égale distance les uns des autres (jamais sur le point lui-même ni
+     * l'un sur l'autre), dans l'annexe ; la place libre la plus proche de son angle.
+     */
+    private Location workSpot(Inhabitant inh, Building annex, CityNPC boss) {
+        Location point = workPoint(annex);
+        if (point == null) return null;
+        World w = point.getWorld();
+        int cx = point.getBlockX(), cy = point.getBlockY(), cz = point.getBlockZ();
+        List<Inhabitant> staff = employees(boss);
+        int n = Math.max(1, staff.size());
+        int index = Math.max(0, staff.indexOf(inh));
+        double angle = 2 * Math.PI * index / n;
+        double tx = cx + 0.5 + 2.2 * Math.cos(angle), tz = cz + 0.5 + 2.2 * Math.sin(angle);
+
+        // Places déjà prises par les employés précédents (dans l'ordre) : jamais deux sur la même
+        java.util.Set<Long> taken = new java.util.HashSet<>();
+        for (int k = 0; k < index; k++) {
+            double a = 2 * Math.PI * k / n;
+            Location other = nearestFree(w, annex, cx, cy, cz, cx + 0.5 + 2.2 * Math.cos(a), cz + 0.5 + 2.2 * Math.sin(a), taken);
+            if (other != null) taken.add(((long) other.getBlockX() << 32) ^ (other.getBlockZ() & 0xffffffffL));
+        }
+        Location spot = nearestFree(w, annex, cx, cy, cz, tx, tz, taken);
+        return spot != null ? spot : point;
+    }
+
+    /** Place libre (debout, dans l'annexe, ni le point ni une place prise) la plus proche de (tx, tz). */
+    private Location nearestFree(World w, Building annex, int cx, int cy, int cz, double tx, double tz,
+                                 java.util.Set<Long> taken) {
+        Location best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                int x = cx + dx, z = cz + dz;
+                if (dx == 0 && dz == 0) continue; // le point de travail lui-même
+                if (x < annex.x1() || x > annex.x2() || z < annex.z1() || z > annex.z2()) continue;
+                if (taken.contains(((long) x << 32) ^ (z & 0xffffffffL)) || !w.isChunkLoaded(x >> 4, z >> 4)) continue;
+                double d = (x + 0.5 - tx) * (x + 0.5 - tx) + (z + 0.5 - tz) * (z + 0.5 - tz);
+                if (d >= bestDist) continue;
+                for (int dy = 2; dy >= -2; dy--) {
+                    Block feet = w.getBlockAt(x, cy + dy, z);
+                    if (standable(feet)) { bestDist = d; best = feet.getLocation().add(0.5, 0, 0.5); break; }
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Minuteur de travail : « ⚒ Hélène — au travail », barre et temps avant le prochain gain. */
+    private void showWorkTimer(Inhabitant inh, NPC npc, CityNPC boss, String blocked, long now) {
+        String text;
+        long cycle = workPlace.cycleMs(boss);
+        String gain = lastGain.get(inh.id);
+        if (gain != null && now - lastGainAt.getOrDefault(inh.id, 0L) < 4000) {
+            text = "§3⚒ " + plainName(boss) + "\n" + gain;
+        } else if (blocked != null || cycle <= 0) {
+            text = "§3⚒ " + plainName(boss) + "\n§c⏸ " + (blocked != null ? blocked : "à l'arrêt");
+        } else {
+            boolean counting = !Bukkit.getOnlinePlayers().isEmpty() && atWork(inh, boss);
+            long left = Math.max(0, (inh.workLeft <= 0 || inh.workLeft > cycle ? cycle : inh.workLeft)
+                    - (counting ? now - lastMaintenance : 0));
+            int filled = (int) Math.round(10.0 * Math.min(1, Math.max(0, 1 - (double) left / cycle)));
+            long sec = (left + 999) / 1000;
+            String bar = "§b" + "▮".repeat(filled) + "§8" + "▮".repeat(10 - filled);
+            text = "§3⚒ " + plainName(boss) + " §7— " + (counting ? "au travail" : "en route") + "\n" + bar + " §f"
+                    + String.format("%d:%02d", sec / 60, sec % 60);
+        }
+        Location above = npc.getEntity().getLocation().add(0, 2.45, 0);
+        TextDisplay display = timers.get(inh.id);
+        if (display == null || !display.isValid() || !display.getWorld().equals(above.getWorld())) {
+            if (display != null) display.remove();
+            display = above.getWorld().spawn(above, TextDisplay.class, d -> {
+                d.setPersistent(false);
+                d.setBillboard(Display.Billboard.CENTER);
+                d.setShadowed(true);
+                d.setDefaultBackground(false);
+                d.setBackgroundColor(Color.fromARGB(110, 0, 0, 0));
+                d.setTeleportDuration(10);
+            });
+            timers.put(inh.id, display);
+        } else if (display.getLocation().distanceSquared(above) > 0.0025) {
+            display.teleport(above);
+        }
+        display.setText(text);
+    }
+
+    private static String plainName(CityNPC npc) {
+        return npc.displayName.replaceAll("§.", "");
+    }
+
+
+    /* =========================
+       BESOINS (phase 6)
+       ========================= */
+
+    public void setDawnListener(Runnable listener) {
+        this.dawnListener = listener;
+    }
+
+    public void setTaxMultiplier(java.util.function.DoubleSupplier multiplier) {
+        this.taxMultiplier = multiplier;
+    }
+
+    public void setArrivalFactor(java.util.function.DoubleSupplier factor) {
+        this.arrivalFactor = factor;
+    }
+
+    /** Lits en deuil (habitant mort, remplacement en attente). */
+    public int mourningCount() {
+        return mourning();
+    }
+
+    /** Millisecondes avant la prochaine arrivée possible (0 = dès qu'un lit est libre). */
+    public long nextArrivalIn() {
+        return Math.max(0, nextArrivalAt - System.currentTimeMillis());
+    }
+
+    /** Maison d'un habitant (bâtiment), ou null. */
+    public Building home(Inhabitant inh) {
+        return inh.test ? null : homes.get(inh.buildingId);
     }
 
     /** Habitant par son identifiant (menus), ou null. */

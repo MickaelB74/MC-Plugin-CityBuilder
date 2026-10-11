@@ -19,6 +19,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class MayorGUI implements NPCGui {
@@ -30,6 +31,14 @@ public class MayorGUI implements NPCGui {
     public static final int SLOT_ECONOMY     = 4;
     public static final int SLOT_EXPAND      = 6;
     public static final int SLOT_FOLLOW      = 8;
+    public static final int SLOT_POPULATION  = 3;
+
+    /** Besoins et satisfaction (phase 6) : bilan affiché dans le chat (menu classique) ; null = case absente. */
+    private java.util.function.Supplier<List<String>> populationReport;
+
+    public void setPopulationReport(java.util.function.Supplier<List<String>> report) {
+        this.populationReport = report;
+    }
 
     private final CityManager      cityManager;
     private final NPCManager       npcManager;
@@ -87,6 +96,11 @@ public class MayorGUI implements NPCGui {
                 }
                 open(player);
             }
+            case SLOT_POPULATION -> {
+                if (populationReport == null) return;
+                player.closeInventory();
+                populationReport.get().forEach(player::sendMessage);
+            }
             case SLOT_FOLLOW -> {
                 if (npcManager.isFollowing(player, CityNPC.MAYOR)) {
                     npcManager.stopFollowing(player, CityNPC.MAYOR);
@@ -140,6 +154,15 @@ public class MayorGUI implements NPCGui {
         inv.setItem(SLOT_BUILDINGS, makeItem(Material.BRICKS, "§a🏗 Bâtiments",
                 List.of("§7Gérez les bâtiments de la ville.",
                         "", "§eCliquez pour ouvrir")));
+
+        // ── POPULATION (phase 6) ──────────────────────────────────
+        if (populationReport != null) {
+            List<String> report = populationReport.get();
+            List<String> lore = new ArrayList<>(report.subList(1, report.size()));
+            lore.add("");
+            lore.add("§eCliquez : bilan dans le chat");
+            inv.setItem(SLOT_POPULATION, makeItem(Material.SUNFLOWER, report.get(0), lore));
+        }
 
         // ── ÉCONOMIE ─────────────────────────────────────────────
         inv.setItem(SLOT_ECONOMY, makeItem(Material.GOLD_INGOT, "§6💰 Économie",

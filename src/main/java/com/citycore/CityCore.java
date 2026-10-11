@@ -63,6 +63,10 @@ public class CityCore extends JavaPlugin {
     private BuildingInspector buildingInspector;
     private com.citycore.inhabitant.InhabitantManager inhabitants;
     private com.citycore.siege.SiegeManager siege;
+    private com.citycore.needs.NeedsManager needs;
+    private com.citycore.jobs.JobsManager jobs;
+    private com.citycore.city.CityChunkLoader chunkLoader;
+    private com.citycore.city.CityMapExport   mapExport;
 
     @Override
     public void onEnable() {
@@ -192,6 +196,27 @@ public class CityCore extends JavaPlugin {
         calendar.register("siege", siege.asEvent());
         calendar.start();
 
+        // ── Besoins et satisfaction des habitants (phase 6) ──────
+        // Repas et soins à l'aube (entrepôts d'Hélène, Rosalie, Anselme), sécurité (garde, sièges),
+        // confort (maisons) ; la satisfaction règle arrivées, impôt et départs
+        needs = new com.citycore.needs.NeedsManager(this, databaseManager, inhabitants, npcDataManager, buildingInspector);
+        needs.start();
+        market.setConsumptionOverride(needs::abstractConsumption);
+        siege.setResultListener(needs::recordSiege);
+
+        // ── La ville vit où que soient les joueurs : ses chunks restent chargés (joueur connecté) ──
+        chunkLoader = new com.citycore.city.CityChunkLoader(this, cityManager);
+        getServer().getPluginManager().registerEvents(chunkLoader, this);
+        chunkLoader.start();
+
+        // ── Bordures de la ville pour les cartes des mods (JourneyMap, via le mod compagnon) ──
+        mapExport = new com.citycore.city.CityMapExport(this, cityManager);
+        mapExport.start();
+
+        // ── Emplois : les habitants travaillent pour les artisans (annexes de travail) ──
+        jobs = new com.citycore.jobs.JobsManager(this, buildingManager, buildingInspector, npcDataManager, market, inhabitants);
+        jobs.start();
+
         getServer().getPluginManager().registerEvents(
                 new FindNpcQuestListener(findNpcQuestManager), this);
         getServer().getPluginManager().registerEvents(
@@ -200,6 +225,7 @@ public class CityCore extends JavaPlugin {
         // ── HUD ──────────────────────────────────────────────────
         cityHUD = new CityCoreHUD(this, cityManager, economy, playerDataManager, cityQuestManager);
         cityHUD.setPopulation(inhabitants::populationLine); // « Habitants 12/16 » dans le panneau Tab
+        cityHUD.setSatisfaction(needs::satisfaction);       // ligne « Satisfaction » (phase 6)
         cityHUD.start();
 
         // ── Interfaces illustrées « Valmont » (pack de ressources) ──
@@ -241,6 +267,8 @@ public class CityCore extends JavaPlugin {
         mayorScreens.setBuildingScreens(buildingScreens);
         mayorScreens.setInspector(buildingInspector);
         mayorScreens.setOccupancy(inhabitants::occupancy); // habitants de chaque habitation
+        mayorScreens.setPopulation(needs, inhabitants);     // clic sur le portrait d'Alderic : « Population »
+        mayorGUI.setPopulationReport(needs::report);        // menu classique : bilan dans le chat
         mayorGUI.setThemed(mayorScreens);
 
         getServer().getPluginManager().registerEvents(
@@ -293,6 +321,8 @@ public class CityCore extends JavaPlugin {
             com.citycore.ui.screens.ArtisanScreens screens = new com.citycore.ui.screens.ArtisanScreens(uiKit,
                     npcType, gui, npcDataManager, npcManager, playerDataManager, market, villagerListener, questGUI);
             screens.setInhabitants(inhabitants); // gestion → Actions → La garde (chez Roland)
+            // Actions → Employés et annexe de travail (création : nom, puis zone au bâton)
+            screens.setJobs(jobs, (p, artisan) -> buildingCreation.askName(p, BuildingType.ANNEXE, artisan));
             gui.setThemed(screens);
             questScreens.register(questGUI, gui);
         }
@@ -370,6 +400,9 @@ public class CityCore extends JavaPlugin {
         cityCommand.setBuildingInspector(buildingInspector);
         cityCommand.setInhabitants(inhabitants);
         cityCommand.setSiege(siege, calendar);
+        cityCommand.setNeeds(needs);
+        cityCommand.setJobs(jobs);
+        cityCommand.setMapExport(mapExport);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);
@@ -413,6 +446,7 @@ public class CityCore extends JavaPlugin {
     public void onDisable() {
         if (prototype != null) prototype.clear(); // PNJ et zombies du prototype : rien ne doit rester
         if (siege != null) siege.shutdown();             // assaillants retirés : rien ne reste dans le monde
+        if (chunkLoader != null) chunkLoader.shutdown(); // chunks de la ville rendus
         if (inhabitants != null) inhabitants.shutdown(); // recréés depuis la base au prochain démarrage
         if (cityHUD != null) cityHUD.stop();
         if (uiPack != null) uiPack.stop();

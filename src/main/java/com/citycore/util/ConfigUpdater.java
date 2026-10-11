@@ -55,6 +55,19 @@ public final class ConfigUpdater {
                             "  max: {1: 8, 2: 16, 3: 25, 4: 36, 5: 50}"},
                     new String[]{"(?m)^  formations: \\{1: 1, 2: 1, 3: 2, 4: 2, 5: 3\\}",
                             "  formations: {1: 2, 2: 3, 3: 4, 4: 5, 5: 6}"}),
+            // 21 : la satisfaction n'est plus qu'un bonus — plus de départs, arrivées jamais arrêtées
+            21, List.<String[]>of(
+                    new String[]{"(?m)^" + java.util.regex.Pattern.quote("    arrivee: {80: 0.6, 50: 1.0, 30: 1.6, 0: 0}   # délai entre deux arrivées × ce facteur, selon la satisfaction (0 = plus d'arrivée)") + "$",
+                            "    arrivee: {80: 0.6, 50: 1.0, 0: 1.5}   # délai entre deux arrivées × ce facteur, selon la satisfaction (jamais d'arrêt)",
+                            "besoins.effets.arrivee (jamais d'arrêt)"},
+                    new String[]{"(?m)^" + java.util.regex.Pattern.quote("    impot: {80: 1.5, 50: 1.0, 30: 0.5, 0: 0}     # impôt × ce facteur, selon la satisfaction") + "$",
+                            "    impot: {80: 1.5, 50: 1.0, 0: 0.75}    # impôt × ce facteur, selon la satisfaction",
+                            "besoins.effets.impot (au moins × 0,75)"},
+                    new String[]{"(?m)^    depart-sous: 25[^\\n]*\\n", "", "besoins.effets.depart-sous (retiré)"},
+                    new String[]{java.util.regex.Pattern.quote("#  compte dès qu'il y a des habitants). La satisfaction est leur moyenne pondérée : elle règle\n#  la vitesse d'arrivée des habitants, l'impôt, et sous un seuil des habitants s'en vont.\n"),
+                            "#  compte dès qu'il y a des habitants). La satisfaction est leur moyenne pondérée ; c'est un\n#  bonus : elle accélère les arrivées et augmente l'impôt, sans jamais faire partir personne.\n", "commentaire de la section besoins"},
+                    new String[]{java.util.regex.Pattern.quote("#  Test (op) : /city habitants aube (repas, soins, impôt, départs tout de suite).\n"),
+                            "#  Test (op) : /city habitants aube (repas, soins et impôt tout de suite).\n", "commentaire de la section besoins"}),
             17, List.<String[]>of(
                     new String[]{"(?m)^    skins: \\[\\]$",
                             "    skins:\n"
@@ -192,7 +205,8 @@ public final class ConfigUpdater {
                 String before = updated;
                 updated = updated.replaceFirst(change[0], Matcher.quoteReplacement(change[1]));
                 // Libellé du journal : la première ligne seulement (une liste en compte plusieurs)
-                if (!updated.equals(before)) added.add(change[1].trim().lines().findFirst().orElse("") + " (nouvelle valeur)");
+                if (!updated.equals(before)) added.add(change.length > 2 ? change[2]
+                        : change[1].trim().lines().findFirst().orElse("") + " (nouvelle valeur)");
             }
         }
         // Nouveaux habitants : leurs lignes de skin s'ajoutent sous npc-skins (section existante)
@@ -212,7 +226,7 @@ public final class ConfigUpdater {
         if (!withGuard.equals(updated)) added.add("soldats (garde)");
         updated = withGuard;
         // Nouveaux réglages des sièges (types, armée ennemie…) et du calendrier : ajoutés sous leur section
-        for (String section : new String[]{"sieges", "evenements"}) {
+        for (String section : new String[]{"sieges", "evenements", "besoins", "emplois", "npc-economy"}) {
             String with = addMissingChildren(updated, lines, user, section);
             if (!with.equals(updated)) added.add(section + " (nouveaux réglages)");
             updated = with;

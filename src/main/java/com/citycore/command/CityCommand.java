@@ -88,6 +88,24 @@ public class CityCommand implements CommandExecutor {
 
     private com.citycore.siege.SiegeManager  siege;
     private com.citycore.siege.EventCalendar calendar;
+    private com.citycore.needs.NeedsManager  needs;
+    private com.citycore.jobs.JobsManager    jobs;
+
+    /** Emplois des habitants chez les artisans. */
+    private com.citycore.city.CityMapExport mapExport;
+
+    public void setMapExport(com.citycore.city.CityMapExport mapExport) {
+        this.mapExport = mapExport;
+    }
+
+    public void setJobs(com.citycore.jobs.JobsManager jobs) {
+        this.jobs = jobs;
+    }
+
+    /** Besoins et satisfaction des habitants (phase 6). */
+    public void setNeeds(com.citycore.needs.NeedsManager needs) {
+        this.needs = needs;
+    }
 
     /** Sièges et calendrier des événements (phase 4). */
     public void setSiege(com.citycore.siege.SiegeManager siege, com.citycore.siege.EventCalendar calendar) {
@@ -393,13 +411,18 @@ public class CityCommand implements CommandExecutor {
                         if (warnings.size() > 15) player.sendMessage("§8… voir la console pour la suite.");
                         warnings.forEach(w -> plugin.getLogger().warning("⚠ [Économie] " + w));
                     }
+                    // Équilibrage (phase 6) : revenus de l'impôt face aux chartes restantes
+                    if (needs != null && inhabitants != null && cityQuestManager != null) {
+                        needs.economyLines(cityQuestManager.getCityLevel(), inhabitants.taxPerInhabitant())
+                                .forEach(player::sendMessage);
+                    }
                 }
 
                 // ── /city habitants (phase 3) ────────────────────
                 case HABITANTS -> {
                     if (inhabitants == null) return true;
                     String action = args.length >= 2 ? args[1].toLowerCase() : "list";
-                    if (!action.equals("list") && !player.isOp()) {
+                    if (!action.equals("list") && !action.equals("besoins") && !player.isOp()) {
                         player.sendMessage("§c❌ Réservé aux admins (actions de test).");
                         return true;
                     }
@@ -419,13 +442,22 @@ public class CityCommand implements CommandExecutor {
                             int paid = inhabitants.payTax();
                             if (paid == 0) player.sendMessage("§7Aucun habitant : aucun impôt versé.");
                         }
+                        // Besoins (phase 6) : bilan pour tous ; « aube » (op) déclenche repas, soins, impôt et départs
+                        case "besoins", "satisfaction" -> {
+                            if (needs != null) needs.report().forEach(player::sendMessage);
+                        }
+                        case "aube" -> {
+                            int paid = inhabitants.dawn();
+                            if (paid == 0) player.sendMessage("§7Aube passée : aucun impôt versé.");
+                        }
                         case "deuil" -> player.sendMessage("§a✅ " + inhabitants.endAllMourning()
                                 + " lit(s) libéré(s) : de nouveaux habitants pourront arriver.");
                         case "recharger", "reload" -> {
                             inhabitants.loadSettings();
-                            player.sendMessage("§a✅ Réglages des habitants relus (section habitants de config.yml).");
+                            if (needs != null) needs.config().reload();
+                            player.sendMessage("§a✅ Réglages des habitants et de leurs besoins relus (sections habitants et besoins).");
                         }
-                        default -> player.sendMessage("§cUsage : /city habitants [list|arrivee|kill <nom>|impot|deuil|recharger]");
+                        default -> player.sendMessage("§cUsage : /city habitants [list|besoins|arrivee|kill <nom>|impot|aube|deuil|recharger]");
                     }
                 }
 
@@ -497,6 +529,44 @@ public class CityCommand implements CommandExecutor {
                         }
                         default -> player.sendMessage("§cUsage : /city event [list|start <type>|stop|recharger]");
                     }
+                }
+
+                // ── /city emplois ────────────────────────────────
+                case EMPLOIS -> {
+                    if (jobs == null || inhabitants == null) return true;
+                    String action = args.length >= 2 ? args[1].toLowerCase() : "list";
+                    if (!action.equals("list") && !action.equals("liste") && !player.isOp()) {
+                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                        return true;
+                    }
+                    switch (action) {
+                        case "list", "liste" -> jobs.report().forEach(player::sendMessage);
+                        case "produire" -> player.sendMessage("§a✅ Cycles de travail terminés : §f"
+                                + inhabitants.finishWorkNow() + " §aobjet(s) produit(s) dans les entrepôts.");
+                        case "recharger", "reload" -> {
+                            jobs.config().reload();
+                            player.sendMessage("§a✅ Réglages des emplois relus (section emplois de config.yml).");
+                        }
+                        default -> player.sendMessage("§cUsage : /city emplois [list|produire|recharger]");
+                    }
+                }
+
+                // ── /city carte : bordures sur les cartes JourneyMap ──
+                case CARTE -> {
+                    if (mapExport == null) return true;
+                    String action = args.length >= 2 ? args[1].toLowerCase() : "";
+                    if (action.equals("recharger") || action.equals("reload")) {
+                        if (!player.isOp()) {
+                            player.sendMessage("§c❌ Réservé aux admins.");
+                            return true;
+                        }
+                        mapExport.reload();
+                        mapExport.export();
+                        player.sendMessage("§a✅ Réglages de la carte relus (section carte de config.yml) ; "
+                                + "les cartes suivent dans les 5 s.");
+                        return true;
+                    }
+                    mapExport.report().forEach(player::sendMessage);
                 }
 
                 // ── /city garde (phase 5) ────────────────────────
@@ -702,8 +772,8 @@ public class CityCommand implements CommandExecutor {
                             }
                             CityNPC owner = null;
                             int nameIndex = 3;
-                            if (type == BuildingType.ATELIER && args.length > 3) {
-                                if (args[3].equalsIgnoreCase("libre")) {
+                            if (type.hasArtisan() && args.length > 3) { // atelier ou annexe : artisan
+                                if (type == BuildingType.ATELIER && args[3].equalsIgnoreCase("libre")) {
                                     nameIndex = 4;
                                 } else if (BuildingCreation.parseArtisan(args[3]) != null) {
                                     owner = BuildingCreation.parseArtisan(args[3]);

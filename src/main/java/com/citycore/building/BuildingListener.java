@@ -61,7 +61,8 @@ public class BuildingListener implements Listener {
 
             if (loc.getBlockX() < minX || loc.getBlockX() > maxX
                     || loc.getBlockZ() < minZ || loc.getBlockZ() > maxZ) {
-                player.sendMessage("§c❌ Le point NPC doit être dans la zone du bâtiment !");
+                player.sendMessage(pending.type() == BuildingType.ANNEXE ? "§c❌ Le point de travail doit être dans la zone de l'annexe !"
+                        : "§c❌ Le point NPC doit être dans la zone du bâtiment !");
                 return;
             }
 
@@ -80,8 +81,8 @@ public class BuildingListener implements Listener {
             // Crée le bâtiment avec le point NPC (type, réservation et hauteur choisis avant)
             creation.finish(player, pending, npcPt.getX(), npcPt.getY(), npcPt.getZ(), npcYaw);
 
-            player.sendMessage("§d📍 Point NPC : §fX" + loc.getBlockX()
-                    + " §7Z" + loc.getBlockZ());
+            player.sendMessage((pending.type() == BuildingType.ANNEXE ? "§d📍 Point de travail : §fX" : "§d📍 Point NPC : §fX")
+                    + loc.getBlockX() + " §7Z" + loc.getBlockZ());
 
             showNpcPointParticle(player, npcPt);
             session.clear(uuid);
@@ -161,24 +162,41 @@ public class BuildingListener implements Listener {
 
             // ✅ Remplace le bâton par l'outil de point NPC
             player.getInventory().setItemInMainHand(null);
-            player.getInventory().addItem(makeNpcPointTool());
+            player.getInventory().addItem(makeNpcPointTool(choice.type() == BuildingType.ANNEXE));
 
-            player.sendMessage("§d📍 §7Clic gauche pour définir le point du NPC.");
-            player.sendMessage("§8(ou /city build skip pour ignorer)");
+            if (choice.type() == BuildingType.ANNEXE) {
+                player.sendMessage("§d📍 §7Clic gauche : le §fpoint de travail §7(les employés se répartissent autour).");
+                player.sendMessage("§8(ou /city build skip : le centre de la zone)");
+            } else {
+                player.sendMessage("§d📍 §7Clic gauche pour définir le point du NPC.");
+                player.sendMessage("§8(ou /city build skip pour ignorer)");
+            }
         }
     }
 
     public static final Material NPC_POINT_TOOL = Material.BLAZE_ROD;
 
-    private ItemStack makeNpcPointTool() {
+    /** Outil du point : point du PNJ (atelier…) ou point de travail (annexe : les employés l'entourent). */
+    private ItemStack makeNpcPointTool(boolean workPoint) {
         ItemStack item = new ItemStack(NPC_POINT_TOOL);
         ItemMeta meta  = item.getItemMeta();
-        meta.setDisplayName("§d📍 Point NPC");
-        meta.setLore(List.of(
-                "§7Clic gauche §f: Définir le point du NPC",
-                "§8Le NPC se rendra sur ce point",
-                "§8quand il sera assigné au bâtiment."
-        ));
+        if (workPoint) {
+            meta.setDisplayName("§d📍 Point de travail");
+            meta.setLore(List.of(
+                    "§7Clic gauche §f: Définir le point de travail",
+                    "§8Les employés se placent autour,",
+                    "§8tournés vers lui (établi, enclume,",
+                    "§8champ… ce sur quoi ils travaillent)."
+            ));
+        } else {
+            meta.setDisplayName("§d📍 Point NPC");
+            meta.setLore(List.of(
+                    "§7Clic gauche §f: Définir le point du NPC",
+                    "§8Le NPC se rendra sur ce point,",
+                    "§8tourné dans la direction où vous",
+                    "§8regardez au moment du clic."
+            ));
+        }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         item.setItemMeta(meta);
         return item;

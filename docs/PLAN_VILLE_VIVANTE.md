@@ -11,11 +11,13 @@ sièges par vagues, fêtes, soldats de la garde. Pas de monuments ni d'autre ges
 | 0 | Prototype technique sur Youer | — | petite | **validée** (plafond de PNJ affichés à relever) |
 | 1 | Types de bâtiments | — | petite | **validée** |
 | 2 | Inspection des constructions | 1 | moyenne | **validée** |
-| 3 | Habitations et habitants (+ impôt simple) | 0, 2 | grosse | **codée, à tester en jeu** |
-| 4 | Protection renforcée, calendrier d'événements, sièges | 3 | moyenne à grosse | **codée, à tester en jeu** |
-| 5 | La garde (soldats) | 3 (4 pour la défense des sièges) | moyenne à grosse | **codée, à tester en jeu** (faite avant la 4) |
-| 6 | Besoins et satisfaction | 3, 5 | moyenne | à faire |
+| 3 | Habitations et habitants (+ impôt simple) | 0, 2 | grosse | **validée** |
+| 4 | Protection renforcée, calendrier d'événements, sièges | 3 | moyenne à grosse | **validée** |
+| 5 | La garde (soldats) | 3 (4 pour la défense des sièges) | moyenne à grosse | **validée** (faite avant la 4) |
+| 6 | Besoins et satisfaction | 3, 5 | moyenne | **codée, à tester en jeu** |
 | 7 | Fêtes | calendrier de la phase 4 | petite à moyenne | à faire |
+| — | Emplois : les habitants travaillent pour les artisans (hors phase) | 3, 6 | moyenne à grosse | **codée, à tester en jeu** |
+| — | Bordures de la ville sur les cartes JourneyMap (hors phase) | — | petite | **codée, à tester en jeu** |
 
 L'ordre suit les dépendances : en ville, les joueurs et les artisans ne peuvent pas être blessés,
 donc un siège n'a d'enjeu que s'il y a des habitants à protéger. Les soldats sont formés à partir
@@ -803,6 +805,272 @@ qui dort → il se lève et part chez Roland.
 
 À tester : stock d'Hélène vide = impôt en baisse puis départs ; siège perdu = sécurité en baisse ;
 maisons améliorées = confort en hausse.
+
+### Ce qui est codé
+
+Paquet `com.citycore.needs` : `NeedsManager` (besoins, satisfaction, aube) et `NeedsConfig`
+(section `besoins` de config.yml).
+
+**Les quatre besoins** (0 à 100 %) :
+- **Nourriture** : à chaque aube, chaque habitant (gardes et recrues compris) mange
+  `rations-par-habitant` (4) rations, prises dans les entrepôts d'**Hélène** (cultures : blé,
+  carottes, pommes de terre, betteraves 1 ration ; pomme 2, citrouille 3, tranche de melon et
+  baies 0,5) et de **Rosalie** (viandes : bœuf et porc 3, mouton, poulet, lapin 2, œuf 1,
+  champignons 0,5), proportionnellement à ce que contient chaque entrepôt. Valeur = rations
+  obtenues / demandées, **lissée** (moitié la veille, moitié le jour même). Avant le premier repas
+  : ce que donneraient les réserves.
+- **Sécurité** : gardes par habitant (1 pour `habitants-par-garde` = 5 donne 100 %) et, pour
+  `poids-sieges` (40 %), l'issue des `sieges-retenus` (3) derniers sièges (repoussé 100 %, perdu
+  0 %) ; sans siège encore, la garde seule.
+- **Santé** : à chaque aube, `soins-par-habitant` (1) soin, pris dans l'entrepôt de **Frère
+  Anselme** (fiole de miel 2, rayon de miel 1, verrue du Nether 1, poudre lumineuse 1, œil
+  d'araignée 1, crème de magma 2, bâton de blaze 3, larme de ghast 4…) ; lissée de même.
+- **Confort** : moyenne, sur les habitants, du confort de leur maison selon son niveau
+  d'inspection (incomplète 20 %, niveau 1 : 40 %, 2 : 55, 3 : 70, 4 : 85, 5 : 100 %).
+- Un besoin ne compte qu'une fois son artisan **installé** (nourriture : Hélène ou Rosalie, et
+  seuls les entrepôts des artisans installés servent ; sécurité : Roland ; santé : Frère
+  Anselme) ; le confort compte dès qu'il y a des habitants.
+- La consommation abstraite des entrepôts d'Hélène, de Rosalie (3 %/h) et de Frère Anselme
+  (4 %/h) remplace les 8 %/h de `npc-economy` : ce sont surtout les repas et les soins qui
+  vident leurs entrepôts et relancent la demande.
+
+**Satisfaction** = moyenne pondérée des besoins comptés (`poids` : nourriture 35, sécurité 25,
+santé 15, confort 25) ; « — » sans habitant. Ses effets (version d'origine, **remplacée** : voir
+« Correctifs (annexe, satisfaction…) » dans la section Emplois — plus de départs, arrivées jamais
+arrêtées) :
+- **arrivées** : délai entre deux arrivées × 0,6 dès 80 %, × 1 dès 50 %, × 1,6 dès 30 %, plus
+  aucune arrivée en dessous ;
+- **impôt** : × 1,5 dès 80 %, × 1 dès 50 %, × 0,5 dès 30 %, rien en dessous ;
+- **départs** : sous `depart-sous` (25 %), un habitant civil (jamais un garde) quitte la ville à
+  chaque aube, en donnant la raison du besoin le plus bas (« on y a faim », « on ne s'y sent pas
+  en sécurité », « on y manque de soins », « les maisons y sont trop rudimentaires »).
+
+**L'aube** : repas et soins, puis une ligne dans le chat (« Aube à Valmont : satisfaction 72 %
+(nourriture 80 %, sécurité 60 %, santé —, confort 70 %) · repas : 48/64 rations »), départ
+éventuel, puis l'impôt (avec son facteur).
+
+**Affichage** :
+- écran **« Population »** chez Alderic : un clic sur son **portrait** (la bulle du portrait donne
+  la satisfaction). Rangée 1 : les quatre besoins (anneau vert ≥ 70 %, ambre ≥ 40 %, rouge en
+  dessous, gris non compté ; bulle : valeur, détail, comment l'améliorer), la satisfaction et ses
+  effets (arrivées, impôt par aube, départs) ; rangée 2 : habitants, places, gardes, recrues,
+  deuils ; rangées 3-4 : chaque habitation (niveau, habitants, confort). Pied de page
+  « SATISFACTION 72 % · 16 HABITANTS ». Menu classique (sans le pack) : une case « Population »
+  dont la bulle donne le bilan, un clic l'affiche dans le chat ;
+- panneau **Tab** de la cité : ligne **« Satisfaction »** avec sa barre et le pourcentage (vert,
+  ambre, rouge) ; en-tête texte sans le pack : « Habitants : 12/16 (72 % satisfaits) ».
+
+**Commandes** : `/city habitants besoins` (tous) : satisfaction, chaque besoin, effets ; op :
+`/city habitants aube` (repas, soins, bilan, départs et impôt tout de suite), `/city habitants
+recharger` relit aussi la section `besoins`. **Équilibrage** : `/city eco check` affiche l'impôt
+par aube (≈ 3 aubes par heure) face aux chartes restantes (24 650 coins au total).
+
+**Base** : tables `city_state` (nourriture et santé lissées, derniers repas) et `siege_results`
+(issue de chaque siège mené à son terme). config.yml version 19 : section `besoins` ajoutée
+d'elle-même avec ses commentaires.
+
+### À tester en jeu
+
+1. Clic sur le portrait d'Alderic : écran « Population » (besoins, effets, population,
+   habitations) ; retour à la mairie. Panneau Tab : ligne « Satisfaction ».
+2. Avec Hélène installée et son entrepôt garni : `/city habitants aube` → « repas : 64/64
+   rations », nourriture 100 %, son entrepôt diminue. Entrepôt vidé (rachetez son stock depuis son
+   écran « Entrepôt », ou laissez les aubes le consommer) puis deux aubes : nourriture qui baisse
+   (lissée), impôt réduit, puis départs sous 25 %.
+3. Sans Frère Anselme installé : santé « non comptée » (anneau gris), sans effet sur la
+   satisfaction ; installé avec un entrepôt vide : santé à 0 %.
+4. Roland installé, 1 garde pour 10 habitants : sécurité 50 % ; un siège perdu
+   (`duree-minutes: 2`) : sécurité en baisse ; une victoire la fait remonter.
+5. Une maison améliorée (niveau 1 → 3) : confort en hausse.
+6. Satisfaction ≥ 80 % : arrivées plus rapides (écran, case « Arrivées ») et impôt × 1,5.
+7. `/city eco check` : lignes « Impôt » et « Chartes ».
+
+## Hors phase — Emplois : les habitants travaillent pour les artisans
+
+Demande : la ville doit s'autogérer, sans que le jeu se résume à produire de la nourriture pour
+la colonie. Les habitants peuvent être embauchés par un artisan et remplissent son entrepôt.
+
+### Ce qui est codé
+
+Paquet `com.citycore.jobs` : `JobsManager` (embauche, production, lieu de travail) et
+`JobsConfig` (section `emplois`) ; comportement des employés dans `InhabitantManager`.
+
+- **Embauche** (menu commun à tous les joueurs) : chez un artisan installé, gestion (clic sur son
+  portrait) → **Actions** → **Employés**. Liste des habitants civils : violet = ses employés
+  (Maj + clic droit : renvoyer), vert = sans emploi (clic : embaucher), ambre = employé ailleurs
+  (clic : il change d'employeur), gris = plus de place. Un habitant formé à la garde quitte son
+  emploi ; gardes et recrues ne travaillent pas.
+- **Annexe de travail** : Actions → « Créer son annexe de travail » → nom dans le chat, puis la
+  zone au bâton (comme un bâtiment), puis le **point de travail** (les employés se répartissent
+  autour ; `/city build skip` = le centre). Nouveau type de bâtiment « Annexe », rattaché à
+  l'artisan, une par artisan ; aussi par `/city build new annexe <artisan>`. Elle n'apparaît pas
+  dans le choix général des types. **Exigences** : 1 lumière (ni toit ni porte : un champ, un
+  chantier conviennent) et les deux premiers « bonus du métier » de son atelier (Hélène :
+  cultures et ruche ; Bastien : four à charbon de bois et meule…), les suivants comptant comme
+  bonus ; une section `batiments.annexes.<artisan>` (format des ateliers) les remplace. **Niveaux**
+  1 à 5 comme les autres bâtiments (variété, décor, bonus) ; écran « Son annexe » (Actions → clic)
+  : exigences, bonus, points, et le cycle de travail de chaque niveau.
+- **Journée d'un employé** : le jour, il se rend à sa place dans l'annexe (téléporté s'il est
+  bloqué 25 s), outil du métier en main (houe, hache, pioche, canne à pêche…), et travaille :
+  gestes et éclats de la matière du métier, **sans son**. Au-dessus de sa tête : « ⚒ Hélène — au
+  travail », barre et temps avant le prochain gain, puis « ✔ +11 objets à l'entrepôt » ; « ⏸ » et
+  la raison s'il ne peut pas travailler (artisan sans atelier, annexe incomplète). La nuit, il
+  rentre dormir. Sans annexe, il vit comme un habitant ordinaire.
+- **Production** : à chaque cycle, chaque employé ajoute à l'entrepôt de l'artisan **un exemplaire
+  de chaque objet que l'artisan rachète** — « généré » (il ne coupe ni ne mine rien).
+
+### Équilibrage (section `emplois`)
+
+| Garde-fou | Réglage | Valeur |
+|---|---|---|
+| Employés par artisan, selon son rang | `employes-max` | 1, 2, 2, 3, 3 (rangs 1 à 5) |
+| Durée d'un cycle, selon le niveau de l'annexe | `cycle-minutes` | 6, 5, 4, 3,5, 3 min |
+| Travail | — | de jour seulement (≈ 10 min sur 20), joueur connecté, artisan installé, annexe conforme |
+| Exemplaires par objet courant et par cycle | `par-cycle` | 1 |
+| Objets de valeur | `valeur-pleine` | au-delà de 0,5 coin l'unité, chance = 0,5 / valeur (une pomme 1 coin : 1 cycle sur 2) |
+| Trophées | `valeur-max` | jamais produits au-delà de 20 coins l'unité (têtes, étoile du Nether, cœur de la mer…) |
+| Plafond de l'entrepôt | `plafond` | plus de production au-delà de 50 % de la capacité : les ventes des joueurs restent au plein prix jusqu'à 40 % |
+| Vitesse globale | `vitesse` | 1 |
+| Rien d'autre | — | ni pièces, ni expérience d'artisan, ni progression de quête directe |
+
+Ordres de grandeur (d'après config.yml) : un employé produit 1 à 15 objets par cycle selon
+l'artisan, pour 0,5 à 7 coins de valeur ; soit, par heure réelle, 2 à 35 coins de valeur
+d'entrepôt au niveau 1, et au plus ≈ 210 avec 3 employés et une annexe de niveau 5 (Indiana :
+tessons, disques). Côté **nourriture** : un employé d'Hélène fournit ≈ 8 rations par cycle, un de
+Rosalie ≈ 12, de quoi nourrir respectivement ≈ 3 et ≈ 5 habitants par aube au niveau 1 ; avec 3
+employés chacun et des annexes de niveau 5, ≈ 50 habitants. Les quêtes de la cité qui comptent un
+stock (le grenier d'Hélène à 384 blés…) restent l'affaire des joueurs : +1 blé par cycle et par
+employé ne les remplit qu'en dizaines d'heures.
+
+**Consommation abstraite** : elle ne fait plus descendre un stock sous
+`npc-economy.consumption-floor-percent` (25 % de la capacité) — sinon elle dévorait la
+production des employés (≈ 60 blés par heure chez Hélène contre ≈ 5 produits par un employé). Elle
+garde son rôle : vider un entrepôt saturé par les ventes.
+
+**Commandes** : `/city emplois` (tous) : chaque artisan, ses employés, son annexe, son cycle et sa
+production moyenne ; op : `produire` (fin immédiate des cycles en cours), `recharger`.
+`/city habitants` indique l'employeur de chaque habitant.
+
+**Base** : colonnes `employer` et `work_left` (cycle en cours) de la table `inhabitants`.
+config.yml version 20 : section `emplois`, `batiments.annexe` et `batiments.annexes`,
+`npc-economy.consumption-floor-percent` ajoutés d'eux-mêmes.
+
+### À tester en jeu
+
+1. Hélène installée → gestion → Actions : cases « Employés » et « Créer son annexe de travail »
+   (avec ses exigences) ; Roland : en plus « La garde ».
+2. Créer l'annexe : nom, deux coins au bâton, point de travail ; écran « Son annexe » : cultures
+   et ruche exigées, lumière ; niveau et cycle de chaque niveau.
+3. Employés : embaucher un habitant (annonce), le rang limite le nombre ; un habitant employé
+   ailleurs passe ambre ; Maj + clic droit le renvoie.
+4. De jour : l'employé marche jusqu'à l'annexe, houe en main, gestes et éclats de blé, minuteur
+   au-dessus de la tête ; à la fin du cycle « ✔ +N objets à l'entrepôt » et l'entrepôt d'Hélène
+   augmente (écran Entrepôt). La nuit : il rentre dormir, le minuteur disparaît.
+5. Annexe rendue incomplète (ruche retirée) : « ⏸ annexe incomplète », plus de production.
+6. `/city emplois produire` puis `/city emplois` : production immédiate et bilan.
+7. Entrepôt à 50 % de sa capacité : « entrepôt plein pour l'instant », plus de production de cet
+   objet ; Gandalf, Geralt : jamais d'étoile du Nether ni de têtes.
+8. Repas de l'aube (`/city habitants aube`) nourris par la production d'Hélène et de Rosalie.
+
+### Correctifs (annexe, satisfaction, point PNJ, point de travail, ville toujours active)
+
+- **Supprimer l'annexe** : écran « Son annexe » (Actions → l'annexe) → case « 🗑 Supprimer
+  l'annexe », **Maj + clic droit** pour confirmer. La zone redevient libre ; les employés gardent
+  leur emploi et attendent une nouvelle annexe. (La liste des bâtiments d'Alderic, mode
+  suppression, le permet aussi.)
+- **Satisfaction sans départs** : plus aucun habitant ne quitte la ville, même mécontent (au
+  début, une bonne satisfaction est impossible, et le but n'est pas la gestion). Elle devient un
+  bonus : au-dessus de 80 %, arrivées 1,7 fois plus rapides et impôt × 1,5 ; de 50 à 79 %,
+  normal ; en dessous, arrivées 1,5 fois plus lentes et impôt × 0,75 — **jamais d'arrêt des
+  arrivées** (avant : plus personne ne venait sous 30 %, et plus d'impôt). Réglage `depart-sous`
+  retiré ; écran « Population » : la case « Départs » devient « Employés » (habitants qui
+  travaillent). config.yml version 21 : nouvelles valeurs mises d'elles-mêmes si les anciennes
+  n'avaient pas été modifiées.
+- **Orientation du point PNJ** : elle était arrondie au point cardinal le plus proche, et
+  appliquée par une téléportation qui ne tourne pas la tête d'un PNJ de type joueur ; après une
+  conversation, l'artisan restait tourné vers le joueur. Désormais : la direction **exacte** du
+  regard au moment du clic, tête et corps tournés, et l'artisan la reprend à son poste dès
+  qu'aucun joueur n'est à moins de 5 blocs. (Les points déjà enregistrés gardent l'angle du clic
+  d'origine : il suffit de les revoir si besoin.)
+- **Point de travail** (annexe) : l'outil de la dernière étape devient « 📍 Point de travail »
+  (« les employés se placent autour, tournés vers lui » : établi, enclume, champ…), avec ses
+  propres messages.
+- **Employés autour du point** : ils se répartissent sur un **cercle d'environ 2 blocs** autour
+  du point de travail, à égale distance les uns des autres (2 : face à face ; 3 : en triangle),
+  jamais sur le point ni l'un sur l'autre (place libre la plus proche de leur angle, dans
+  l'annexe), et ils **regardent le point** en travaillant.
+- **La ville vit où que soient les joueurs** (`city.CityChunkLoader`) : tant qu'au moins un
+  joueur est connecté, chaque chunk revendiqué reste chargé et actif (ticket de chargement du
+  plugin), chargé en arrière-plan sans à-coup, revu toutes les 30 s (nouvelles parcelles) et à
+  chaque connexion ; tout est rendu quand le dernier joueur se déconnecte (et à l'arrêt du
+  serveur). Artisans, habitants, gardes, employés, minuteurs et sièges continuent donc même si
+  tout le monde est loin. Restent soumis à la présence d'un joueur, par les règles du jeu : la
+  pousse des cultures et l'apparition naturelle des monstres.
+
+À tester : supprimer l'annexe (Maj + clic droit) ; une aube avec une satisfaction basse :
+personne ne part, impôt × 0,75, arrivées plus lentes mais présentes ; créer un atelier en
+regardant en diagonale au clic du point : l'artisan regarde dans cette direction, s'en détourne
+pour parler, puis s'y remet ; créer une annexe : outil « Point de travail », 2 ou 3 employés en
+cercle autour, tournés vers le point ; partir à 300 blocs de la ville : les employés continuent de
+produire, les artisans rejoignent leur poste (`/city emplois` ; retour en ville).
+
+## Hors phase — Bordures de la ville sur les cartes (JourneyMap)
+
+Les parcelles de la ville s'affichent sur la **carte plein écran et la minicarte de JourneyMap** :
+zone teintée de l'or de Valmont, contour, nom de la ville au centre et bulle au survol
+(« Valmont — 42 parcelles · 15 habitants »). Rien à installer de plus chez les joueurs que
+JourneyMap lui-même : c'est le serveur qui envoie la zone.
+
+### Comment c'est fait
+
+- **Plugin** (`city.CityMapExport`) : écrit `plugins/CityCore/carte.json` (nom, couleur,
+  opacités, chunks revendiqués de chaque dimension), revu toutes les 30 s et réécrit seulement
+  s'il a changé ; écriture atomique (jamais de fichier à moitié écrit). Le plugin ne dépend
+  d'aucun mod.
+- **Mod serveur NeoForge « CityCore — JourneyMap »** (`companions/citycore-journeymap`, mod
+  `citycore_journeymap`) : utilise l'**API serveur de JourneyMap** (superpositions envoyées par le
+  serveur, JourneyMap 6.0.5 et plus). Il relit `carte.json` dès qu'il change (contrôle toutes les
+  5 s), calcule les contours et les envoie à chaque joueur : 5 s puis 30 s après la connexion, 2 s
+  après un changement de dimension, à chaque modification des parcelles, et toutes les 2 min par
+  sécurité (la zone est remplacée, jamais dupliquée). Sans JourneyMap sur le serveur, le mod ne
+  fait rien et le serveur démarre normalement.
+- **Contours** (`ChunkOutline`) : les côtés partagés entre parcelles disparaissent ; une zone
+  d'un seul tenant devient un polygone, avec ses **trous** (parcelle non revendiquée entourée par
+  la ville) ; deux parcelles qui ne se touchent que par un coin restent deux zones ; les points
+  alignés sont retirés (un rectangle de parcelles = 4 coins). Vérifié hors jeu : formes simples,
+  anneaux, îlot dans un trou, coins, villes aléatoires jusqu'à 680 parcelles (surface exacte).
+
+### Réglages (section `carte` de config.yml, version 22)
+
+| Réglage | Défaut | Effet |
+|---|---|---|
+| `activee` | true | false : la zone disparaît des cartes |
+| `nom` | "" | texte affiché sur la zone ; vide = nom de la ville |
+| `couleur` | "F1CF5E" | couleur RRGGBB (or de Valmont) |
+| `remplissage` | 0.15 | opacité de l'intérieur |
+| `bordure` | 0.9 | opacité du contour |
+| `epaisseur` | 2.0 | épaisseur du contour, en pixels |
+
+### Installation
+
+1. Construire le mod : dans `companions/citycore-journeymap`, `./gradlew build` → 
+   `build/libs/citycore-journeymap-1.0.0.jar`.
+2. Dans le dossier `mods` du **serveur** : **JourneyMap NeoForge 1.21.1 (6.0.9)** et
+   `citycore-journeymap-1.0.0.jar` ; redémarrer. Journal attendu : « API serveur de JourneyMap
+   reçue », puis « Bordures de la ville : 1 zone(s) envoyée(s) ».
+3. Côté joueurs : **JourneyMap seulement** (version 6.0.5 ou plus, la même que le serveur de
+   préférence).
+
+### À tester en jeu
+
+- Ouvrir la carte JourneyMap (J) : zone dorée sur les parcelles, nom au centre, bulle au survol ;
+  minicarte aussi.
+- Revendiquer une parcelle puis la rendre : la carte suit en 30 à 35 s, sans se déconnecter.
+- `/city carte` : état (parcelles publiées, dernière écriture). `carte.activee: false` puis
+  `/city carte recharger` (op) : la zone disparaît en 5 s ; `true` : elle revient.
+- Se déconnecter puis revenir : la zone revient en 5 s.
+- Points incertains (non vérifiables hors jeu) : fonctionnement de JourneyMap côté serveur sous
+  Youer ; affichage du nom pour une ville en plusieurs morceaux (un nom par morceau).
 
 ## Phase 7 — Fêtes
 

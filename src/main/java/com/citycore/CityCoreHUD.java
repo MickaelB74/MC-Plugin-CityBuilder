@@ -33,6 +33,13 @@ public class CityCoreHUD {
     /** Population « 12/16 » (habitants / lits, phase 3) ; null = nombre d'artisans installés. */
     private java.util.function.Supplier<String> population;
 
+    /** Satisfaction des habitants (phase 6) : 0-100, ou -1 sans habitant ; null = ligne absente. */
+    private java.util.function.IntSupplier satisfaction;
+
+    public void setSatisfaction(java.util.function.IntSupplier satisfaction) {
+        this.satisfaction = satisfaction;
+    }
+
     public void setPopulation(java.util.function.Supplier<String> population) {
         this.population = population;
     }
@@ -126,6 +133,8 @@ public class CityCoreHUD {
                 .append(Component.text(cityLevel, NamedTextColor.GREEN))
                 .append(Component.text("   Habitants : ", NamedTextColor.GRAY))
                 .append(Component.text(cityPop, NamedTextColor.WHITE))
+                .append(Component.text(satisfaction == null || satisfaction.getAsInt() < 0 ? ""
+                        : " (" + satisfaction.getAsInt() + " % satisfaits)", NamedTextColor.GRAY))
                 .append(Component.text("   Coffre : ", NamedTextColor.GRAY))
                 .append(Component.text(cityCoins + " 🪙", NamedTextColor.GOLD))
                 .append(Component.text("   Taille : ", NamedTextColor.GRAY))
@@ -168,6 +177,13 @@ public class CityCoreHUD {
             // Habitants (phase 3) : vivants / lits des habitations conformes ; avant, les artisans installés
             cityRows.add(UiHud.Row.value("Habitants", population != null ? population.get()
                     : String.valueOf(city.getResidentCount()), UiHud.CREAM));
+            // Satisfaction (phase 6) : barre et pourcentage (vert ≥ 70 %, ambre ≥ 40 %, rouge en dessous)
+            if (satisfaction != null) {
+                int sat = satisfaction.getAsInt();
+                cityRows.add(UiHud.Row.bar("Satisfaction", UiHud.MUTED, sat < 0 ? "—" : sat + " %",
+                        sat < 0 ? UiHud.MUTED : sat >= 70 ? UiHud.GREEN : sat >= 40 ? UiHud.GOLD : UiHud.RED,
+                        Math.max(0, sat) / 100.0, false));
+            }
             cityRows.add(UiHud.Row.value("Trésor", fmt(city.getCoins()), UiHud.GOLD));
             int max = Math.max(1, city.getMaxChunks());
             cityRows.add(UiHud.Row.bar("Parcelles", UiHud.MUTED, city.getClaimedChunks() + "/" + city.getMaxChunks(),

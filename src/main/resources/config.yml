@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 18
+config-version: 22
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -98,6 +98,7 @@ npc-economy:
   min-price-percent: 35
   # % de la capacité consommé par heure (si au moins un joueur est connecté). 0 = off
   consumption-percent-per-hour: 8
+  consumption-floor-percent: 25   # la consommation ne descend pas sous ce % de la capacité (emplois, repas) ; 0 = jusqu'à vide
   # Avantages de l'employé d'un PNJ (remplace l'ancien multiplicateur de stock, source de duplication)
   job-sell-bonus: 10
   job-shop-discount: 15
@@ -1954,6 +1955,73 @@ sieges:
     champion: {palier: 7, nom: "Morvan le Noir", vie: 140, combat: melee, arme: NETHERITE_SWORD, casque: NETHERITE_HELMET, plastron: NETHERITE_CHESTPLATE, jambieres: NETHERITE_LEGGINGS, bottes: NETHERITE_BOOTS}
 
 # ============================================================
+#  BESOINS DES HABITANTS (plan « Valmont vivante », phase 6)
+#  Quatre besoins de 0 à 100 % : nourriture, sécurité, santé, confort. Un besoin ne compte
+#  qu'une fois son artisan installé (Hélène ou Rosalie, Roland, Frère Anselme ; le confort
+#  compte dès qu'il y a des habitants). La satisfaction est leur moyenne pondérée ; c'est un
+#  bonus : elle accélère les arrivées et augmente l'impôt, sans jamais faire partir personne.
+#  À chaque aube, avant l'impôt, les habitants mangent et se soignent dans les entrepôts des
+#  artisans (nourriture et santé lissées : moitié la veille, moitié le jour même).
+#  Écran : clic sur le portrait d'Alderic. Bilan : /city habitants besoins.
+#  Test (op) : /city habitants aube (repas, soins et impôt tout de suite).
+# ============================================================
+besoins:
+  poids: {nourriture: 35, securite: 25, sante: 15, confort: 25}
+  nourriture:
+    rations-par-habitant: 4        # rations mangées par chaque habitant à l'aube
+    consommation-abstraite: 3      # % de l'entrepôt d'Hélène et de Rosalie consommé par heure (au lieu de npc-economy)
+    aliments:                      # rations par objet, pris dans l'entrepôt de l'artisan (clé de config.yml)
+      helene: {WHEAT: 1, CARROT: 1, POTATO: 1, BEETROOT: 1, MELON_SLICE: 0.5, SWEET_BERRIES: 0.5, GLOW_BERRIES: 0.5, APPLE: 2, PUMPKIN: 3}
+      rosalie: {BEEF: 3, PORKCHOP: 3, MUTTON: 2, CHICKEN: 2, RABBIT: 2, EGG: 1, BROWN_MUSHROOM: 0.5, RED_MUSHROOM: 0.5}
+  sante:
+    soins-par-habitant: 1          # soins reçus par chaque habitant à l'aube
+    consommation-abstraite: 4      # % de l'entrepôt de Frère Anselme consommé par heure (au lieu de npc-economy)
+    remedes:
+      anselme: {HONEY_BOTTLE: 2, HONEYCOMB: 1, NETHER_WART: 1, GLOWSTONE_DUST: 1, SPIDER_EYE: 1, MAGMA_CREAM: 2, BLAZE_ROD: 3, GHAST_TEAR: 4, PHANTOM_MEMBRANE: 2, RABBIT_FOOT: 3}
+  securite:
+    habitants-par-garde: 5         # 1 garde pour 5 habitants = 100 %
+    poids-sieges: 40               # part des derniers sièges (repoussé 100 %, perdu 0 %)
+    sieges-retenus: 3              # nombre de sièges pris en compte
+  confort: {0: 20, 1: 40, 2: 55, 3: 70, 4: 85, 5: 100}   # selon le niveau de l'habitation (0 = incomplète)
+  effets:
+    arrivee: {80: 0.6, 50: 1.0, 0: 1.5}   # délai entre deux arrivées × ce facteur, selon la satisfaction (jamais d'arrêt)
+    impot: {80: 1.5, 50: 1.0, 0: 0.75}    # impôt × ce facteur, selon la satisfaction
+
+# ============================================================
+#  EMPLOIS — les habitants travaillent pour les artisans
+#  Chez un artisan installé : gestion (clic sur son portrait) → Actions → Employés (menu commun à
+#  tous les joueurs) et Annexe de travail (zone créée comme un bâtiment, avec ses exigences et ses
+#  niveaux). Le jour, un employé se rend à l'annexe ; à chaque cycle, il ajoute à l'entrepôt de
+#  l'artisan un exemplaire de chaque objet que celui-ci rachète (les objets de valeur plus
+#  rarement). La nuit, il dort. Production seulement quand un joueur est connecté.
+#  Bilan : /city emplois. Test (op) : /city emplois produire.
+#  ÉQUILIBRAGE : nombre d'employés, durée des cycles, valeur des objets, plafond de l'entrepôt.
+# ============================================================
+emplois:
+  employes-max: {1: 1, 2: 2, 3: 2, 4: 3, 5: 3}     # employés au plus par artisan, selon son rang
+  cycle-minutes: {1: 6, 2: 5, 3: 4, 4: 3.5, 5: 3}  # durée d'un cycle selon le niveau de l'annexe (de jour seulement)
+  par-cycle: 1          # exemplaires de chaque objet courant produits par employé et par cycle
+  valeur-pleine: 0.5    # objet valant au plus 0,5 coin l'unité : produit à chaque cycle ; au-delà, chance = 0,5 / valeur
+  valeur-max: 20        # objet valant plus de 20 coins l'unité : jamais produit (têtes, étoile du Nether…)
+  plafond: 50           # % de la capacité de l'entrepôt au-delà duquel les employés ne produisent plus cet objet
+  vitesse: 1.0          # multiplicateur global (2 = cycles deux fois plus courts)
+
+# ============================================================
+#  CARTE — bordures de la ville sur les cartes des mods (JourneyMap)
+#  Le plugin écrit plugins/CityCore/carte.json (chunks revendiqués, revu toutes les 30 s) ;
+#  le mod serveur « CityCore — JourneyMap » (companions/citycore-journeymap) le lit et dessine
+#  la zone sur la carte plein écran et la minicarte de chaque joueur. À installer sur le
+#  serveur : JourneyMap + ce mod ; côté joueurs, JourneyMap suffit.
+# ============================================================
+carte:
+  activee: true        # false : la zone disparaît des cartes
+  nom: ""              # nom affiché sur la carte ; vide = nom de la ville
+  couleur: "F1CF5E"    # couleur RRGGBB (or de Valmont)
+  remplissage: 0.15    # opacité de l'intérieur (0 = transparent, 1 = opaque)
+  bordure: 0.9         # opacité du contour
+  epaisseur: 2.0       # épaisseur du contour, en pixels
+
+# ============================================================
 #  BÂTIMENTS — inspection des constructions (plan « Valmont vivante », phase 2)
 #  Chaque bâtiment est inspecté : blocs requis selon son type (et l'artisan d'un atelier),
 #  porte, toit, lumière. Niveau 0 = incomplet (aucun artisan ne s'y installe), 1 = conforme,
@@ -1997,6 +2065,8 @@ batiments:
   # Exigences communes (habitations, ateliers, mairie) ; chaque section peut les remplacer.
   # toit = part du sol (en %) qui doit être sous un toit ; 0 = pas d'exigence.
   commun: {porte: 1, lumiere: 2, toit: 60}
+  annexe: {porte: 0, lumiere: 1, toit: 0}   # annexe de travail (emplois) : règles communes ; ses outils = les « bonus » de l'atelier
+  annexes: {}                               # exigences propres à l'annexe d'un artisan (même format que ateliers), sinon les bonus
   habitation:
     requis:
       - {bloc: "#beds", nombre: 1, nom: "lit", pluriel: "lits"}

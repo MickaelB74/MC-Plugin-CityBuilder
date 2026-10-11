@@ -120,7 +120,7 @@ public final class BuildingScreens {
             close(c);
 
             Building mairie = buildings.findMairie(existing == null ? -1 : existing.id());
-            BuildingType[] types = BuildingType.values();
+            BuildingType[] types = BuildingType.choosable().toArray(new BuildingType[0]);
             for (int i = 0; i < types.length; i++) {
                 BuildingType type = types[i];
                 boolean current = existing != null && existing.type() == type;

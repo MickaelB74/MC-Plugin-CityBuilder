@@ -218,6 +218,26 @@ public class DatabaseManager {
         addColumn(stmt, "inhabitants", "role TEXT");
         addColumn(stmt, "inhabitants", "training_left INTEGER NOT NULL DEFAULT 0");
         addColumn(stmt, "inhabitants", "uniform INTEGER NOT NULL DEFAULT -1");
+        // Emplois : artisan employeur (tag) et temps restant du cycle de travail en cours (ms)
+        addColumn(stmt, "inhabitants", "employer TEXT");
+        addColumn(stmt, "inhabitants", "work_left INTEGER NOT NULL DEFAULT 0");
+
+        // Besoins (phase 6) : valeurs enregistrées (nourriture et santé lissées, derniers repas)
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS city_state (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """);
+        // Issue des sièges (phase 4) : la sécurité des habitants tient compte des derniers
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS siege_results (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                at      INTEGER NOT NULL,
+                victory INTEGER NOT NULL,
+                tier    INTEGER NOT NULL
+            )
+        """);
 
         stmt.close();
     }

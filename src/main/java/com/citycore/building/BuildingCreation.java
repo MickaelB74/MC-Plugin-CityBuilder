@@ -172,6 +172,11 @@ public class BuildingCreation {
             player.sendMessage("§6⚠ Cet artisan a déjà un atelier : §e" + p.name() + " §6sera un atelier libre.");
             reserved = null;
         }
+        if (type == BuildingType.ANNEXE && (reserved == null || buildings.findAnnex(reserved, -1) != null)) {
+            player.sendMessage("§6⚠ Cet artisan a déjà une annexe : §e" + p.name() + " §6sera de type Divers.");
+            type = BuildingType.DIVERS;
+            reserved = null;
+        }
         buildings.createBuilding(p.name(), p.world(), p.x1(), p.z1(), p.x2(), p.z2(),
                 npcX, npcY, npcZ, npcYaw, type, reserved, p.yMin(), p.yMax(), p.refY());
         CityNPC owner = reserved != null ? CityNPC.fromTag(reserved) : null;
@@ -234,6 +239,17 @@ public class BuildingCreation {
                 return false;
             }
         }
+        if (type == BuildingType.ANNEXE) {
+            if (owner == null) {
+                player.sendMessage("§c❌ Une annexe de travail se crée depuis les Actions d'un artisan.");
+                return false;
+            }
+            Building other = buildings.findAnnex(owner.tag, excludeId);
+            if (other != null) {
+                player.sendMessage("§c❌ " + owner.displayName + " §ca déjà une annexe : §e" + other.name() + "§c.");
+                return false;
+            }
+        }
         if (type == BuildingType.ATELIER && owner != null) {
             if (!isFound(owner)) {
                 player.sendMessage("§c❌ " + owner.displayName + " §cn'a pas encore été trouvé : "
@@ -257,7 +273,7 @@ public class BuildingCreation {
         player.sendMessage("§6🏗 Quel bâtiment construire ? §7(cliquez)");
         TextComponent types = new TextComponent("  ");
         BuildingRequirements req = requirements();
-        for (BuildingType type : BuildingType.values()) {
+        for (BuildingType type : BuildingType.choosable()) {
             String label = type == BuildingType.ATELIER ? "Atelier libre" : type.label;
             List<String> hover = new ArrayList<>(type.description);
             if (req != null) { // prérequis du type (phase 2)
@@ -310,6 +326,7 @@ public class BuildingCreation {
             case ATELIER    -> owner != null
                     ? "§6⚒ §7Nom de l'§6atelier de " + owner.displayName + " §8(" + owner.function + ")§7 :"
                     : "§6⚒ §7Nom du nouvel §6atelier libre §7:";
+            case ANNEXE     -> "§3⚒ §7Nom de l'§3annexe de travail" + (owner != null ? " de " + owner.displayName : "") + " §7:";
             case MAIRIE     -> "§e🏛 §7Nom de la §emairie §7:";
             case DIVERS     -> "§7🏗 Nom du bâtiment §8(entrepôt, place, rempart…)§7 :";
         };
@@ -320,6 +337,7 @@ public class BuildingCreation {
         String base = switch (type) {
             case HABITATION -> "Maison";
             case ATELIER    -> owner != null ? ATELIER_NAMES.getOrDefault(owner.skinId, "Atelier_de_" + owner.skinId) : "Atelier";
+            case ANNEXE     -> owner != null ? "Annexe_de_" + owner.skinId : "Annexe";
             case MAIRIE     -> "Hotel_de_ville";
             case DIVERS     -> "Entrepot";
         };
@@ -340,6 +358,7 @@ public class BuildingCreation {
 
     /** « Habitation », « Atelier de Thorvald », « Atelier libre »… (coloré). */
     public static String label(BuildingType type, CityNPC owner) {
+        if (type == BuildingType.ANNEXE) return owner != null ? type.color + "Annexe de " + owner.displayName : type.coloredLabel();
         if (type != BuildingType.ATELIER) return type.coloredLabel();
         return owner != null ? type.color + "Atelier de " + owner.displayName : type.color + "Atelier libre";
     }

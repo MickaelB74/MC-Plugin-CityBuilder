@@ -7,6 +7,8 @@ import com.citycore.economy.MarketService;
 import com.citycore.inhabitant.GuardConfig;
 import com.citycore.inhabitant.InhabitantManager;
 import com.citycore.inhabitant.InhabitantManager.Inhabitant;
+import com.citycore.jobs.JobsConfig;
+import com.citycore.jobs.JobsManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
@@ -73,6 +75,15 @@ public final class ArtisanScreens {
     }
 
     /** Habitants et garde de la ville (écran « La garde » chez Roland). */
+    /** Emplois : employés et annexe de travail de cet artisan ; null = pas d'emplois. */
+    private JobsManager jobs;
+    private java.util.function.BiConsumer<Player, CityNPC> annexCreator;
+
+    public void setJobs(JobsManager jobs, java.util.function.BiConsumer<Player, CityNPC> annexCreator) {
+        this.jobs = jobs;
+        this.annexCreator = annexCreator;
+    }
+
     public void setInhabitants(InhabitantManager inhabitants) {
         this.inhabitants = inhabitants;
     }
@@ -275,17 +286,27 @@ public final class ArtisanScreens {
 
     private final class AtelierView extends ArtisanMenu {
 
-        AtelierView(Player p) { super(p); }
+        /** Annexe de travail affichée à la place de l'atelier (emplois), ou null. */
+        private final Building annex;
+
+        AtelierView(Player p) { this(p, null); }
+
+        AtelierView(Player p, Building annex) {
+            super(p);
+            this.annex = annex;
+        }
 
         @Override
         protected void draw(UiCanvas c) {
             com.citycore.building.BuildingInspector inspector = actions.inspector();
-            com.citycore.building.Inspection insp = inspector == null ? null : inspector.freshAtelierInspection(npc);
+            com.citycore.building.Inspection insp = inspector == null ? null
+                    : annex != null ? inspector.recheck(annex.id(), null) : inspector.freshAtelierInspection(npc);
 
             c.background("bg_grid");
             title(c);
-            back(c, 0, "Gestion", () -> kit.show(new Manage(player)));
-            c.sprite("rib_atelier", sx(1), sy(0));
+            if (annex != null) back(c, 0, "Actions", () -> kit.show(new ActionsView(player)));
+            else back(c, 0, "Gestion", () -> kit.show(new Manage(player)));
+            c.sprite(annex != null ? "rib_annexe" : "rib_atelier", sx(1), sy(0));
             close(c);
             pager(c, 0, 1, p -> { });
 
@@ -295,11 +316,16 @@ public final class ArtisanScreens {
                 return;
             }
             List<String> help = new ArrayList<>(List.of("§f" + insp.building().name() + " §8— " + insp.levelLabel(), "",
-                    "§7Rangée 1 : §fce qu'il doit contenir", "§7Rangée 2 : §fbonus du métier §8(+points)",
-                    "§7Rangée 3 : §fpoints de détail", "",
-                    "§7Chaque niveau au-delà du 1er agrandit", "§7son entrepôt de §f+"
-                            + Math.round(inspector.requirements().storageBonus() * 100) + " %§7."));
-            info(c, 7, "§e🏠 Son atelier", help);
+                    "§7Rangée 1 : §fce qu'" + (annex != null ? "elle" : "il") + " doit contenir",
+                    "§7Rangée 2 : §fbonus du métier §8(+points)", "§7Rangée 3 : §fpoints de détail", ""));
+            if (annex != null && jobs != null) {
+                help.addAll(List.of("§7Chaque niveau raccourcit le cycle", "§7de travail des employés :"));
+                for (int lv = 1; lv <= 5; lv++) help.add("§8  niveau " + lv + " : §f" + JobsManager.clock(jobs.config().cycleMs(lv)));
+            } else {
+                help.addAll(List.of("§7Chaque niveau au-delà du 1er agrandit", "§7son entrepôt de §f+"
+                        + Math.round(inspector.requirements().storageBonus() * 100) + " %§7."));
+            }
+            info(c, 7, annex != null ? "§3🏗 Son annexe de travail" : "§e🏠 Son atelier", help);
 
             // Rangée 1 : exigences
             List<com.citycore.building.Inspection.Check> checks = insp.checks();
@@ -307,7 +333,8 @@ public final class ArtisanScreens {
                 com.citycore.building.Inspection.Check ch = checks.get(i);
                 c.sprite(ch.ok() ? "ring_green" : "ring_red", sx(i), sy(1));
                 item(i, 1, UiItems.shown(ch.icon(), (ch.ok() ? "§a✔ " : "§c✘ ") + "§f" + ch.label(),
-                        List.of("§7" + ch.detail(), ch.ok() ? "§aFait" : "§cÀ ajouter dans l'atelier"), false), null);
+                        List.of("§7" + ch.detail(), ch.ok() ? "§aFait" : annex != null ? "§cÀ ajouter dans l'annexe"
+                                : "§cÀ ajouter dans l'atelier"), false), null);
             }
 
             // Rangée 2 : bonus du métier
@@ -349,6 +376,22 @@ public final class ArtisanScreens {
                     : "NIV. " + insp.level() + " → " + (insp.level() + 1) + " : +" + insp.nextLevelPoints() + " PTS";
             footer(c, false, next);
             zone(1, 5, 7, 1, insp.levelLabel(), insp.lore(), null);
+
+            // Annexe : la supprimer (Maj + clic droit, pour éviter un clic malheureux)
+            if (annex != null && jobs != null) {
+                c.sprite("ring_red", sx(8), sy(4));
+                item(8, 4, UiItems.shown(Material.BARRIER, "§c🗑 Supprimer l'annexe", List.of(
+                        "§7La zone redevient libre.", "§7Ses employés gardent leur emploi",
+                        "§7et attendent une nouvelle annexe.", "", "§cMaj + clic droit §7: supprimer"), false), t -> {
+                    if (t != ClickType.SHIFT_RIGHT) {
+                        player.sendMessage("§7Maj + clic droit pour confirmer la suppression de l'annexe.");
+                        return;
+                    }
+                    String name = jobs.deleteAnnex(npc);
+                    player.sendMessage(name != null ? "§a✅ Annexe §e" + name + " §asupprimée." : "§7Aucune annexe à supprimer.");
+                    kit.show(new ActionsView(player));
+                });
+            }
         }
 
         /** Case de points : icône, valeur sur le maximum (anneau vert au maximum). */
@@ -439,19 +482,62 @@ public final class ArtisanScreens {
                     List.of("§7Services que ce personnage rend", "§7à toute la ville (communs à tous", "§7les joueurs)."));
             close(c);
 
-            if (npc != CityNPC.GUARD || inhabitants == null) {
+            if (inhabitants == null || (jobs == null && npc != CityNPC.GUARD)) {
                 footer(c, false, "AUCUNE ACTION POUR L'INSTANT");
                 return;
             }
-            int rank = inhabitants.guardRank();
-            GuardConfig guard = inhabitants.guard();
-            c.sprite("ring_purple", sx(0), sy(1));
-            item(0, 1, UiItems.shown(Material.SHIELD, "§9🛡 La garde", List.of(
-                    "§7Choisissez parmi les habitants qui", "§7former, et à quel rôle.", "",
-                    "§7Garde : §f" + inhabitants.guardSize() + " §7/ §f" + guard.maxGuards(rank),
-                    "§7Formations : §f" + inhabitants.trainees().size() + " §7/ §f" + guard.maxTraining(rank),
-                    "", "§eCliquez pour ouvrir"), false), t -> kit.show(new GuardView(player, 0)));
-            footer(c, false, guardFooter());
+            int col = 0;
+            if (jobs != null) {
+                // Employés : habitants qui travaillent pour lui
+                int staff = inhabitants.employees(npc).size(), max = jobs.maxEmployees(npc);
+                c.sprite(staff < max ? "ring_green" : "ring_gold", sx(col), sy(1));
+                item(col, 1, UiItems.shown(jobs.tool(npc), "§3⚒ Employés", List.of(
+                        "§7Des habitants travaillent pour " + plain(npc.displayName),
+                        "§7et remplissent son entrepôt.", "",
+                        "§7Employés : §f" + staff + " §7/ §f" + max + " §8(rang " + data.getLevel(npc) + ")",
+                        "", "§eCliquez pour ouvrir"), false), t -> kit.show(new EmployeesView(player, 0)));
+                col++;
+
+                // Annexe de travail : la créer, ou voir ce qui lui manque
+                Building annex = jobs.annex(npc);
+                com.citycore.building.BuildingInspector inspector = actions.inspector();
+                if (annex == null) {
+                    List<String> lore = new ArrayList<>(List.of("§7Lieu de travail de ses employés.",
+                            "§7Une zone de la ville, comme un bâtiment.", "", "§7Elle doit contenir :"));
+                    if (inspector != null) lore.addAll(com.citycore.building.BuildingRequirements.lore(
+                            inspector.requirements().annexSpec(npc)));
+                    lore.addAll(List.of("", "§7Plus elle est belle (niveau), plus", "§7ses employés travaillent vite.", "",
+                            "§eCliquez : son nom, puis la zone au bâton"));
+                    c.sprite("ring_amber", sx(col), sy(1));
+                    item(col, 1, UiItems.shown(Material.SCAFFOLDING, "§3🏗 Créer son annexe de travail", lore, false), t -> {
+                        if (annexCreator == null) return;
+                        player.closeInventory();
+                        annexCreator.accept(player, npc);
+                    });
+                } else {
+                    int level = jobs.annexLevel(annex);
+                    long cycle = jobs.cycleMs(npc);
+                    c.sprite(level <= 0 ? "ring_red" : level >= 5 ? "ring_gold" : "ring_green", sx(col), sy(1));
+                    item(col, 1, UiItems.shown(Material.SCAFFOLDING, "§3🏗 Son annexe : §f" + annex.name(), List.of(
+                            level <= 0 ? "§c✘ Incomplète : ses employés attendent" : "§6Niveau " + level + " "
+                                    + com.citycore.building.Inspection.stars(level),
+                            cycle > 0 ? "§7Cycle de travail : §f" + JobsManager.clock(cycle) : "§7Cycle de travail : §8—",
+                            "", "§eCliquez : ce qu'il faut pour monter de niveau"), level >= 5),
+                            t -> kit.show(new AtelierView(player, annex)));
+                }
+                col++;
+            }
+            if (npc == CityNPC.GUARD) {
+                int rank = inhabitants.guardRank();
+                GuardConfig guard = inhabitants.guard();
+                c.sprite("ring_purple", sx(col), sy(1));
+                item(col, 1, UiItems.shown(Material.SHIELD, "§9🛡 La garde", List.of(
+                        "§7Choisissez parmi les habitants qui", "§7former, et à quel rôle.", "",
+                        "§7Garde : §f" + inhabitants.guardSize() + " §7/ §f" + guard.maxGuards(rank),
+                        "§7Formations : §f" + inhabitants.trainees().size() + " §7/ §f" + guard.maxTraining(rank),
+                        "", "§eCliquez pour ouvrir"), false), t -> kit.show(new GuardView(player, 0)));
+            }
+            footer(c, false, jobs != null ? jobsFooter() : guardFooter());
         }
     }
 
@@ -636,6 +722,101 @@ public final class ArtisanScreens {
             }
             return lines.isEmpty() ? List.of("§8• §7aucun") : lines;
         }
+    }
+
+    /* =========================
+       EMPLOYÉS — liste commune des habitants qu'on peut embaucher pour cet artisan
+       Violet : ses employés ; vert : sans emploi (place libre) ; ambre : employé ailleurs ;
+       gris : plus de place.
+       ========================= */
+
+    private final class EmployeesView extends ArtisanMenu implements Paged {
+
+        private final int page;
+
+        @Override
+        public int page() { return page; }
+
+        EmployeesView(Player p, int page) {
+            super(p);
+            this.page = page;
+        }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            c.background("bg_grid");
+            title(c);
+            back(c, 0, "Actions", () -> kit.show(new ActionsView(player)));
+            c.sprite("rib_employes", sx(1), sy(0));
+            JobsConfig cfg = jobs.config();
+            List<Inhabitant> staff = inhabitants.employees(npc);
+            int max = jobs.maxEmployees(npc);
+            boolean room = staff.size() < max;
+            info(c, 7, "§3⚒ Employés de " + plain(npc.displayName), List.of(
+                    "§7Cliquez sur un habitant pour l'embaucher.", "§7Le jour, il se rend à l'annexe de travail",
+                    "§7et remplit l'entrepôt à chaque cycle :", "§7un exemplaire de chaque objet racheté",
+                    "§7(les objets de valeur plus rarement).", "",
+                    "§7Rang " + data.getLevel(npc) + " : §f" + max + " §7employé(s) au plus.",
+                    "§7Il s'arrête à §f" + cfg.ceiling() + " %§7 de la capacité de l'entrepôt.",
+                    "§7Seulement le jour, un joueur connecté.", "",
+                    "§5■ §7employé  §a■ §7sans emploi  §6■ §7employé ailleurs"));
+            close(c);
+
+            // Ses employés, puis les habitants sans emploi, puis ceux qui travaillent ailleurs
+            List<Inhabitant> roster = new ArrayList<>(staff);
+            List<Inhabitant> elsewhere = new ArrayList<>();
+            for (Inhabitant inh : inhabitants.civilians()) {
+                if (inh.test || roster.contains(inh)) continue;
+                if (inh.employer == null) roster.add(inh); else elsewhere.add(inh);
+            }
+            roster.addAll(elsewhere);
+            int pg = clampPage(page, roster.size());
+            for (int i = 0; i < GRID && pg * GRID + i < roster.size(); i++) {
+                Inhabitant inh = roster.get(pg * GRID + i);
+                CityNPC boss = inhabitants.employerOf(inh);
+                List<String> lore = new ArrayList<>();
+                lore.add("§7Habitant de §f" + inhabitants.homeName(inh));
+                String ring;
+                Consumer<ClickType> click;
+                if (boss == npc) {
+                    ring = "ring_purple";
+                    lore.add("§5Employé de " + plain(npc.displayName));
+                    lore.addAll(List.of("", "§cMaj + clic droit §7: le renvoyer"));
+                    click = t -> {
+                        if (t != ClickType.SHIFT_RIGHT) return;
+                        String err = jobs.fire(inh.id);
+                        if (err != null) player.sendMessage("§c❌ " + err);
+                        kit.show(new EmployeesView(player, page));
+                    };
+                } else {
+                    ring = !room ? "ring_gray" : boss == null ? "ring_green" : "ring_amber";
+                    if (boss != null) lore.add("§6Travaille pour " + plain(boss.displayName));
+                    lore.add("");
+                    lore.add(!room ? "§8" + plain(npc.displayName) + " n'a plus de place (rang " + data.getLevel(npc) + ")"
+                            : boss == null ? "§eCliquez : l'embaucher" : "§eCliquez : l'embaucher ici §8(il quitte son emploi)");
+                    click = t -> {
+                        String err = jobs.hire(inh.id, npc);
+                        if (err != null) player.sendMessage("§c❌ " + err);
+                        kit.show(new EmployeesView(player, page));
+                    };
+                }
+                c.sprite(ring, sx(col(i)), sy(row(i)));
+                item(col(i), row(i), inhabitantHead(inh, "§f" + inh.name, lore), click);
+            }
+            if (roster.isEmpty()) {
+                info(c, 6, "§7Personne à embaucher", List.of("§7Aucun habitant en ville : il en", "§7arrive un par lit d'habitation."));
+            }
+            pager(c, pg, pages(roster.size()), p -> kit.show(new EmployeesView(player, p)));
+            footer(c, false, jobsFooter());
+        }
+    }
+
+    /** « EMPLOYÉS 1/2 · CYCLE 4:00 » ou la raison de l'arrêt. */
+    private String jobsFooter() {
+        String blocked = jobs.blocked(npc);
+        String count = "EMPLOYÉS " + inhabitants.employees(npc).size() + "/" + jobs.maxEmployees(npc);
+        return blocked != null ? count + " · " + blocked.toUpperCase(java.util.Locale.ROOT)
+                : count + " · CYCLE " + JobsManager.clock(jobs.cycleMs(npc));
     }
 
     /* =========================

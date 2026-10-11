@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+version = mod_version
+group = 'com.citycore'
+base { archivesName = 'citycore-journeymap' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    // API JourneyMap (servie par le dépôt de BlameJared)
+    maven {
+        url = 'https://maven.blamejared.com'
+        content { includeGroup 'info.journeymap' }
+    }
+}
+
+neoForge {
+    version = neo_version
+    mods {
+        citycore_journeymap {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // Compilation seulement : à l'exécution, l'API est fournie par le mod JourneyMap
+    // (sa licence interdit de redistribuer ses classes)
+    compileOnly "info.journeymap:journeymap-api-neoforge:${journeymap_api_version}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// Version du mod reprise dans neoforge.mods.toml
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand 'version': project.version
+    }
+}

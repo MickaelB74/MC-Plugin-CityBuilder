@@ -1,0 +1,10 @@
+// Mod serveur NeoForge « CityCore — JourneyMap » : projet indépendant du plugin
+// (construit à part : ./gradlew build dans ce dossier).
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+}
+
+rootProject.name = 'citycore-journeymap'

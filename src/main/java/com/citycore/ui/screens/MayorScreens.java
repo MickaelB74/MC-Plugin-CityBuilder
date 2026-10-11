@@ -4,6 +4,10 @@ import com.citycore.building.Building;
 import com.citycore.building.BuildingManager;
 import com.citycore.city.City;
 import com.citycore.city.CityManager;
+import com.citycore.inhabitant.InhabitantManager;
+import com.citycore.needs.NeedsConfig;
+import com.citycore.needs.NeedsConfig.Need;
+import com.citycore.needs.NeedsManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCManager;
 import com.citycore.npc.mayor.MayorBuildingGUI;
@@ -19,6 +23,7 @@ import com.citycore.util.TypewriterUtil;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
@@ -28,7 +33,8 @@ import static com.citycore.ui.UiLayout.*;
 
 /**
  * Écrans illustrés d'Alderic : accueil de la mairie, quêtes de la cité et charte, bâtiments,
- * trésor. Les boutons appellent les actions des menus classiques du maire.
+ * trésor, population (clic sur son portrait). Les boutons appellent les actions des menus
+ * classiques du maire.
  */
 public final class MayorScreens {
 
@@ -68,6 +74,15 @@ public final class MayorScreens {
 
     public void setOccupancy(java.util.function.Function<Building, String> occupancy) {
         this.occupancy = occupancy;
+    }
+
+    /** Besoins et satisfaction (phase 6) : écran « Population » ; null = pas d'écran. */
+    private NeedsManager needs;
+    private InhabitantManager inhabitants;
+
+    public void setPopulation(NeedsManager needs, InhabitantManager inhabitants) {
+        this.needs = needs;
+        this.inhabitants = inhabitants;
     }
 
     /* =========================
@@ -110,10 +125,21 @@ public final class MayorScreens {
         }
 
         void portrait(UiCanvas c) {
+            portrait(c, null);
+        }
+
+        /** Portrait d'Alderic ; onClick non nul : un clic ouvre l'écran « Population ». */
+        void portrait(UiCanvas c, Runnable onClick) {
             kit.portraits().draw(c, CityNPC.MAYOR, false);
             List<String> lore = new ArrayList<>();
             for (String line : CityNPC.MAYOR.backstory) lore.add("§8§o" + line);
-            zone(0, 1, 4, 4, CityNPC.MAYOR.displayName + " §8— §7Maire", lore, null);
+            if (onClick != null) {
+                int sat = needs.satisfaction();
+                lore.add("");
+                lore.add("§7Satisfaction des habitants : " + (sat < 0 ? "§8—" : color(sat) + sat + " %"));
+                lore.add("§eCliquez : population et besoins");
+            }
+            zone(0, 1, 4, 4, CityNPC.MAYOR.displayName + " §8— §7Maire", lore, onClick == null ? null : t -> onClick.run());
         }
 
         void bigButton(UiCanvas c, int row, String sprite, String name, List<String> lore, Runnable action) {
@@ -170,7 +196,7 @@ public final class MayorScreens {
                     List.of(following ? "§7Alderic restera ici." : "§7Alderic vous accompagnera dans la ville."),
                     t -> mayor.handleClick(player, MayorGUI.SLOT_FOLLOW));
             close(c);
-            portrait(c);
+            portrait(c, needs == null ? null : () -> kit.show(new Population(player)));
 
             List<String> questLore = new ArrayList<>(List.of("§7Niveau  : §f" + tier.level,
                     "§7Palier  : " + tier.tierName, "§7" + tier.chapter, ""));
@@ -198,6 +224,142 @@ public final class MayorScreens {
                     List.of("§7Revendiquées : §f" + claimed, "§7Emplacements : §f" + data.getMaxChunks(),
                             "§8Agrandissez pour revendiquer davantage."), null);
         }
+    }
+
+    /* =========================
+       POPULATION — besoins et satisfaction des habitants (phase 6)
+       Rangée 1 : les quatre besoins, la satisfaction et ses effets ; rangée 2 : la population ;
+       rangées 3-4 : les habitations (niveau → confort).
+       ========================= */
+
+    private final class Population extends MayorMenu {
+
+        Population(Player p) { super(p); }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            c.background("bg_grid");
+            nameplate(c, MAYOR_NAME, "Population");
+            back(c, 0, "Mairie", () -> mayor.open(player));
+            c.sprite("rib_population", sx(1), sy(0));
+            NeedsConfig cfg = needs.config();
+            info(c, 7, "§6😊 Satisfaction des habitants", List.of(
+                    "§7Moyenne des besoins comptés, pondérée :",
+                    "§7nourriture §f" + cfg.weight(Need.NOURRITURE) + "§7, sécurité §f" + cfg.weight(Need.SECURITE)
+                            + "§7, santé §f" + cfg.weight(Need.SANTE) + "§7, confort §f" + cfg.weight(Need.CONFORT) + "§7.",
+                    "§7Un besoin ne compte qu'une fois", "§7son artisan installé.", "",
+                    "§7C'est un bonus : haute, elle accélère", "§7les arrivées et augmente l'impôt ;",
+                    "§7basse, elle les ralentit un peu.", "§7Personne ne part, même mécontent.", "",
+                    "§a■ §7≥ 70 %  §6■ §7≥ 40 %  §c■ §7moins  §8■ §7non compté"));
+            close(c);
+
+            // Rangée 1 : les besoins…
+            int col = 0;
+            for (NeedsManager.Status s : needs.statuses()) {
+                Material icon = switch (s.need()) {
+                    case NOURRITURE -> Material.BREAD;
+                    case SECURITE   -> Material.SHIELD;
+                    case SANTE      -> Material.HONEY_BOTTLE;
+                    case CONFORT    -> Material.RED_BED;
+                };
+                c.sprite(!s.counted() ? "ring_gray" : ring(s.value()), sx(col), sy(1));
+                List<String> lore = new ArrayList<>();
+                lore.add(s.counted() ? color(s.value()) + s.value() + " % §8(poids " + cfg.weight(s.need()) + ")"
+                        : "§8Non compté : " + s.detail());
+                if (s.counted()) for (String part : s.detail().split(" · ")) lore.add("§7" + part);
+                lore.add("");
+                lore.addAll(s.help());
+                item(col, 1, UiItems.shown(icon, (s.counted() ? "§f" : "§8") + s.need().label, lore, false), null);
+                col++;
+            }
+
+            // … la satisfaction et ses effets
+            int sat = needs.satisfaction();
+            c.sprite(sat < 0 ? "ring_gray" : sat >= 70 ? "ring_gold" : ring(sat), sx(5), sy(1));
+            item(5, 1, UiItems.shown(Material.SUNFLOWER, "§6Satisfaction : " + (sat < 0 ? "—" : sat + " %"),
+                    sat < 0 ? List.of("§7Aucun habitant pour l'instant.") : needs.report().subList(1, needs.report().size()), sat >= 70), null);
+
+            double arrival = sat < 0 ? 1 : cfg.arrivalFactor(sat);
+            long wait = inhabitants.nextArrivalIn() / 1000;
+            c.sprite(arrival <= 0 ? "ring_red" : arrival < 1 ? "ring_green" : arrival > 1 ? "ring_amber" : "ring_gray", sx(6), sy(1));
+            item(6, 1, UiItems.shown(Material.CLOCK, "§fArrivées d'habitants", List.of(
+                    arrival <= 0 ? "§cPlus personne ne vient s'installer." : "§7Délai entre deux arrivées : §f×" + fmtFactor(arrival),
+                    arrival > 0 ? "§7Prochaine possible dans §f" + wait / 60 + " min " + wait % 60 + " s" : "§7Améliorez les besoins !",
+                    "", "§8Plus la satisfaction est haute,", "§8plus les arrivées sont rapides."), false), null);
+
+            double taxFactor = sat < 0 ? 1 : cfg.taxFactor(sat);
+            long civilians = inhabitants.civilians().stream().filter(i -> !i.test).count();
+            long perDawn = Math.round(civilians * inhabitants.taxPerInhabitant() * taxFactor);
+            c.sprite(taxFactor <= 0 ? "ring_red" : taxFactor > 1 ? "ring_green" : taxFactor < 1 ? "ring_amber" : "ring_gray", sx(7), sy(1));
+            item(7, 1, UiItems.shown(Material.GOLD_NUGGET, "§6Impôt de l'aube", List.of(
+                    "§7" + civilians + " habitant(s) × " + inhabitants.taxPerInhabitant() + " × §f" + fmtFactor(taxFactor),
+                    "§7= §6" + perDawn + " coins §7par aube", "", "§8Gardes et recrues ne paient pas."), false), null);
+
+            long employed = inhabitants.civilians().stream().filter(i -> !i.test && i.employer != null).count();
+            c.sprite(employed > 0 ? "ring_green" : "ring_gray", sx(8), sy(1));
+            item(8, 1, UiItems.shown(Material.IRON_HOE, "§3⚒ Employés : §f" + employed, List.of(
+                    "§7Habitants qui travaillent pour les", "§7artisans et remplissent leurs entrepôts",
+                    "§7(nourriture comprise).", "", "§8Chez un artisan : Actions → Employés."), false), null);
+
+            // Rangée 2 : la population
+            long pop = inhabitants.living().stream().filter(i -> !i.test).count();
+            long guards = inhabitants.guards().stream().filter(i -> !i.test).count();
+            populationTile(c, 0, Material.PLAYER_HEAD, "§fHabitants", String.valueOf(pop),
+                    List.of("§7Vivants, gardes et recrues compris."));
+            populationTile(c, 1, Material.WHITE_BED, "§fPlaces", String.valueOf(inhabitants.capacity()),
+                    List.of("§7Lits des habitations conformes."));
+            populationTile(c, 2, Material.IRON_SWORD, "§9Gardes", String.valueOf(guards),
+                    List.of("§7Formés chez Roland."));
+            populationTile(c, 3, Material.WOODEN_SWORD, "§6Recrues", String.valueOf(inhabitants.trainees().size()),
+                    List.of("§7En formation chez Roland."));
+            populationTile(c, 4, Material.WITHER_ROSE, "§8Deuils", String.valueOf(inhabitants.mourningCount()),
+                    List.of("§7Lits dont l'habitant est mort,", "§7en attente d'un remplaçant."));
+
+            // Rangées 3-4 : les habitations, leur niveau et leur confort
+            List<Building> houses = buildings.getAllBuildings().stream()
+                    .filter(b -> b.type() == com.citycore.building.BuildingType.HABITATION).toList();
+            for (int i = 0; i < Math.min(18, houses.size()); i++) {
+                Building b = houses.get(i);
+                int level = needs.houseLevel(b);
+                int comfort = cfg.comfort(level);
+                int x = i % 9, y = 3 + i / 9;
+                c.sprite(level == 0 ? "ring_red" : ring(comfort), sx(x), sy(y));
+                List<String> lore = new ArrayList<>();
+                lore.add(level == 0 ? "§c✘ Incomplète" : "§6Niveau " + level + " " + com.citycore.building.Inspection.stars(level));
+                String occ = occupancy.apply(b);
+                if (occ != null) lore.add(occ);
+                lore.add("§7Confort : " + color(comfort) + comfort + " %");
+                item(x, y, UiItems.shown(Material.RED_BED, "§e🏠 " + b.name(), lore, level >= 5), null);
+            }
+            if (houses.isEmpty()) {
+                item(0, 3, UiItems.blank("§7Aucune habitation", List.of("§7Créez-en une chez Alderic :",
+                        "§7Bâtiments, type « habitation »")), null);
+            }
+            footer(c, false, sat < 0 ? "AUCUN HABITANT" : "SATISFACTION " + sat + " % · " + pop + " HABITANT" + (pop > 1 ? "S" : ""));
+        }
+
+        private void populationTile(UiCanvas c, int col, Material icon, String name, String value, List<String> help) {
+            c.sprite("ring_gray", sx(col), sy(2));
+            List<String> lore = new ArrayList<>(List.of("§f" + value, ""));
+            lore.addAll(help);
+            ItemStack stack = UiItems.shown(icon, name + " : §f" + value, lore, false);
+            int n = 0;
+            try { n = Integer.parseInt(value); } catch (NumberFormatException ignored) { }
+            stack.setAmount(Math.max(1, Math.min(64, n)));
+            item(col, 2, stack, null);
+        }
+    }
+
+    private static String ring(int v) {
+        return v >= 70 ? "ring_green" : v >= 40 ? "ring_amber" : "ring_red";
+    }
+
+    private static String color(int v) {
+        return v >= 70 ? "§a" : v >= 40 ? "§6" : "§c";
+    }
+
+    private static String fmtFactor(double f) {
+        return f == Math.rint(f) ? String.valueOf((long) f) : String.format(java.util.Locale.FRANCE, "%.1f", f);
     }
 
     /* =========================

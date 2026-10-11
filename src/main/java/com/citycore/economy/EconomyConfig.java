@@ -9,6 +9,8 @@ import org.bukkit.configuration.file.FileConfiguration;
  * @param fullPriceUntil           % de remplissage de l'entrepôt sous lequel le PNJ paie plein tarif
  * @param minPricePercent          % du prix plein payé quand l'entrepôt est presque plein
  * @param consumptionPercentPerHour % de la capacité consommé par heure (joueurs connectés), 0 = off
+ * @param consumptionFloorPercent  % de la capacité sous lequel cette consommation ne descend pas
+ *                                 (le travail des employés et les repas des habitants s'y appuient)
  * @param jobSellBonus             bonus (%) sur les ventes de l'employé à son PNJ
  * @param jobShopDiscount          réduction (%) sur les achats de l'employé chez son PNJ
  * @param validatorMargin          marge minimale (%) exigée par le contrôle anti-arbitrage
@@ -22,6 +24,7 @@ public record EconomyConfig(
         int    fullPriceUntil,
         int    minPricePercent,
         double consumptionPercentPerHour,
+        int    consumptionFloorPercent,
         int    jobSellBonus,
         int    jobShopDiscount,
         int    validatorMargin,
@@ -36,6 +39,7 @@ public record EconomyConfig(
                 clamp(cfg.getInt("npc-economy.full-price-until", 40), 0, 99),
                 clamp(cfg.getInt("npc-economy.min-price-percent", 35), 1, 100),
                 Math.max(0, cfg.getDouble("npc-economy.consumption-percent-per-hour", 8)),
+                clamp(cfg.getInt("npc-economy.consumption-floor-percent", 25), 0, 100),
                 clamp(cfg.getInt("npc-economy.job-sell-bonus", 10), 0, 100),
                 clamp(cfg.getInt("npc-economy.job-shop-discount", 15), 0, 90),
                 Math.max(0, cfg.getInt("npc-economy.validator-margin", 10)),

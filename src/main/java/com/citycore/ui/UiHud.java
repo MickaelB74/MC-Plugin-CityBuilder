@@ -20,6 +20,7 @@ public final class UiHud {
     public static final int MUTED  = 0xC9B48A;
     public static final int GREEN  = 0x9BE07A;
     public static final int PURPLE = 0xC09AE8;
+    public static final int RED    = 0xF08080;
 
     /** HEAD = ligne d'en-tête (bois clair), BAR = ligne avec barre, PLAIN = ligne simple. */
     public enum Kind { HEAD, BAR, PLAIN }
