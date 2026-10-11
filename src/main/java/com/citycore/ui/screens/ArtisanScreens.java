@@ -4,6 +4,9 @@ import com.citycore.building.Building;
 import com.citycore.building.BuildingType;
 import com.citycore.economy.ItemTags;
 import com.citycore.economy.MarketService;
+import com.citycore.inhabitant.GuardConfig;
+import com.citycore.inhabitant.InhabitantManager;
+import com.citycore.inhabitant.InhabitantManager.Inhabitant;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCManager;
@@ -52,6 +55,7 @@ public final class ArtisanScreens {
     private final MarketService     market;
     private final VillagerListener  actions;
     private final QuestGUI          questGUI;
+    private InhabitantManager       inhabitants; // garde (phase 5) : menu « Actions » de Roland
 
     public ArtisanScreens(UiKit kit, CityNPC npc, VillagerGUI gui, NPCDataManager data, NPCManager npcManager,
                           PlayerDataManager players, MarketService market, VillagerListener actions,
@@ -66,6 +70,11 @@ public final class ArtisanScreens {
         this.market     = market;
         this.actions    = actions;
         this.questGUI   = questGUI;
+    }
+
+    /** Habitants et garde de la ville (écran « La garde » chez Roland). */
+    public void setInhabitants(InhabitantManager inhabitants) {
+        this.inhabitants = inhabitants;
     }
 
     /* =========================
@@ -212,16 +221,17 @@ public final class ArtisanScreens {
             jobIcon(c);
             followIcon(c, 7);
             close(c);
-            // Portrait : son histoire, l'état de son atelier, et un clic ouvre l'écran « Son atelier »
+            // Portrait : son histoire, l'état de son atelier, et un clic ouvre la gestion du bâtiment
             kit.portraits().draw(c, npc, false);
             List<String> portraitLore = new ArrayList<>(gui.backstoryLore());
             if (actions.inspector() != null) {
                 portraitLore.add("");
                 portraitLore.addAll(actions.inspector().atelierLore(npc));
-                portraitLore.add("§eCliquez : son atelier §7(ce qu'il faut pour monter de niveau)");
             }
+            portraitLore.add("");
+            portraitLore.add("§eCliquez : gestion §7(logis, actions)");
             zone(0, 1, 4, 4, npc.displayName + " §8— §7" + npc.function, portraitLore,
-                    actions.inspector() == null ? null : t -> kit.show(new AtelierView(player)));
+                    t -> kit.show(new Manage(player)));
 
             bigButton(c, 1, "btn_vendre", "§a💰 Vendre",
                     List.of("§7Vendez vos ressources.", "§7Le prix baisse quand son", "§7entrepôt se remplit."),
@@ -274,8 +284,8 @@ public final class ArtisanScreens {
 
             c.background("bg_grid");
             title(c);
-            back(c, 0, "Retour", () -> gui.open(player));
-            c.sprite("rib_logis", sx(1), sy(0));
+            back(c, 0, "Gestion", () -> kit.show(new Manage(player)));
+            c.sprite("rib_atelier", sx(1), sy(0));
             close(c);
             pager(c, 0, 1, p -> { });
 
@@ -347,6 +357,284 @@ public final class ArtisanScreens {
             List<String> lore = new ArrayList<>(List.of("§f" + value + " §7/ §f" + max + " pts", ""));
             lore.addAll(help);
             item(col, 3, UiItems.shown(icon, name, lore, false), null);
+        }
+    }
+
+    /* =========================
+       GESTION DU BÂTIMENT — variante de l'accueil (clic sur le portrait)
+       Le menu de droite ne vend plus : Logis (son atelier), Actions (la garde chez Roland),
+       Son histoire. Un clic sur le portrait revient à l'accueil.
+       ========================= */
+
+    private final class Manage extends ArtisanMenu {
+
+        Manage(Player p) { super(p); }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            c.background("bg_character_gestion");
+            title(c);
+            c.text("GESTION", STATE_X, rowText(0), CREAM, true);
+            zone(0, 0, 6, 1, "§e⚙ Gestion du bâtiment", List.of("§7Son atelier et ses actions.",
+                    "§7Cliquez sur le portrait pour revenir", "§7à son commerce."), null);
+            followIcon(c, 7);
+            close(c);
+
+            kit.portraits().draw(c, npc, false);
+            zone(0, 1, 4, 4, npc.displayName + " §8— §7" + npc.function,
+                    List.of("§eCliquez : retour au commerce §7(vente, entrepôt…)"), t -> gui.open(player));
+
+            com.citycore.building.BuildingInspector inspector = actions.inspector();
+            List<String> logisLore = new ArrayList<>();
+            if (inspector != null) logisLore.addAll(inspector.atelierLore(npc));
+            logisLore.addAll(List.of("", "§7Exigences, bonus du métier et", "§7points de détail de son atelier.",
+                    "", "§eCliquez : ce qu'il faut pour monter de niveau"));
+            bigButton(c, 1, "btn_logis", "§e🏠 Logis", logisLore, t -> kit.show(new AtelierView(player)));
+
+            List<String> actionLore = new ArrayList<>();
+            if (npc == CityNPC.GUARD && inhabitants != null) {
+                int rank = inhabitants.guardRank();
+                actionLore.addAll(List.of("§7Former des habitants de la ville", "§7à la garde (soldat, archer…).", "",
+                        "§7Garde : §f" + inhabitants.guardSize() + " §7/ §f" + inhabitants.guard().maxGuards(rank),
+                        "§7Formations : §f" + inhabitants.trainees().size() + " §7/ §f" + inhabitants.guard().maxTraining(rank)));
+            } else {
+                actionLore.add("§7Aucune action pour l'instant.");
+            }
+            bigButton(c, 2, "btn_actions", "§c🛡 Actions", actionLore, t -> kit.show(new ActionsView(player)));
+            bigButton(c, 3, "btn_histoire", "§6📖 Son histoire", storyLore(), t -> tellStory(player));
+
+            // Barre : progression de l'atelier vers le niveau suivant
+            com.citycore.building.Inspection insp = inspector == null ? null : inspector.atelierInspection(npc);
+            if (insp == null) {
+                bar(c, 0, false, "AUCUN ATELIER");
+            } else if (!insp.compliant()) {
+                bar(c, 0, false, "ATELIER INCOMPLET");
+            } else if (insp.nextLevelPoints() < 0) {
+                bar(c, 1, true, "ATELIER NIVEAU MAXIMAL");
+            } else {
+                double fraction = (double) (insp.points() - insp.levelFloor())
+                        / Math.max(1, insp.nextThreshold() - insp.levelFloor());
+                bar(c, fraction, false, "ATELIER : " + insp.points() + " / " + insp.nextThreshold() + " PTS");
+            }
+            zone(0, 5, 9, 1, "§bProgression de l'atelier",
+                    insp == null ? List.of("§7Aucun atelier.") : insp.lore(), null);
+        }
+    }
+
+    /* =========================
+       ACTIONS — ce que le personnage peut faire pour la ville
+       ========================= */
+
+    private final class ActionsView extends ArtisanMenu {
+
+        ActionsView(Player p) { super(p); }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            c.background("bg_grid");
+            title(c);
+            back(c, 0, "Gestion", () -> kit.show(new Manage(player)));
+            c.sprite("rib_actions", sx(1), sy(0));
+            info(c, 7, "§c🛡 Actions de " + plain(npc.displayName),
+                    List.of("§7Services que ce personnage rend", "§7à toute la ville (communs à tous", "§7les joueurs)."));
+            close(c);
+
+            if (npc != CityNPC.GUARD || inhabitants == null) {
+                footer(c, false, "AUCUNE ACTION POUR L'INSTANT");
+                return;
+            }
+            int rank = inhabitants.guardRank();
+            GuardConfig guard = inhabitants.guard();
+            c.sprite("ring_purple", sx(0), sy(1));
+            item(0, 1, UiItems.shown(Material.SHIELD, "§9🛡 La garde", List.of(
+                    "§7Choisissez parmi les habitants qui", "§7former, et à quel rôle.", "",
+                    "§7Garde : §f" + inhabitants.guardSize() + " §7/ §f" + guard.maxGuards(rank),
+                    "§7Formations : §f" + inhabitants.trainees().size() + " §7/ §f" + guard.maxTraining(rank),
+                    "", "§eCliquez pour ouvrir"), false), t -> kit.show(new GuardView(player, 0)));
+            footer(c, false, guardFooter());
+        }
+    }
+
+    /** « GARDE 3/4 · FORMATION 1/1 ». */
+    private String guardFooter() {
+        int rank = inhabitants.guardRank();
+        return "GARDE " + inhabitants.guardSize() + "/" + inhabitants.guard().maxGuards(rank)
+                + " · FORMATION " + inhabitants.trainees().size() + "/" + inhabitants.guard().maxTraining(rank);
+    }
+
+    /** Tête de l'habitant (skin, ou uniforme pour un garde). */
+    private ItemStack inhabitantHead(Inhabitant inh, String name, List<String> lore) {
+        String key = inh.state == InhabitantManager.State.SOLDAT ? "soldats_" + inh.uniform : "habitants_" + inh.skin;
+        return UiItems.head(inhabitants.skinTexture(inh), key, name, lore);
+    }
+
+    /* =========================
+       LA GARDE — liste commune des gardes, recrues et habitants (chez Roland)
+       Violet : garde ; ambre : en formation ; vert : habitant à former ; gris : plus de place.
+       ========================= */
+
+    private final class GuardView extends ArtisanMenu implements Paged {
+
+        private final int page;
+
+        @Override
+        public int page() { return page; }
+
+        GuardView(Player p, int page) {
+            super(p);
+            this.page = page;
+        }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            c.background("bg_grid");
+            title(c);
+            back(c, 0, "Actions", () -> kit.show(new ActionsView(player)));
+            c.sprite("rib_garde", sx(1), sy(0));
+            int rank = inhabitants.guardRank();
+            GuardConfig guard = inhabitants.guard();
+            info(c, 7, "§9🛡 La garde de Valmont", List.of(
+                    "§7Cliquez sur un habitant pour le", "§7former, puis choisissez son rôle.",
+                    "§7Il s'entraîne chez Roland (temps", "§7compté quand un joueur est en ligne).", "",
+                    "§7Les gardes patrouillent dans la", "§7ville, jour et nuit, hors des", "§7bâtiments.", "",
+                    "§7Rang " + rank + " de Roland : §f" + guard.maxGuards(rank) + " §7gardes, §f"
+                            + guard.maxTraining(rank) + " §7formation(s) à la fois.", "",
+                    "§5■ §7garde  §6■ §7en formation  §a■ §7à former"));
+            close(c);
+
+            List<Inhabitant> roster = inhabitants.guardRoster();
+            String blocked = inhabitants.canRecruit();
+            int pg = clampPage(page, roster.size());
+            for (int i = 0; i < GRID && pg * GRID + i < roster.size(); i++) {
+                Inhabitant inh = roster.get(pg * GRID + i);
+                GuardConfig.Role role = guard.role(inh.role);
+                List<String> lore = new ArrayList<>();
+                String ring;
+                Consumer<ClickType> click;
+                switch (inh.state) {
+                    case SOLDAT -> {
+                        ring = "ring_purple";
+                        lore.add("§9" + (role != null ? role.name() : "Garde") + " §7de la garde");
+                        String hp = inhabitants.healthLine(inh);
+                        if (hp != null) lore.add(hp);
+                        lore.add("§7Lit : §f" + inhabitants.homeName(inh));
+                        lore.addAll(List.of("", "§cMaj + clic droit §7: le rendre", "§7à la vie civile"));
+                        click = t -> dismiss(t, inh);
+                    }
+                    case FORMATION -> {
+                        ring = "ring_amber";
+                        lore.add("§6Recrue §7: " + (role != null ? role.name() : "?"));
+                        lore.add("§7Encore §f" + InhabitantManager.minutes(inh.trainingLeft) + " §7de formation");
+                        if (rank == 0) lore.add("§c⏸ En pause : Roland n'a pas d'atelier");
+                        lore.add("§7Lit : §f" + inhabitants.homeName(inh));
+                        lore.addAll(List.of("", "§cMaj + clic droit §7: arrêter", "§7la formation"));
+                        click = t -> dismiss(t, inh);
+                    }
+                    default -> {
+                        ring = blocked == null ? "ring_green" : "ring_gray";
+                        lore.add("§7Habitant de §f" + inhabitants.homeName(inh));
+                        lore.add("");
+                        lore.add(blocked == null ? "§eCliquez : choisir son rôle" : "§8" + blocked);
+                        click = t -> {
+                            String why = inhabitants.canRecruit();
+                            if (why != null) player.sendMessage("§c❌ " + why);
+                            else kit.show(new RoleView(player, inh.id));
+                        };
+                    }
+                }
+                c.sprite(ring, sx(col(i)), sy(row(i)));
+                item(col(i), row(i), inhabitantHead(inh, "§f" + inh.name, lore), click);
+            }
+            if (roster.isEmpty()) {
+                info(c, 6, "§7Personne à former", List.of("§7Aucun habitant en ville : il en", "§7arrive un par lit d'habitation."));
+            }
+            pager(c, pg, pages(roster.size()), p -> kit.show(new GuardView(player, p)));
+            footer(c, false, guardFooter());
+        }
+
+        /** Maj + clic droit : le garde (ou la recrue) redevient habitant. */
+        private void dismiss(ClickType t, Inhabitant inh) {
+            if (t != ClickType.SHIFT_RIGHT) return;
+            String err = inhabitants.dismiss(inh.id);
+            if (err != null) player.sendMessage("§c❌ " + err);
+            kit.show(new GuardView(player, page));
+        }
+    }
+
+    /* =========================
+       RÔLE — choix du rôle d'une recrue (verrouillé selon le rang de Roland)
+       ========================= */
+
+    private final class RoleView extends ArtisanMenu {
+
+        private final int inhabitantId;
+
+        RoleView(Player p, int inhabitantId) {
+            super(p);
+            this.inhabitantId = inhabitantId;
+        }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            Inhabitant inh = inhabitants.get(inhabitantId);
+            c.background("bg_grid");
+            title(c);
+            back(c, 0, "La garde", () -> kit.show(new GuardView(player, 0)));
+            c.sprite("rib_role", sx(1), sy(0));
+            close(c);
+            if (inh == null || inh.state != InhabitantManager.State.HABITANT) {
+                footer(c, false, "HABITANT INDISPONIBLE");
+                return;
+            }
+            item(7, 0, inhabitantHead(inh, "§f" + inh.name, List.of("§7Habitant de §f" + inhabitants.homeName(inh),
+                    "", "§7Choisissez le rôle qu'il apprendra", "§7chez Roland.")), null);
+
+            int rank = inhabitants.guardRank();
+            List<GuardConfig.Role> roles = inhabitants.guard().roles();
+            for (int i = 0; i < Math.min(GRID, roles.size()); i++) {
+                GuardConfig.Role role = roles.get(i);
+                List<String> lore = new ArrayList<>(List.of(
+                        "§7Combat : §f" + (role.ranged() ? "à distance (arc)" : "au contact"),
+                        "§7Vie : §f" + fmtHealth(role.health()),
+                        "§7Formation : §f" + InhabitantManager.minutes(role.trainingMs()), "§7Équipement :"));
+                lore.addAll(equipment(role));
+                lore.add("");
+                if (role.rank() > rank) {
+                    lore.add("§c🔒 Roland doit être au rang " + role.rank());
+                    c.sprite("ring_gray", sx(col(i)), sy(row(i)));
+                    c.sprite("lock", sx(col(i)) + 3, sy(row(i)) + 3);
+                    item(col(i), row(i), UiItems.blank("§8🔒 " + role.name(), lore), null);
+                    continue;
+                }
+                lore.add("§eCliquez : former " + inh.name);
+                c.sprite("ring_green", sx(col(i)), sy(row(i)));
+                item(col(i), row(i), UiItems.shown(role.weapon() != null ? role.weapon() : Material.IRON_SWORD,
+                        "§f" + role.name(), lore, false), t -> {
+                    String err = inhabitants.train(inhabitantId, role.key());
+                    if (err != null) {
+                        player.sendMessage("§c❌ " + err);
+                        kit.show(new RoleView(player, inhabitantId));
+                    } else {
+                        kit.show(new GuardView(player, 0));
+                    }
+                });
+            }
+            footer(c, false, "FORMER : " + inh.name.toUpperCase());
+        }
+
+        /** « 15 ❤ » (2 points de vie par cœur). */
+        private String fmtHealth(double health) {
+            double hearts = health / 2;
+            return (hearts == Math.floor(hearts) ? String.valueOf((int) hearts) : String.valueOf(hearts)) + " ❤";
+        }
+
+        /** Une ligne par objet du rôle (arme, puis armure). */
+        private List<String> equipment(GuardConfig.Role role) {
+            List<String> lines = new ArrayList<>();
+            for (Material m : new Material[]{role.weapon(), role.helmet(), role.chest(), role.legs(), role.boots()}) {
+                if (m != null) lines.add("§8• §f" + VillagerGUI.formatName(m));
+            }
+            return lines.isEmpty() ? List.of("§8• §7aucun") : lines;
         }
     }
 

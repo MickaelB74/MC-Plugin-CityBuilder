@@ -74,7 +74,7 @@ public final class UiLayout {
     /** Déclare au registre toutes les combinaisons image / hauteur utilisées par les écrans. */
     public static void declare(UiAtlas a) {
         for (String bg : new String[]{"bg_character", "bg_grid", "bg_quests", "bg_personal",
-                "bg_cityquests", "bg_buildings"}) a.background(bg);
+                "bg_cityquests", "bg_buildings", "bg_character_gestion"}) a.background(bg);
 
         int row0 = sy(0), row5 = sy(5);
         int[] rows14 = {sy(1), sy(2), sy(3), sy(4)};
@@ -83,7 +83,8 @@ public final class UiLayout {
         for (String s : new String[]{"ic_close", "ic_back", "ic_info", "ic_follow", "ic_follow_stop",
                 "ic_job", "ic_job_quit", "ic_job_locked", "ic_story", "ic_purse"}) a.sprite(s, row0);
         for (String s : new String[]{"rib_vendre", "rib_entrepot", "rib_boutique", "rib_quetes_pnj",
-                "rib_recits", "rib_logis", "rib_batiments", "rib_supprimer", "rib_quetes"}) a.sprite(s, row0);
+                "rib_recits", "rib_logis", "rib_batiments", "rib_supprimer", "rib_quetes",
+                "rib_atelier", "rib_actions", "rib_garde", "rib_role"}) a.sprite(s, row0);
         // Pied de page : pagination et gros boutons
         for (String s : new String[]{"ic_prev", "ic_next", "ic_prev_off", "ic_next_off"}) a.sprite(s, row5);
         for (String s : new String[]{"fb_ajouter", "fb_supprimer", "fb_retour", "fb_recit", "fb_charte",
@@ -92,7 +93,7 @@ public final class UiLayout {
         for (String s : new String[]{"btn_vendre", "btn_entrepot", "btn_boutique",
                 "btn_suivre", "btn_arreter", "btn_logis", "btn_promener", "btn_rester", "btn_quetes",
                 "btn_batiments", "btn_tresor", "btn_agrandir", "btn_agrandir_off", "btn_deposer",
-                "btn_histoire", "plate"}) a.sprite(s, rows14);
+                "btn_histoire", "btn_actions", "plate"}) a.sprite(s, rows14);
         // États des cases de liste, cadenas
         for (String s : new String[]{"ring_green", "ring_amber", "ring_red", "ring_gray", "ring_purple",
                 "ring_gold"}) a.sprite(s, rows14);

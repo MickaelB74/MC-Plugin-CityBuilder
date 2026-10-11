@@ -773,6 +773,20 @@ public class ValmontArt {
                 "..kkk.......",
                 ".kk.........",
                 "kk..........");
+        // Écu de la garde (bouton « Actions », écran de la garde)
+        icon("shield",
+                "kkkkkkkkkkkk",
+                "kBBBBYYBBBBk",
+                "kBbbbYYbbbBk",
+                "kBbbbYYbbbBk",
+                "kYYYYYYYYYYk",
+                "kBbbbYYbbbBk",
+                "kBbbbYYbbbBk",
+                ".kBbbYYbbBk.",
+                ".kBbbYYbbBk.",
+                "..kBbYYbBk..",
+                "...kBYYBk...",
+                "....kkkk....");
         icon("crown",
                 "............",
                 "............",
@@ -1232,6 +1246,14 @@ public class ValmontArt {
 
     /** Écran « personnage » : portrait, 4 gros boutons, barre d'expérience. */
     static BufferedImage bgCharacter() {
+        return bgCharacter(GOLD, "star");
+    }
+
+    /**
+     * Écran d'un personnage. Variante « gestion » (logis, actions) : cadre du portrait et
+     * médaillon turquoises, médaillon à la maison — un clic sur le portrait passe de l'une à l'autre.
+     */
+    static BufferedImage bgCharacter(int[] frame, String medal) {
         BufferedImage im = windowBase(11);
         // Rangée 0 : plaque d'état (colonnes 0-5) + 3 logements de boutons
         recess(im, M + sx(0), M + sy(0), 108, 18, true);
@@ -1240,7 +1262,7 @@ public class ValmontArt {
         // Cadre du portrait (colonnes 0-3, rangées 1-4)
         int px0 = M + sx(0), py0 = M + sy(1);
         fill(im, px0, py0, 72, 72, OUT);
-        bevel(im, px0, py0, 72, 72, GOLD);
+        bevel(im, px0, py0, 72, 72, frame);
         fill(im, px0 + 3, py0 + 3, 66, 66, OUT);
         fill(im, px0 + 4, py0 + 4, 64, 64, W0);
         goldCorner(im, px0 + 1, py0 + 1, 1, 1); goldCorner(im, px0 + 70, py0 + 1, -1, 1);
@@ -1253,9 +1275,9 @@ public class ValmontArt {
         fill(im, M + 27, by + 3, 140, 12, OUT);
         fill(im, M + 28, by + 4, 138, 10, 0xFF241509);
         for (int x = M + 28; x < M + 166; x++) px(im, x, by + 4, 0xFF140C05);
-        // médaillon de niveau
-        bevel(im, M + sx(0) + 1, by + 1, 16, 16, GOLD);
-        drawIcon(im, "star", M + sx(0) + 3, by + 3);
+        // médaillon de niveau (étoile) ou de l'atelier (maison)
+        bevel(im, M + sx(0) + 1, by + 1, 16, 16, frame);
+        drawIcon(im, medal, M + sx(0) + 3, by + 3);
         return im;
     }
 
@@ -1418,6 +1440,7 @@ public class ValmontArt {
         BufferedImage bgCQ = bgCityQuests(), bgB = bgBuildings();
         save(bgChar, "bg_character"); save(bgList, "bg_grid"); save(bgQ, "bg_quests");
         save(bgP, "bg_personal");     save(bgCQ, "bg_cityquests"); save(bgB, "bg_buildings");
+        save(bgCharacter(TEAL, "house"), "bg_character_gestion"); // écran « gestion » d'un artisan
 
         // ── Gros boutons 90 x 18 ────────────────────────────
         Map<String, BufferedImage> big = new LinkedHashMap<>();
@@ -1436,6 +1459,7 @@ public class ValmontArt {
         big.put("btn_agrandir_off", button(90, 18, GRAY, "map",    "AGRANDIR"));
         big.put("btn_deposer",    button(90, 18, GREEN,  "coinup", "DÉPOSER"));
         big.put("btn_histoire",   button(90, 18, BROWN,  "book",   "SON HISTOIRE"));
+        big.put("btn_actions",    button(90, 18, RED,    "shield", "ACTIONS"));
         big.put("plate",          plate(90));
         for (var e : big.entrySet()) save(e.getValue(), e.getKey());
 
@@ -1487,6 +1511,10 @@ public class ValmontArt {
         ribs.put("rib_batiments", ribbon(TEAL,   "BÂTIMENTS"));
         ribs.put("rib_supprimer", ribbon(RED,    "SUPPRIMER"));
         ribs.put("rib_quetes",    ribbon(GOLD,   "QUÊTES"));
+        ribs.put("rib_atelier",   ribbon(TEAL,   "SON ATELIER"));
+        ribs.put("rib_actions",   ribbon(RED,    "ACTIONS"));
+        ribs.put("rib_garde",     ribbon(RED,    "LA GARDE"));
+        ribs.put("rib_role",      ribbon(RED,    "RÔLE"));
         for (var e : ribs.entrySet()) save(e.getValue(), e.getKey());
 
         // ── États des cases, pastilles, étoiles, barres ─────

@@ -12,8 +12,8 @@ sièges par vagues, fêtes, soldats de la garde. Pas de monuments ni d'autre ges
 | 1 | Types de bâtiments | — | petite | **validée** |
 | 2 | Inspection des constructions | 1 | moyenne | **validée** |
 | 3 | Habitations et habitants (+ impôt simple) | 0, 2 | grosse | **codée, à tester en jeu** |
-| 4 | Protection renforcée, calendrier d'événements, sièges | 3 | moyenne à grosse | à faire |
-| 5 | La garde (soldats) | 3, 4 | moyenne à grosse | à faire |
+| 4 | Protection renforcée, calendrier d'événements, sièges | 3 | moyenne à grosse | **codée, à tester en jeu** |
+| 5 | La garde (soldats) | 3 (4 pour la défense des sièges) | moyenne à grosse | **codée, à tester en jeu** (faite avant la 4) |
 | 6 | Besoins et satisfaction | 3, 5 | moyenne | à faire |
 | 7 | Fêtes | calendrier de la phase 4 | petite à moyenne | à faire |
 
@@ -61,7 +61,7 @@ jamais sauvegardés et disparaissent au redémarrage.
 | Commande | Effet |
 |---|---|
 | `/city proto habitant` | Habitant blessable devant vous (PNJ de type joueur, skin suivant de la liste) |
-| `/city proto soldat` | Soldat blessable (uniforme de `soldats.skins`, armure de fer, épée, 30 PV) qui attaque les monstres à moins de 16 blocs |
+| `/city proto soldat` | Désormais un **garde de test** au comportement réel de la garde (voir phase 4, « gardes de test ») ; à l'origine, soldat blessable du prototype qui attaquait les monstres à moins de 16 blocs |
 | `/city proto former` | L'habitant du prototype le plus proche (16 blocs) devient soldat : il change de skin (uniforme), reçoit armure et épée, réapparaît sur place |
 | `/city proto zombie` | Zombie qui cible le PNJ du prototype le plus proche |
 | `/city proto foule <n>` | n habitants qui se promènent autour de vous (1 à 60), dans la ville uniquement |
@@ -417,20 +417,377 @@ joueurs minimum), annonce 5 minutes avant, `/city event list|start|stop`.
 À tester : sièges aux paliers 1, 5 et 10 ; aucun bloc touché ; joueurs et artisans indemnes ;
 habitants tués puis remplacés ; plus aucun assaillant après un redémarrage en plein siège.
 
+### Ce qui est codé
+
+**4a. Protection renforcée** (`ClaimProtectionListener`, chunks de la ville en cache) — dans la
+ville :
+- une créature hostile (enderman, ravageur, wither, poisson d'argent, zombie…), un lapin ou un
+  projectile qui n'a pas été tiré par un joueur ne peut ni prendre ni modifier un bloc ; les
+  blocs qui tombent, les moutons qui broutent et les villageois qui cultivent ne sont pas
+  concernés ;
+- portes jamais enfoncées ;
+- feu : seul un joueur peut en allumer un ; ni propagation, ni combustion de blocs, ni feu de lave,
+  de foudre ou de boule de feu ;
+- cultures et œufs de tortue jamais piétinés (joueurs et créatures) ;
+- tableaux, cadres et porte-armures protégés de tout ce qui n'est pas un joueur (monstres,
+  explosions, flèches perdues des gardes).
+
+Limite : un monstre ajouté par un mod de Youer qui modifie les blocs sans passer par les
+événements de Bukkit n'est pas arrêté (non vérifiable sans le mod).
+
+**4b. Calendrier** (`siege.EventCalendar`, section `evenements`) : créneaux en heure réelle
+(fuseau `Europe/Paris` par défaut) — type, jours (`lundi` … `dimanche`, `tous`), heure,
+joueurs minimum. Par défaut : siège le mercredi et le samedi à 21:00, 2 joueurs minimum.
+Annonce dans le chat (et cloche) `annonce-minutes` (5) avant ; à l'heure dite, lancement s'il y
+a assez de joueurs, sinon « Siège annulé : 1 joueur connecté, il en faut 2 ». Pas d'annonce tant
+que la ville n'a pas atteint `premier-palier`. Les fêtes de la phase 7 s'ajouteront comme un
+nouveau type. `/city event list` (tous) : planning, prochain rendez-vous et compte à rebours ;
+op : `start [siege]`, `stop`, `recharger`.
+
+**4c. Le siège** (`siege.SiegeManager`, réglages `siege.SiegeConfig`, section `sieges`) :
+- **Alerte** : titre « ⚔ Siège ! », cor de raid, message (chapitre, nombre de vagues, côté
+  attaqué), puis `preparation-secondes` (30) avant la première vague.
+- **Vagues** : `vagues` selon le palier (2 aux chapitres I-III, 3 aux IV-VI, 4 aux VII-VIII, 5
+  aux IX-X). Assaillants par vague : (4 + palier) × (1 + 0,5 × (joueurs connectés − 1)), 40 au
+  plus. Monstres tirés au hasard selon des poids par palier : zombies et squelettes ; + araignées,
+  pillards, sorcières (IV) ; + vindicateurs, évocateurs (VII) ; + ravageurs (IX). À partir du
+  chapitre IX, la dernière vague est menée par un **champion** nommé, lumineux, 120 PV, hache en
+  netherite (« Gorvak le Brise-Portes »). Répit de `pause-vagues-secondes` (30) entre deux vagues.
+- **Côté attaqué** : chaque vague arrive d'un bord de la ville, de préférence proche des joueurs,
+  annoncé (« par le nord-est »). Les assaillants apparaissent **hors des chunks revendiqués**, à
+  `distance-apparition` (12) blocs au-delà de la lisière, au sol (jamais dans l'eau), sans
+  équipement ni monture au hasard (pas de poulet-jockey) ; squelettes, pillards et vindicateurs
+  reçoivent leur arme (jamais lâchée). Ils ne brûlent pas au soleil, ne ramassent rien, ne
+  rejoignent pas de raid, ne disparaissent pas d'eux-mêmes.
+- **Cibles** : l'habitant, la recrue ou le garde le plus proche (48 blocs) ; sinon ils marchent sur
+  la **mairie** (centre du bâtiment de type mairie), par étapes. Les joueurs restent invulnérables
+  en ville, les artisans aussi.
+- **La garde** : pendant un siège, les gardes qui ne voient pas d'ennemi accourent au pas de
+  course vers le côté attaqué, puis font leur ronde autour de ce point ; ils attaquent tout
+  monstre hostile qu'ils voient dans la ville.
+- **Barre rouge** en haut de l'écran (le panneau de quêtes masque les barres blanches) : « Vague
+  2/3 · 12 assaillants · par le nord · Gorvak · 14:21 restantes », compte à rebours pendant
+  l'alerte et les répits.
+- **Victoire** (toutes les vagues repoussées avant `duree-minutes`, 20 min après l'alerte) :
+  titre, `coins` + `coins-par-palier` × palier dans la caisse (150 + 50 × palier), XP pour
+  Roland (40 + 10 × palier ; annonce s'il monte de rang), bilan : meilleurs défenseurs,
+  monstres abattus par la garde, habitants et gardes perdus. **Défaite** (temps écoulé) : les
+  assaillants se retirent, pas de récompense, même bilan. Plus aucun joueur connecté : siège
+  abandonné.
+- **Nettoyage** : les assaillants sont marqués et jamais enregistrés avec le monde ; ceux d'un
+  siège interrompu (arrêt du serveur, plantage) sont retirés au démarrage et au chargement de
+  leur chunk. Un assaillant dont le chunk se décharge en plein siège réapparaît du côté
+  attaqué ; un zombie noyé ou un squelette gelé reste un assaillant.
+- `/city siege` (tous) : état du siège ; op : `start [palier]` (sans palier minimal, utile pour
+  tester les chapitres 1, 5 et 10), `stop`, `next` (vague suivante).
+
+**config.yml** (`config-version` 15) : sections `evenements` et `sieges` ajoutées d'elles-mêmes
+avec leurs commentaires ; garde portée à 50 (voir phase 5).
+
+### À tester en jeu
+
+1. `/city event list` : planning, prochain siège, compte à rebours ; avant le chapitre IV, la
+   mention « Valmont est encore trop modeste ».
+2. Créneau de test : ajouter `- {type: siege, jours: [tous], heure: "HH:MM", joueurs-min: 1}`
+   quelques minutes plus tard, `/city event recharger` → annonce 5 min avant, siège à l'heure (ou
+   « Siège annulé » avec `joueurs-min: 2` et un seul joueur).
+3. `/city siege start 1` : alerte, barre rouge, première vague par le côté annoncé, apparition
+   hors de la ville ; les gardes accourent ; les assaillants visent habitants et gardes.
+4. Pendant le siège : aucun bloc touché (portes, cultures, cadres) ; un joueur en ville ne prend
+   aucun dégât ; les artisans non plus.
+5. Un habitant tué → lit en deuil puis remplacement (phase 3) ; le bilan compte la perte.
+6. `/city siege next` jusqu'à la victoire : récompense dans la caisse, XP de Roland, bilan.
+7. `/city siege start 5` puis `start 10` : pillards et sorcières, puis vindicateurs, évocateurs,
+   ravageurs et le champion (nom, lueur, annonce de sa chute).
+8. Attendre la fin du temps (`duree-minutes: 2` puis `/city event recharger`) : défaite, les
+   assaillants disparaissent.
+9. Redémarrer le serveur en plein siège : plus aucun assaillant au retour, ni barre.
+10. Hors siège : un enderman ne prend plus de blocs, le feu ne se propage pas, un zombie
+    n'enfonce pas une porte, sauter sur une culture ne la piétine pas (ville uniquement).
+
+### Correctifs (front de la garde, pillards, retour en ville, armée ennemie)
+
+- **La garde en position** : avant, un garde finissait sa ronde avant de partir, au pas, puis
+  errait au hasard autour du point de ralliement. Désormais, dès l'alerte et pendant chaque répit,
+  chaque garde reçoit un **poste** le long du bord attaqué (ce chunk de lisière et ses voisins) :
+  soldats et sergents en première ligne (2 et 4 blocs à l'intérieur de la lisière), archers en
+  retrait (7 et 9 blocs), un poste tous les 2 blocs, au sol, hors des bâtiments, du centre vers
+  les ailes. Il interrompt sa ronde et y court ; bloqué plus de 30 s (mur, rivière), il y est
+  téléporté. Sur place, il reste immobile face à l'ennemi. Il quitte son poste pour combattre un
+  ennemi entré dans la ville (16 blocs), puis y revient. Pendant un siège, les archers tirent aussi
+  sur les ennemis qui approchent hors de la ville, sans quitter leur poste. Quand la vague
+  suivante vient d'ailleurs, la garde change de front pendant le répit.
+- **Pillards immobiles** : sans défenseur à moins de 48 blocs, les assaillants recevaient un point
+  de marche pris à leur propre hauteur (souvent dans le vide ou dans le sol) : le chemin échouait,
+  et les pillards, sorcières et évocateurs ne se déplacent pas d'eux-mêmes vers une cible
+  lointaine. Désormais les étapes de marche (24 blocs) sont prises au sol, et toutes les 2 s chaque
+  monstre est relancé vers sa cible tant qu'il n'est pas à portée (2,5 blocs au contact, 10 pour
+  les tireurs) ou qu'il ne la voit pas.
+- **Fin du siège** : les gardes quittent le front, rentrent vers leur quartier (un point de ronde
+  près de leur lit, 90 s au plus), puis reprennent leurs rondes habituelles.
+- **Types de siège** (`sieges.types`, tiré au hasard à chaque siège, 1 chance sur 2 par défaut) :
+  - **monstres** (comme avant) ;
+  - **bannière** : l'armée d'une **faction ennemie** (`sieges.banniere.factions` : l'Ost du
+    Corbeau, les Lames de Grisval, la Horde des Marais ; nom et couleur), faite de soldats PNJ
+    comme la garde (`sieges.banniere.unites` : milicien, archer, soldat, arbalétrier, chevalier ;
+    vie, combat, arme et armure), d'autant plus nombreux et aguerris que la ville est avancée
+    (`composition` par palier, nombre comme `sieges.assaillants`). Chaque vague est ouverte par un
+    **porte-étendard** (bannière de la faction sur la tête ; sa chute est annoncée) ; à partir du
+    chapitre VII, la dernière vague est menée par un **champion** (« Morvan le Noir », 140 PV,
+    armure et épée en netherite, lumineux). Ils visent habitants et gardes (sinon les joueurs à
+    moins de 24 blocs), au contact ou à l'arc / l'arbalète, marchent sur la mairie faute de
+    cible, n'ouvrent pas les portes (une maison fermée protège ses habitants) et ne sont jamais
+    téléportés quand ils sont bloqués. Pas de tirs entre eux ; ni butin ni message de mort ;
+    jamais enregistrés. Les gardes les combattent comme des monstres, les joueurs peuvent les
+    frapper. Uniformes : `sieges.banniere.skins` (vide = skins par défaut de Minecraft).
+- `/city siege start [palier] [monstres|banniere]` ; `/city event recharger` relit aussi les
+  uniformes ennemis. config.yml version 16 : `types` et `banniere` ajoutés d'eux-mêmes sous
+  `sieges`.
+
+À tester :
+1. `/city siege start 1 monstres` : pendant les 30 s d'alerte, les gardes interrompent leur ronde
+   et courent se placer en ligne sur le bord annoncé (archers derrière), face à l'extérieur.
+2. Les pillards (`/city siege start 5 monstres`) avancent vers les habitants ou la mairie.
+3. Après la victoire (`/city siege next` jusqu'au bout) ou `/city siege stop` : les gardes
+   rentrent vers leurs maisons, puis reprennent leurs rondes.
+4. `/city siege start 4 banniere` : message et barre au nom de la faction ; porte-étendard avec
+   la bannière ; miliciens, soldats et archers ennemis attaquent habitants et gardes ; les gardes
+   ripostent ; un joueur peut les abattre ; ils ne se blessent pas entre eux.
+5. `/city siege start 8 banniere` : arbalétriers, chevaliers et le champion Morvan le Noir à la
+   dernière vague.
+6. Un habitant dans une maison à porte fermée est hors d'atteinte des soldats ennemis.
+
+### Correctifs (combats entre soldats, dégâts, ambiance sonore)
+
+- **Gardes et soldats ennemis s'ignoraient, aucun dégât entre eux ni sur les joueurs** : la
+  fonction de Citizens qui dit si une entité est un PNJ d'un registre répond « oui » pour
+  **n'importe quel** PNJ, quel que soit son registre. Résultat : chaque garde ou habitant était
+  aussi pris pour un « soldat ennemi » (et inversement) ; les coups entre « soldats ennemis »
+  étant bloqués, tous les coups de PNJ à PNJ l'étaient ; un coup de soldat ennemi sur un joueur
+  passait pour un coup de garde (bloqué) ; un coup de joueur sur un soldat ennemi passait pour un
+  coup sur un habitant (bloqué). Chaque gestionnaire vérifie désormais que le PNJ lui appartient.
+- **Contrôle PvP** : pour Minecraft, habitants, gardes et soldats ennemis sont des joueurs ; si le
+  PvP est coupé sur le serveur, leurs coups et leurs flèches entre eux n'ont aucun effet. Les coups
+  sont donc portés par le plugin (`inhabitant.NpcCombat`) : dégâts de l'arme en main (épée de
+  diamant 7…), armure prise en compte, recul, son de coup. Flèches : 4,5 (arc), 6 (arbalète). Un
+  joueur qui frappe un soldat ennemi alors que le PvP est coupé : coup porté de même (recharge de
+  l'attaque et coup critique en chute compris).
+- **Riposte** : un soldat ennemi frappé par un garde ou un joueur (16 blocs) se retourne contre
+  lui ; les gardes combattent tout soldat ennemi en vue dans la ville. L'auteur de chaque coup est
+  retenu : le bilan compte bien les ennemis abattus par la garde et par chaque joueur.
+- **Joueurs blessés pendant un siège** (`sieges.joueurs-blesses`, activé) : pendant un siège, les
+  monstres et soldats ennemis peuvent blesser les joueurs, même en ville ; hors siège, les joueurs
+  restent invulnérables en ville. `false` : invulnérables en ville même pendant un siège.
+- **Ambiance sonore** (`siege.SiegeSounds`) :
+  - alerte : trois coups de cloche (et la cloche de la mairie qui résonne), puis le **cor de
+    guerre** venu du côté attaqué (cor de raid pour les monstres, cor de chèvre pour une armée) ;
+    Roland : « Gardes, à vos postes ! Ils viennent par le nord ! » ;
+  - compte à rebours avant chaque vague : un coup de tambour par seconde sur les 5 dernières, « 3,
+    2, 1 » à l'écran ;
+  - début de vague : cor, puis cri de guerre (acclamations d'une armée, rugissement de monstres) ;
+    grondement ou second cor quand le champion arrive ;
+  - pendant la vague : **tambours de guerre** toutes les 3 s, venus du camp ennemi ; son de coup à
+    chaque coup porté entre combattants ;
+  - porte-étendard abattu : bouclier brisé et fanfare ; champion abattu : fanfare ;
+  - vague repoussée : deux coups de cloche, fanfare ;
+  - victoire : fanfare, cloches à toute volée et **feux d'artifice** au-dessus de la mairie (aux
+    couleurs de Valmont, éclatant très haut) ; défaite : grondement sourd et cloche qui résonne.
+  Les sons « venus de » sont joués à 12 blocs de chaque joueur dans la direction de leur source :
+  on les entend de partout et on sait d'où ils viennent.
+- config.yml version 18 : `joueurs-blesses` ajouté de lui-même sous `sieges`.
+
+À tester :
+1. `/city siege start 4 banniere` : alerte (cloches, cor du côté annoncé, ordre de Roland),
+   compte à rebours, cor et cris au début de la vague, tambours pendant le combat.
+2. Les gardes engagent les soldats ennemis (coups, flèches, PV qui baissent) ; les soldats
+   ennemis ripostent contre les gardes qui les frappent ; ils ne se blessent pas entre eux.
+3. Les soldats ennemis blessent habitants et gardes, et les joueurs (en ville comme dehors) ;
+   avec `joueurs-blesses: false` (`/city event recharger`), plus en ville.
+4. Un joueur abat un soldat ennemi à l'épée et à l'arc ; le bilan de fin le compte.
+5. Victoire : feux d'artifice au-dessus de la mairie ; défaite (`duree-minutes: 2`) : son sourd.
+
+### Correctifs (plantage du serveur, battement de cœur, gardes de test)
+
+- **Plantage « x not finite »** : un coup porté par le plugin n'avait ni attaquant ni point
+  d'origine ; sur Youer, le recul calculé à partir de là donnait une vitesse invalide (NaN) à la
+  victime, puis le serveur plantait en l'envoyant aux joueurs. Le dégât part désormais de la
+  position de l'attaquant (le jeu en tire le recul), et toute vitesse invalide est remise à zéro
+  aussitôt après le coup, ainsi qu'à chaque passage pour chaque habitant, garde et soldat ennemi.
+- **Battement de cœur** pendant les vagues, pour chaque joueur, de plus en plus rapide à mesure
+  que les assaillants approchent : toutes les 1,75 s au loin, 1,25 s à moins de 48 blocs, 1 s à
+  moins de 24 (plus fort), 0,75 s à moins de 10. Les tambours de guerre venus du camp ennemi sont
+  plus forts.
+- **Gardes de test** : le soldat de `/city proto soldat` venait du prototype de la phase 0 (il ne
+  faisait que frapper les monstres proches : ni postes, ni front, ni soldats ennemis). Désormais :
+  - `/city garde test [nombre] [rôle]` (op) crée jusqu'à 20 **vrais gardes** près du joueur,
+    tout de suite : rondes, front d'un siège, combat, retour en ville… comme un garde formé chez
+    Roland ; sans lit ni formation, hors limite de la garde, jamais enregistrés (ils disparaissent
+    au redémarrage) ; « (test) » dans `/city garde` ; leur mort n'ouvre pas de deuil ;
+  - `/city garde test retirer` les retire ; `/city proto clear` aussi ;
+  - `/city proto soldat [rôle]` crée maintenant un garde de test.
+  Ils comptent dans la taille de la garde (menu de Roland) tant qu'ils existent.
+
+À tester : `/city garde test 6`, `/city garde test 3 archer`, puis `/city siege start 4 banniere` :
+les gardes de test prennent position sur le front, combattent les soldats ennemis, rentrent en
+ville à la fin ; aucun plantage pendant les combats ; battement de cœur qui s'accélère quand
+l'ennemi approche.
+
+### Correctifs (sons, sortie de la garde, assaillants en ville)
+
+- **Sons** (remplace l'ambiance sonore et le battement de cœur ci-dessus, demande mal comprise) :
+  des sons **au début et à la fin seulement**, plus la chute de la bannière :
+  - début du siège : cloches d'alarme, cor de guerre venu du côté attaqué ;
+  - porte-étendard abattu : bouclier brisé et fanfare ;
+  - fin : victoire (fanfare, cloches, feux d'artifice) ou défaite (grondement sourd).
+
+  Retirés : battement de cœur, tambours, compte à rebours sonore (le « 3, 2, 1 » reste à
+  l'écran), cor et cris à chaque vague, cloches entre les vagues, sons du champion, son ajouté à
+  chaque coup porté. Restent les sons naturels du jeu (coups reçus, tir d'arc et d'arbalète).
+- **La garde sort combattre** : pendant l'alerte et les répits, elle tient le front (inchangé) ;
+  dès qu'une vague arrive, chaque garde quitte son poste et **sort de la ville** à la rencontre de
+  l'assaillant le plus proche (monstre ou soldat, jusqu'à 64 blocs) : les soldats et sergents
+  l'engagent au contact, les archers avancent jusqu'à portée de tir. Ils marchent au combat (par
+  étapes, jamais téléportés). Quand il n'y a plus d'assaillant (répit), ils reviennent à leurs
+  postes ; à la fin du siège, ils rentrent en ville et reprennent leurs rondes.
+- **Tous les assaillants entrent dans la ville** : hors de la ville, les tireurs (archers et
+  arbalétriers ennemis, squelettes, pillards, sorcières, évocateurs) ne s'arrêtent plus à la
+  lisière pour tirer de loin : ils marchent vers la mairie (ou le côté attaqué) ; en chemin, un
+  soldat tireur ne tire que sur une cible à moins de 10 blocs. Une fois en ville, ils combattent
+  normalement. Les soldats au contact attaquent l'habitant ou le garde le plus proche (y compris
+  les gardes sortis à leur rencontre), sinon marchent sur la mairie.
+
+À tester : `/city garde test 6` et `/city garde test 3 archer`, puis `/city siege start 4 banniere`
+et `/city siege start 5 monstres` : pendant l'alerte, la garde se met en ligne ; à l'arrivée de la
+vague, elle sort et va au contact ; les archers ennemis et les pillards entrent dans la ville ;
+seuls l'alerte, la chute de la bannière et la fin font du son.
+
 ## Phase 5 — La garde
 
+Faite **avant la phase 4** (choix du 11/10/2026) : la défense pendant les sièges viendra avec la
+phase 4.
+
 - Écran « La garde » chez Roland : soldats / maximum, recrues en formation, « Former une recrue ».
-- Maximum selon le rang de Roland (ex. 2, 4, 6, 9, 12).
+- Maximum selon le rang de Roland : 8, 16, 25, 36, 50 (au lieu de 2 à 12, jugé trop peu) ;
+  formations simultanées 2, 3, 4, 5, 6.
 - Formation : un habitant part à l'atelier de Roland, X minutes (comptées avec un joueur
   connecté), il en ressort armé et en uniforme (skin de `soldats.skins`).
 - Un soldat garde son lit : population (habitants + soldats) ≤ lits.
-- Patrouille automatique entre les bâtiments et la lisière ; attaque les monstres proches ; se
-  soigne au repos. Pendant un siège, rejoint le côté attaqué.
+- Patrouille automatique sur le terrain de la ville ; attaque les monstres proches ; se soigne au
+  repos. Pendant un siège, rejoint le côté attaqué (phase 4).
 - Mort : place libérée, il faut former une nouvelle recrue ; son lit accueillera un habitant.
-- `/city garde list|skip|kill`.
 
-À tester : maximum selon le rang ; formation avec `skip` ; intervention sur un monstre ; siège
-avec et sans garde ; pas de remplacement automatique d'un soldat mort.
+### Ce qui est codé
+
+**Menus** (pixel art du pack, voir `docs/INTERFACES_VALMONT.md`) :
+- Accueil d'un artisan installé : un clic sur le **portrait** ouvre la **gestion du bâtiment**,
+  variante de l'écran d'accueil (cadre turquoise, médaillon « maison »). Le menu de droite n'y
+  propose plus la vente, l'entrepôt… mais **Logis** (l'écran « Son atelier » de la phase 2),
+  **Actions** et **Son histoire** ; la barre montre la progression de l'atelier vers le niveau
+  suivant. Un clic sur le portrait revient au commerce. Vrai pour tous les artisans.
+- **Actions** : « La garde » chez Roland ; « Aucune action pour l'instant » chez les autres (place
+  prévue pour les actions des phases suivantes).
+- **La garde** : liste **commune à tous les joueurs** des gardes (anneau violet), des recrues
+  (ambre) et des habitants à former (vert ; gris s'il n'y a plus de place), têtes au skin de
+  chacun (uniforme pour un garde), pied de page « GARDE 3/4 · FORMATION 1/1 ». Clic sur un
+  habitant → **Rôle** ; **Maj + clic droit** sur un garde ou une recrue → il redevient habitant.
+- **Rôle** : rôles de `soldats.roles` (combat, vie, durée, équipement) ; ceux d'un rang supérieur
+  à celui de Roland sont verrouillés. Un clic lance la formation (annonce dans le chat).
+
+**Règles** (`InhabitantManager`, réglages `GuardConfig`) :
+- Formation seulement si Roland est **installé** dans son atelier ; taille de la garde (gardes +
+  recrues) et nombre de formations simultanées selon son rang (`soldats.max`,
+  `soldats.formations`). Le temps de formation n'avance que si un joueur est connecté (et que
+  Roland a son atelier) ; il est enregistré, un redémarrage ne le perd pas.
+- **Recrue** : elle se place **à côté de Roland** (à 2 blocs environ, une place par recrue) et
+  s'y entraîne jour et nuit, avec son skin d'habitant (voir « Correctifs » plus bas). À la fin :
+  elle devient **garde** — uniforme
+  (`soldats.skins`, distribué à tour de rôle), équipement et points de vie de son rôle, annonce.
+- **Garde** : toujours affiché (hors plafond `max-visibles`). Il **patrouille** sur le terrain de
+  la ville (points pris au sol, dans les chunks revendiqués, **hors de la zone de tout
+  bâtiment**, sans ouvrir les portes), de jour comme de nuit, **sans dormir**. Il repère les
+  monstres hostiles dans la ville (`vision`, 16 blocs) : un soldat ou un sergent les attaque au
+  contact, un archer tire à l'arc à `portee-arc` (14 blocs, une flèche toutes les 1,5 s, flèches
+  non ramassables). Il ne poursuit pas un monstre hors de la ville. Au repos, il regagne 1 PV
+  toutes les 5 s.
+- Les gardes ne blessent que les monstres (ni joueur, ni habitant, ni animal) ; les joueurs ne
+  blessent pas les gardes. La nuit, les monstres proches les prennent pour cible comme les
+  habitants.
+- Un garde **garde son lit** (la population ne dépasse pas le nombre de lits) et **ne paie pas
+  l'impôt** (seuls les habitants civils le paient). Mort : annonce avec son rôle, lit en deuil
+  puis un nouvel habitant arrive — **pas de remplacement automatique** du garde.
+- Un garde renvoyé (menu ou commande) redevient habitant, avec son ancien skin, dans son lit.
+
+**Commande** `/city garde` (alias `guard`) : `list` (bilan), `former <habitant> <rôle>`,
+`renvoyer <nom>` — ouvertes à tous, comme le menu ; actions de test (op) : `fin` (fin immédiate
+des formations), `kill <nom>`. Complétion des noms et des rôles.
+
+**config.yml** (`config-version` 14, clés ajoutées d'elles-mêmes sous `soldats`, skins conservés) :
+`max`, `formations`, `vitesse-patrouille`, `vision`, `portee-arc`, `roles` (soldat rang 1, archer
+rang 2, sergent rang 4 : nom, rang, minutes, vie, combat `melee`/`distance`, arme et armure).
+Base : colonnes `role`, `training_left`, `uniform` ajoutées à la table `inhabitants`.
+
+### À tester en jeu
+
+1. Accueil de n'importe quel artisan installé → clic sur le portrait : écran de gestion (Logis,
+   Actions, Son histoire, barre de l'atelier) ; clic sur le portrait → retour au commerce ;
+   Logis → « Son atelier », dont la flèche revient à la gestion.
+2. Actions chez un autre artisan : « Aucune action pour l'instant ».
+3. Roland (rang 1) → Actions → La garde : les habitants apparaissent avec leur tête ; pied de
+   page « GARDE 0/8 · FORMATION 0/2 ».
+4. Clic sur un habitant → Rôle : Soldat disponible, Archer (rang 2) et Sergent (rang 4)
+   verrouillés ; choisir Soldat → annonce, la recrue marche jusqu'à l'atelier de Roland et y
+   reste (y compris la nuit, sans dormir).
+5. Un second joueur ouvre la même liste : il voit la recrue (menu commun) ; il lance une
+   deuxième formation, la troisième est refusée (« Roland forme déjà 2 recrue(s) à la fois »).
+6. `/city garde fin` : la recrue change de skin (uniforme), reçoit épée et armure de fer ;
+   bilan `/city garde`.
+7. Le garde patrouille dans la ville, hors des bâtiments, de jour comme de nuit (`/time set
+   night`) ; il ne franchit pas les portes.
+8. Un zombie dans la ville : le soldat l'attaque au contact ; avec Roland au rang 2, former un
+   archer, qui tire de loin ; un joueur placé dans la ligne de tir n'est pas blessé.
+9. Frapper un garde : aucun dégât. Le garde blessé regagne ses PV au repos.
+10. Maj + clic droit sur le garde (ou `/city garde renvoyer <nom>`) : il redevient habitant avec
+    son ancien skin ; l'impôt de l'aube le compte de nouveau.
+11. `/city garde kill <nom>` : « …, soldat est tombé », lit en deuil, pas de nouveau garde ;
+    après le deuil, un habitant arrive dans ce lit.
+12. Redémarrer pendant une formation : la recrue reprend où elle en était ; les gardes
+    réapparaissent près des joueurs présents en ville.
+13. Déloger Roland (supprimer son atelier) : la formation se met en pause, aucune nouvelle
+    formation possible.
+14. Vérifier sur Youer : combat au contact et tir à l'arc des PNJ Citizens (non testés à la
+    phase 0 pour l'arc).
+
+### Correctifs (formation visible, couverture du sol, réveil des habitants)
+
+- **Formation visible** : la recrue rejoint une place à environ 2 blocs de Roland (là où il se
+  tient s'il est dans son atelier, sinon son point de travail), dans l'atelier ; chaque recrue a
+  sa place. Si le chemin échoue pendant 20 s (porte, comptoir), elle y est téléportée. Sur
+  place, elle s'entraîne face à Roland : épée de bois (soldat, sergent) ou arc (archer), gestes
+  d'arme trois temps sur quatre, coup balayé ou étincelles, son discret. Au-dessus de son nom,
+  un **minuteur** : « ⚔ Soldat en formation », barre de progression sur 10 crans et temps restant
+  (m:ss), « ⏸ » en rouge quand la formation est en pause (personne en ligne, Roland sans
+  atelier). Le minuteur n'est jamais enregistré avec le monde.
+- **Couverture du sol** (inspection, phase 2) : un sol était compté « couvert » seulement s'il
+  restait 2 blocs libres au-dessus de lui ; dans une pièce de 2 blocs de haut, un meuble posé
+  (coffre, table, tapis…) faisait chercher le sol plus haut, sur le toit, compté à ciel ouvert.
+  Les murs étaient aussi comptés à ciel ouvert. Désormais : premier vide au-dessus du sol, bloc
+  solide plus haut → couvert, quelle que soit la hauteur sous plafond ; le haut d'un mur, d'un
+  pilier ou d'un toit (2 blocs construits empilés ou plus sous le vide) n'est compté ni dedans ni
+  dehors. Un bâtiment entièrement couvert approche donc 100 %.
+- **Habitant resté couché** : le trait « sommeil » de Citizens garde le lit en mémoire quand le
+  PNJ disparaît (plafond d'affichage, chunk déchargé) et le recouche à sa réapparition, alors que
+  le plugin le croyait levé ; un habitant formé en pleine nuit restait aussi couché. Désormais le
+  sommeil (et la posture « couché ») est retiré au réveil et à chaque disparition ; au réveil,
+  l'habitant se lève à côté de son lit, et s'il est encore couché un instant plus tard, il
+  réapparaît debout.
+
+À tester : former un habitant → il marche jusqu'à Roland, s'arrête à côté de lui et s'entraîne
+(gestes, particules), minuteur au-dessus de la tête qui décompte ; deux recrues ont deux places
+différentes ; minuteur « en pause » si on déloge Roland ; il disparaît à la fin (`/city garde
+fin`). Couverture : un bâtiment au toit complet, pièce de 2 blocs de haut meublée → près de
+100 % (`/city build inspect <nom>`). Réveil : nuit puis matin (`/time set 0`) ; s'éloigner pour
+que les habitants disparaissent la nuit, revenir le matin → tous debout ; former un habitant
+qui dort → il se lève et part chez Roland.
 
 ## Phase 6 — Besoins et satisfaction
 

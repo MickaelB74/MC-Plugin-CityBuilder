@@ -62,6 +62,7 @@ public class CityCore extends JavaPlugin {
     private com.citycore.debug.NpcPrototype prototype;
     private BuildingInspector buildingInspector;
     private com.citycore.inhabitant.InhabitantManager inhabitants;
+    private com.citycore.siege.SiegeManager siege;
 
     @Override
     public void onEnable() {
@@ -121,7 +122,7 @@ public class CityCore extends JavaPlugin {
         getServer().getPluginManager().registerEvents(buildingInspector, this);
         // Habitants (phase 3) : un par lit d'habitation conforme ; démarrés une fois le serveur prêt
         inhabitants = new com.citycore.inhabitant.InhabitantManager(this, databaseManager, buildingManager,
-                buildingInspector, cityManager);
+                buildingInspector, cityManager, npcDataManager, npcManager);
         getServer().getPluginManager().registerEvents(inhabitants, this);
         Bukkit.getScheduler().runTask(this, inhabitants::start);
 
@@ -181,6 +182,15 @@ public class CityCore extends JavaPlugin {
                 this, npcManager, npcDataManager, cityManager, cityQuestManager);
         // Piste de recrutement et annonce d'arrivée : ce que demandera l'atelier du personnage
         findNpcQuestManager.setAtelierRequest(buildingInspector::requestSentence);
+
+        // ── Sièges et calendrier des événements (phase 4 du plan « Valmont vivante ») ──
+        siege = new com.citycore.siege.SiegeManager(this, cityManager, buildingManager, inhabitants,
+                npcDataManager, market, cityQuestManager::getCityLevel);
+        getServer().getPluginManager().registerEvents(siege, this);
+        Bukkit.getScheduler().runTask(this, siege::start); // assaillants d'un siège interrompu retirés
+        com.citycore.siege.EventCalendar calendar = new com.citycore.siege.EventCalendar(this);
+        calendar.register("siege", siege.asEvent());
+        calendar.start();
 
         getServer().getPluginManager().registerEvents(
                 new FindNpcQuestListener(findNpcQuestManager), this);
@@ -280,8 +290,10 @@ public class CityCore extends JavaPlugin {
                     buildingManager, playerDataManager, market);
             villagerListener.setInspector(buildingInspector); // logis : atelier conforme exigé
             getServer().getPluginManager().registerEvents(villagerListener, this);
-            gui.setThemed(new com.citycore.ui.screens.ArtisanScreens(uiKit, npcType, gui, npcDataManager,
-                    npcManager, playerDataManager, market, villagerListener, questGUI));
+            com.citycore.ui.screens.ArtisanScreens screens = new com.citycore.ui.screens.ArtisanScreens(uiKit,
+                    npcType, gui, npcDataManager, npcManager, playerDataManager, market, villagerListener, questGUI);
+            screens.setInhabitants(inhabitants); // gestion → Actions → La garde (chez Roland)
+            gui.setThemed(screens);
             questScreens.register(questGUI, gui);
         }
 
@@ -335,8 +347,9 @@ public class CityCore extends JavaPlugin {
                 new CityQuestSelectionListener(questSelectionGUI), this);
 
         // ── Chunks ────────────────────────────────────────────────
-        getServer().getPluginManager().registerEvents(
-                new ClaimProtectionListener(cityManager), this);
+        ClaimProtectionListener claimProtection = new ClaimProtectionListener(cityManager);
+        claimProtection.setSiegeAttacker(siege::woundsPlayers); // siège : les assaillants peuvent blesser les joueurs
+        getServer().getPluginManager().registerEvents(claimProtection, this);
 
         // ── Commandes ────────────────────────────────────────────
         var cityCmd = getCommand("city");
@@ -356,6 +369,7 @@ public class CityCore extends JavaPlugin {
         cityCommand.setBuildingCreation(buildingCreation);
         cityCommand.setBuildingInspector(buildingInspector);
         cityCommand.setInhabitants(inhabitants);
+        cityCommand.setSiege(siege, calendar);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);
@@ -398,6 +412,7 @@ public class CityCore extends JavaPlugin {
     @Override
     public void onDisable() {
         if (prototype != null) prototype.clear(); // PNJ et zombies du prototype : rien ne doit rester
+        if (siege != null) siege.shutdown();             // assaillants retirés : rien ne reste dans le monde
         if (inhabitants != null) inhabitants.shutdown(); // recréés depuis la base au prochain démarrage
         if (cityHUD != null) cityHUD.stop();
         if (uiPack != null) uiPack.stop();

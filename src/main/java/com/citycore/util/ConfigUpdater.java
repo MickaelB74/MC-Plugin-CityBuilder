@@ -42,6 +42,26 @@ public final class ConfigUpdater {
     private static final java.util.Map<Integer, List<String>> REPLACED_SECTIONS = java.util.Map.of(
             6, List.of("jacksparrow"));
 
+    /**
+     * Valeurs par défaut changées en passant à une version : la ligne n'est remplacée que si elle
+     * porte encore l'ancienne valeur par défaut (un réglage modifié à la main est conservé).
+     * Chaque entrée : {expression de l'ancienne ligne, nouvelle valeur}.
+     * 15 : la garde monte jusqu'à 50 (au lieu de 12), formations simultanées en conséquence.
+     * 17 : trois emplacements à remplir pour les uniformes de l'armée ennemie (liste vide en 16).
+     */
+    private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
+            15, List.of(
+                    new String[]{"(?m)^  max: \\{1: 2, 2: 4, 3: 6, 4: 9, 5: 12\\}",
+                            "  max: {1: 8, 2: 16, 3: 25, 4: 36, 5: 50}"},
+                    new String[]{"(?m)^  formations: \\{1: 1, 2: 1, 3: 2, 4: 2, 5: 3\\}",
+                            "  formations: {1: 2, 2: 3, 3: 4, 4: 5, 5: 6}"}),
+            17, List.<String[]>of(
+                    new String[]{"(?m)^    skins: \\[\\]$",
+                            "    skins:\n"
+                                    + "      - {name: \"\", value: \"\", signature: \"\"}\n"
+                                    + "      - {name: \"\", value: \"\", signature: \"\"}\n"
+                                    + "      - {name: \"\", value: \"\", signature: \"\"}"}));
+
     private ConfigUpdater() {}
 
     /** À appeler au tout début de onEnable, avant toute lecture de la config. */
@@ -166,6 +186,15 @@ public final class ConfigUpdater {
 
         String updated = userText.replaceFirst("(?m)^config-version:\\s*\\d+", "config-version: " + jarVersion);
         for (String section : replaced) updated = removeSection(updated, section);
+        // Anciennes valeurs par défaut remplacées (seulement si elles n'ont pas été modifiées)
+        for (int v = fileVersion + 1; v <= jarVersion; v++) {
+            for (String[] change : UPDATED_LINES.getOrDefault(v, List.of())) {
+                String before = updated;
+                updated = updated.replaceFirst(change[0], Matcher.quoteReplacement(change[1]));
+                // Libellé du journal : la première ligne seulement (une liste en compte plusieurs)
+                if (!updated.equals(before)) added.add(change[1].trim().lines().findFirst().orElse("") + " (nouvelle valeur)");
+            }
+        }
         // Nouveaux habitants : leurs lignes de skin s'ajoutent sous npc-skins (section existante)
         String withSkins = addMissingChildren(updated, lines, user, "npc-skins");
         if (!withSkins.equals(updated)) added.add("npc-skins (nouveaux habitants)");
@@ -178,6 +207,16 @@ public final class ConfigUpdater {
         String withInhabitants = addMissingChildren(updated, lines, user, "habitants");
         if (!withInhabitants.equals(updated)) added.add("habitants (nouveaux réglages)");
         updated = withInhabitants;
+        // Réglages de la garde (taille, formations, rôles…) : ajoutés sous soldats (section existante)
+        String withGuard = addMissingChildren(updated, lines, user, "soldats");
+        if (!withGuard.equals(updated)) added.add("soldats (garde)");
+        updated = withGuard;
+        // Nouveaux réglages des sièges (types, armée ennemie…) et du calendrier : ajoutés sous leur section
+        for (String section : new String[]{"sieges", "evenements"}) {
+            String with = addMissingChildren(updated, lines, user, section);
+            if (!with.equals(updated)) added.add(section + " (nouveaux réglages)");
+            updated = with;
+        }
         // Nouveaux réglages des bâtiments (hauteur, profondeur, terrain…) : ajoutés sous batiments
         String withBuildings = addMissingChildren(updated, lines, user, "batiments");
         if (!withBuildings.equals(updated)) added.add("batiments (nouveaux réglages)");

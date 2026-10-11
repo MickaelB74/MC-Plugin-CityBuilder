@@ -71,6 +71,16 @@ public final class InhabitantSkins {
         return skins.isEmpty();
     }
 
+    /**
+     * Texture {value, signature} du skin numéro index (têtes dans les menus), ou null : skin
+     * repris d'un compte (name), liste vide ou numéro hors liste.
+     */
+    public String[] texture(int index) {
+        if (skins.isEmpty() || index < 0) return null;
+        Skin skin = skins.get(Math.floorMod(index, skins.size()));
+        return skin.isTexture() ? new String[]{skin.value(), skin.signature()} : null;
+    }
+
     /** Numéro du prochain skin à distribuer (à tour de rôle), ou -1 si la liste est vide. */
     public int nextIndex() {
         return skins.isEmpty() ? -1 : Math.floorMod(next++, skins.size());

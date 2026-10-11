@@ -24,6 +24,13 @@ public enum CitySubCommand {
             "interface", "menus"),
     HABITANTS("habitants", "habitants [list|arrivee|kill <nom>|impot|deuil|recharger]",
             "Habitants de la ville : lits, arrivées, deuils, impôt (actions de test : op)", "population"),
+    SIEGE("siege", "siege [start [palier] [monstres|banniere]|stop|next]",
+            "Sièges de la ville : état ; lancer, arrêter, passer à la vague suivante (op)", "siège"),
+    EVENT("event", "event [list|start <type>|stop|recharger]",
+            "Calendrier des événements (sièges…) : planning et prochain rendez-vous ; actions (op)",
+            "evenements", "événements"),
+    GARDE("garde", "garde [list|former <habitant> <rôle>|renvoyer <nom>|fin|kill <nom>|test [n] [rôle]|test retirer]",
+            "Garde de la ville : formations chez Roland, gardes en patrouille (fin, kill, test : op)", "guard"),
     PROTO("proto", "proto <habitant|soldat|former|zombie|foule|tps|skins|clear>",
             "Prototype temporaire : PNJ blessables, foule, combat (op)");
 

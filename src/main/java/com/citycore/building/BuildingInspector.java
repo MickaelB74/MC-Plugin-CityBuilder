@@ -267,16 +267,27 @@ public class BuildingInspector implements Listener {
                     }
                     counts.merge(m, 1, Integer::sum);
                 }
-                // Toit : au point le plus bas où l'on peut se tenir, à partir du sol de définition
-                // (une grotte sous la maison ne compte pas), y a-t-il un bloc solide au-dessus ?
-                int spot = -1;
-                for (int i = Math.max(1, ref - 1 - yMin); i + 1 < column.length; i++) {
-                    if (solid(column[i - 1]) && !column[i].isSolid() && !column[i + 1].isSolid()) { spot = i; break; }
+                // Toit : premier vide au-dessus d'un bloc solide, à partir du sol de définition (une
+                // grotte sous la maison ne compte pas). Un bloc solide plus haut → sol couvert, quels
+                // que soient la hauteur sous plafond et les meubles posés (un coffre ou une table dans
+                // une pièce de 2 blocs de haut ne « découvre » plus le sol).
+                int gap = -1;
+                for (int i = Math.max(1, ref - 1 - yMin); i < column.length; i++) {
+                    if (solid(column[i - 1]) && !solid(column[i])) { gap = i; break; }
                 }
-                if (spot < 0) continue; // mur, pilier, sol plein : ni dedans ni dehors
+                if (gap < 0) continue;
                 boolean roofed = false;
-                for (int i = spot + 2; i < column.length && !roofed; i++) roofed = solid(column[i]);
-                if (roofed) covered++; else open++;
+                for (int i = gap + 1; i < column.length && !roofed; i++) roofed = solid(column[i]);
+                if (roofed) {
+                    covered++;
+                } else {
+                    // Rien au-dessus : sol à ciel ouvert, sauf si le vide est le haut d'un mur, d'un
+                    // pilier ou d'un toit (au moins 2 blocs construits empilés juste dessous) : ni
+                    // dedans ni dehors
+                    int built = 0;
+                    for (int i = gap - 1; i >= 0 && built < 2 && solid(column[i]) && !terrain.contains(column[i]); i--) built++;
+                    if (built < 2) open++;
+                }
             }
         }
 

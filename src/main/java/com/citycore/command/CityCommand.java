@@ -73,6 +73,28 @@ public class CityCommand implements CommandExecutor {
         this.inhabitants = inhabitants;
     }
 
+    /** Place libre près du joueur (à 2-3 blocs, au même niveau), sinon sa propre position. */
+    private static Location testSpot(Player player) {
+        java.util.concurrent.ThreadLocalRandom rnd = java.util.concurrent.ThreadLocalRandom.current();
+        for (int attempt = 0; attempt < 8; attempt++) {
+            Location at = player.getLocation().clone().add(rnd.nextInt(-3, 4), 0, rnd.nextInt(-3, 4));
+            if (at.getBlock().isPassable() && at.clone().add(0, 1, 0).getBlock().isPassable()
+                    && at.clone().add(0, -1, 0).getBlock().getType().isSolid()) {
+                return at.getBlock().getLocation().add(0.5, 0, 0.5);
+            }
+        }
+        return player.getLocation();
+    }
+
+    private com.citycore.siege.SiegeManager  siege;
+    private com.citycore.siege.EventCalendar calendar;
+
+    /** Sièges et calendrier des événements (phase 4). */
+    public void setSiege(com.citycore.siege.SiegeManager siege, com.citycore.siege.EventCalendar calendar) {
+        this.siege    = siege;
+        this.calendar = calendar;
+    }
+
     /** Inspection des constructions (phase 2) : /city build inspect, contrôle de /city build assign. */
     private com.citycore.building.BuildingInspector buildingInspector;
 
@@ -407,13 +429,168 @@ public class CityCommand implements CommandExecutor {
                     }
                 }
 
+                // ── /city siege (phase 4) ────────────────────────
+                case SIEGE -> {
+                    if (siege == null) return true;
+                    String action = args.length >= 2 ? args[1].toLowerCase() : "etat";
+                    if (!action.equals("etat") && !action.equals("état") && !player.isOp()) {
+                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                        return true;
+                    }
+                    switch (action) {
+                        case "etat", "état", "status" -> siege.status().forEach(player::sendMessage);
+                        case "start", "lancer" -> {
+                            // /city siege start [palier] [monstres|banniere] (dans n'importe quel ordre)
+                            Integer tier = null;
+                            com.citycore.siege.SiegeConfig.Kind kind = null;
+                            for (int i = 2; i < args.length; i++) {
+                                com.citycore.siege.SiegeConfig.Kind k = com.citycore.siege.SiegeConfig.Kind.parse(args[i]);
+                                if (k != null) { kind = k; continue; }
+                                try {
+                                    tier = Integer.parseInt(args[i]);
+                                } catch (NumberFormatException e) {
+                                    player.sendMessage("§cUsage : /city siege start [palier 1-10] [monstres|banniere]");
+                                    return true;
+                                }
+                            }
+                            String err = siege.begin(tier, true, kind);
+                            if (err != null) player.sendMessage("§c❌ " + err);
+                        }
+                        case "stop", "arreter", "arrêter" -> {
+                            if (!siege.stop()) player.sendMessage("§7Aucun siège en cours.");
+                        }
+                        case "next", "suivante" -> {
+                            if (!siege.skipWave()) player.sendMessage("§7Aucun siège en cours.");
+                        }
+                        default -> player.sendMessage("§cUsage : /city siege [start [palier]|stop|next]");
+                    }
+                }
+
+                // ── /city event (phase 4) ────────────────────────
+                case EVENT -> {
+                    if (calendar == null) return true;
+                    String action = args.length >= 2 ? args[1].toLowerCase() : "list";
+                    if (!action.equals("list") && !action.equals("liste") && !player.isOp()) {
+                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                        return true;
+                    }
+                    switch (action) {
+                        case "list", "liste" -> calendar.listing().forEach(player::sendMessage);
+                        case "start", "lancer" -> {
+                            com.citycore.siege.EventCalendar.Event event = calendar.event(args.length >= 3 ? args[2] : "siege");
+                            if (event == null) {
+                                player.sendMessage("§c❌ Type inconnu. Types : " + String.join(", ", calendar.types()));
+                                return true;
+                            }
+                            String err = event.start();
+                            if (err != null) player.sendMessage("§c❌ " + err);
+                        }
+                        case "stop", "arreter", "arrêter" -> {
+                            boolean stopped = false;
+                            for (String type : calendar.types()) stopped |= calendar.event(type).stop();
+                            if (!stopped) player.sendMessage("§7Aucun événement en cours.");
+                        }
+                        case "recharger", "reload" -> {
+                            calendar.reload();
+                            siege.reload();
+                            player.sendMessage("§a✅ Calendrier et réglages des sièges relus (sections evenements et sieges).");
+                        }
+                        default -> player.sendMessage("§cUsage : /city event [list|start <type>|stop|recharger]");
+                    }
+                }
+
+                // ── /city garde (phase 5) ────────────────────────
+                // Même chose que le menu de Roland (commun à tous) ; fin et kill sont des actions de test
+                case GARDE -> {
+                    if (inhabitants == null) return true;
+                    String action = args.length >= 2 ? args[1].toLowerCase() : "list";
+                    if ((action.equals("fin") || action.equals("kill") || action.equals("tuer") || action.equals("test"))
+                            && !player.isOp()) {
+                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                        return true;
+                    }
+                    switch (action) {
+                        case "list", "liste" -> inhabitants.listGuard(player);
+                        case "former", "train" -> {
+                            if (args.length < 4) {
+                                player.sendMessage("§cUsage : /city garde former <habitant> <rôle>");
+                                return true;
+                            }
+                            // Le rôle est le dernier mot, le nom peut en contenir plusieurs (« Jehan 2 »)
+                            String name = String.join(" ", Arrays.copyOfRange(args, 2, args.length - 1));
+                            com.citycore.inhabitant.InhabitantManager.Inhabitant inh = inhabitants.byName(name);
+                            if (inh == null) {
+                                player.sendMessage("§c❌ Habitant §f" + name + " §cintrouvable.");
+                                return true;
+                            }
+                            String err = inhabitants.train(inh.id, args[args.length - 1].toLowerCase());
+                            if (err != null) player.sendMessage("§c❌ " + err);
+                        }
+                        case "renvoyer", "dismiss" -> {
+                            if (args.length < 3) {
+                                player.sendMessage("§cUsage : /city garde renvoyer <nom>");
+                                return true;
+                            }
+                            String name = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                            com.citycore.inhabitant.InhabitantManager.Inhabitant inh = inhabitants.byName(name);
+                            String err = inh == null ? "Garde " + name + " introuvable." : inhabitants.dismiss(inh.id);
+                            if (err != null) player.sendMessage("§c❌ " + err);
+                        }
+                        // /city garde test [nombre] [rôle] | test retirer : vrais gardes, sans lit ni formation
+                        case "test" -> {
+                            if (args.length >= 3 && (args[2].equalsIgnoreCase("retirer") || args[2].equalsIgnoreCase("clear"))) {
+                                player.sendMessage("§a✅ " + inhabitants.removeTestGuards() + " garde(s) de test retiré(s).");
+                                return true;
+                            }
+                            int count = 1;
+                            String roleKey = null;
+                            for (int i = 2; i < args.length; i++) {
+                                try { count = Integer.parseInt(args[i]); } catch (NumberFormatException e) { roleKey = args[i].toLowerCase(); }
+                            }
+                            if (roleKey != null && inhabitants.guard().role(roleKey) == null) {
+                                player.sendMessage("§c❌ Rôle inconnu. Rôles : " + String.join(", ",
+                                        inhabitants.guard().roles().stream().map(r -> r.key()).toList()));
+                                return true;
+                            }
+                            count = Math.max(1, Math.min(20, count));
+                            for (int i = 0; i < count; i++) inhabitants.spawnTestGuard(testSpot(player), roleKey);
+                            player.sendMessage("§a✅ " + count + " garde(s) de test créé(s) §7(même comportement qu'un garde"
+                                    + " formé chez Roland ; ni lit ni formation ; retirés au redémarrage ou par"
+                                    + " §f/city garde test retirer§7).");
+                        }
+                        case "fin" -> player.sendMessage("§a✅ " + inhabitants.finishTrainingNow()
+                                + " recrue(s) devenue(s) garde(s).");
+                        case "kill", "tuer" -> {
+                            if (args.length < 3) {
+                                player.sendMessage("§cUsage : /city garde kill <nom>");
+                                return true;
+                            }
+                            String target = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                            if (!inhabitants.kill(target)) player.sendMessage("§c❌ §f" + target + " §cintrouvable.");
+                        }
+                        default -> player.sendMessage("§cUsage : /city garde [list|former <habitant> <rôle>|renvoyer <nom>|fin|kill <nom>]");
+                    }
+                }
+
                 // ── /city proto (phase 0, temporaire) ────────────
                 case PROTO -> {
                     if (!player.isOp()) {
                         player.sendMessage("§c❌ Réservé aux admins.");
                         return true;
                     }
+                    // Le soldat du prototype (phase 0) n'a pas le comportement de la garde : on crée un vrai
+                    // garde de test à la place (rondes, front d'un siège, combat contre les soldats ennemis)
+                    if (args.length >= 2 && args[1].equalsIgnoreCase("soldat") && inhabitants != null) {
+                        inhabitants.spawnTestGuard(testSpot(player), args.length >= 3 ? args[2].toLowerCase() : null);
+                        player.sendMessage("§a✅ Garde de test créé §7(comportement réel de la garde). Plusieurs à la fois :"
+                                + " §f/city garde test <nombre> [rôle]§7 ; retirer : §f/city garde test retirer§7.");
+                        return true;
+                    }
                     if (prototype != null) prototype.handle(player, args);
+                    if (args.length >= 2 && args[1].equalsIgnoreCase("clear") && inhabitants != null) {
+                        int removed = inhabitants.removeTestGuards();
+                        if (removed > 0) player.sendMessage("§a✅ " + removed + " garde(s) de test retiré(s).");
+                    }
                 }
 
                 // ── /city npc ────────────────────────────────────

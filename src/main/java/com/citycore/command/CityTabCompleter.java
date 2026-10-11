@@ -69,6 +69,13 @@ public class CityTabCompleter implements TabCompleter {
                 case "habitants", "population" -> player.isOp()
                         ? List.of("list", "arrivee", "kill", "impot", "deuil", "recharger")
                         : List.of("list");
+                case "garde", "guard" -> player.isOp()
+                        ? List.of("list", "former", "renvoyer", "fin", "kill", "test")
+                        : List.of("list", "former", "renvoyer");
+                case "siege", "siège" -> player.isOp() ? List.of("start", "stop", "next") : new ArrayList<>();
+                case "event", "evenements", "événements" -> player.isOp()
+                        ? List.of("list", "start", "stop", "recharger")
+                        : List.of("list");
                 case "proto"    -> player.isOp()
                         ? List.of("habitant", "soldat", "former", "zombie", "foule", "tps", "skins", "clear")
                         : new ArrayList<>();
@@ -123,6 +130,20 @@ public class CityTabCompleter implements TabCompleter {
                         && (args[1].equalsIgnoreCase("kill") || args[1].equalsIgnoreCase("tuer"))
                         ? inhabitants.livingNames()
                         : new ArrayList<>();
+                case "siege", "siège" -> player.isOp() && args[1].equalsIgnoreCase("start")
+                        ? List.of("1", "4", "7", "10", "monstres", "banniere")
+                        : new ArrayList<>();
+                case "event", "evenements", "événements" -> player.isOp() && args[1].equalsIgnoreCase("start")
+                        ? List.of("siege")
+                        : new ArrayList<>();
+                // /city garde former <habitant civil> | renvoyer <garde> | kill <garde> (op)
+                case "garde", "guard" -> inhabitants == null ? new ArrayList<String>() : switch (args[1].toLowerCase()) {
+                    case "former", "train" -> inhabitants.civilianNames();
+                    case "renvoyer", "dismiss" -> inhabitants.guardNames();
+                    case "kill", "tuer" -> player.isOp() ? inhabitants.guardNames() : new ArrayList<String>();
+                    case "test" -> player.isOp() ? List.of("1", "5", "10", "retirer") : new ArrayList<String>();
+                    default -> new ArrayList<String>();
+                };
                 case "job" -> player.isOp()
                         ? Arrays.stream(CityNPC.values())
                         .filter(n -> n != CityNPC.MAYOR)
@@ -156,6 +177,15 @@ public class CityTabCompleter implements TabCompleter {
                     case "hauteur" -> List.of("auto", String.valueOf(player.getLocation().getBlockY() - 1));
                     default -> new ArrayList<String>();
                 };
+                // /city garde former <habitant> <rôle>
+                case "garde", "guard" -> inhabitants != null && (args[1].equalsIgnoreCase("former")
+                        || args[1].equalsIgnoreCase("train") || args[1].equalsIgnoreCase("test"))
+                        ? inhabitants.guard().roles().stream().map(r -> r.key()).collect(Collectors.toList())
+                        : new ArrayList<>();
+                // /city siege start <palier> <type>
+                case "siege", "siège" -> player.isOp() && args[1].equalsIgnoreCase("start")
+                        ? List.of("monstres", "banniere")
+                        : new ArrayList<>();
                 case "player" -> {
                     if (!player.isOp()) yield new ArrayList<>();
                     yield args[2].equalsIgnoreCase("setLevel")

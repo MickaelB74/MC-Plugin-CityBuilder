@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 13
+config-version: 18
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -1860,6 +1860,98 @@ habitants:
 soldats:
   skins:
     - {name: "", value: "ewogICJ0aW1lc3RhbXAiIDogMTYxNDg5NDc2NzMxNiwKICAicHJvZmlsZUlkIiA6ICJhYTZhNDA5NjU4YTk0MDIwYmU3OGQwN2JkMzVlNTg5MyIsCiAgInByb2ZpbGVOYW1lIiA6ICJiejE0IiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzhiMmFiNmE0MjNlMzU1YWFiNjgwOWFjNDlmZjIwMmQ5ZmYxMjEwY2JhMjJiZWRkN2RmZTNkNTkyN2I4ZGI4MyIKICAgIH0KICB9Cn0=", signature: "Lp0BSj3H9YgBjyGAfqyO8mIY5OF01VckpOer5zWgBwT/bxls4SUmYA80C8cnHkm7/qYwLHyYC1dcqailFCksGAOr5n0BLB9/LJ1syRYOd6VpZ7GAiB/6edmk987zCrXZKkpPg/zQJRhGvsDKqGQGOPQwck0L+indTM1xPUsYakO3oASRH3yhGw1/tNkRpEEVLQ15bR1Blj+IzapXXX0DWNQ4arY9ooDUULgQG5s+a+N1egLLNZ3DoCFh7PLQEXwRPrrCv78jBnveVVfDHavPPV1XDbwbLsgXF6tEJPVfY/dQwOFh+RQGQbDG5EgPUmcCvSVWZzG7o2qcLC9Tc3k5/l/uXZDS3neDD0g13YEEw0i4z5nCAaZubgXn6kpCKCBRpr7rsLlgYPFYdTxRZB9oOLg691JSEC2B5AF+/YRVmvBEZohSBVp23ZZMVo+mvREUg/bq9Sfj85w/AdZB+yBzDg1v7nCvgmfJVuvt3nlsIXs3HD9jPd0PYRkWYkQShqwmnenDll02fyRLP7JWZFzkPh5HXyHFSoeAns5LKSLfEhZ8+meYY1ROKgstxxo7LF6PdLaaGN0bIjwz1HvCpKkBWXQYnnqH8eJK6q6g6pjFoCHSH6+HWHvsGLFDerT8t5601ENn7ljWuJtrzzfILUWLi1hcDQI8EzsesTCM9I71/WE="}
+  # Garde (phase 5) : chez Roland installé, écran de gestion (clic sur son portrait) → Actions →
+  # La garde. On choisit l'habitant à former et son rôle ; plusieurs recrues à la fois selon le
+  # rang de Roland. Les gardes patrouillent sur le terrain de la ville (jamais dans les
+  # bâtiments), de jour comme de nuit, et attaquent les monstres. Un garde mort n'est pas remplacé.
+  max: {1: 8, 2: 16, 3: 25, 4: 36, 5: 50}     # taille de la garde (gardes + recrues) selon le rang de Roland
+  formations: {1: 2, 2: 3, 3: 4, 4: 5, 5: 6}  # recrues formées en même temps selon le rang de Roland
+  max-visibles: 50                            # gardes affichés à la fois (les plus proches des joueurs) ; à baisser si le serveur rame
+  vitesse-patrouille: 0.6                     # vitesse de ronde (1 = un joueur ; en combat, ils courent)
+  vision: 16                                  # distance à laquelle un garde repère un monstre
+  portee-arc: 14                              # distance de tir des archers
+  roles:
+    soldat:  {nom: "Soldat",  rang: 1, minutes: 10, vie: 30, combat: melee,    arme: IRON_SWORD,    casque: IRON_HELMET,    plastron: IRON_CHESTPLATE,      jambieres: IRON_LEGGINGS,    bottes: IRON_BOOTS}
+    archer:  {nom: "Archer",  rang: 2, minutes: 15, vie: 24, combat: distance, arme: BOW,           casque: LEATHER_HELMET, plastron: CHAINMAIL_CHESTPLATE, jambieres: LEATHER_LEGGINGS, bottes: LEATHER_BOOTS}
+    sergent: {nom: "Sergent", rang: 4, minutes: 25, vie: 40, combat: melee,    arme: DIAMOND_SWORD, casque: IRON_HELMET,    plastron: DIAMOND_CHESTPLATE,   jambieres: IRON_LEGGINGS,    bottes: IRON_BOOTS}
+
+# ============================================================
+#  ÉVÉNEMENTS — calendrier en heure réelle (plan « Valmont vivante », phase 4)
+#  Rendez-vous réguliers : sièges (les fêtes s'y ajouteront). Une annonce dans le chat
+#  annonce-minutes avant l'heure ; à l'heure dite, si moins de joueurs-min sont connectés,
+#  l'événement est annulé (annonce). jours : lundi … dimanche, ou tous ; heure : "HH:MM".
+#  Planning et prochain rendez-vous : /city event list.
+# ============================================================
+evenements:
+  fuseau: "Europe/Paris"   # fuseau horaire des heures du planning
+  annonce-minutes: 5       # annonce avant le début
+  planning:
+    - {type: siege, jours: [mercredi, samedi], heure: "21:00", joueurs-min: 2}
+
+# ============================================================
+#  SIÈGES (phase 4) — vagues d'assaillants contre la ville : monstres, ou armée ennemie
+#  Aucun bloc n'est touché dans la ville. Les assaillants s'en prennent aux habitants et aux gardes
+#  (et aux joueurs, voir joueurs-blesses), sinon marchent sur la mairie. Ils apparaissent hors
+#  de la ville, d'un côté de la lisière (annoncé : « au nord »…), vague après vague ; les gardes
+#  accourent de ce côté. Barre rouge en haut de l'écran.
+#  Victoire : toutes les vagues repoussées dans le temps imparti → récompense dans la caisse et
+#  XP pour Roland. Sinon, les assaillants se retirent sans rien rapporter.
+#  Dès l'alerte et pendant les répits, la garde prend position sur ce front ; à la fin, elle
+#  rentre en ville et reprend ses rondes.
+#  Commandes (op) : /city siege start [palier] [monstres|banniere] | stop | next.
+# ============================================================
+sieges:
+  premier-palier: 4          # aucun siège programmé avant ce palier de la ville (chapitre IV)
+  preparation-secondes: 30   # délai entre l'alerte et la première vague
+  pause-vagues-secondes: 30  # répit entre deux vagues
+  duree-minutes: 20          # au-delà, le siège est perdu (les assaillants se retirent)
+  distance-apparition: 12    # blocs au-delà de la lisière où apparaissent les assaillants
+  joueurs-blesses: true      # pendant un siège, monstres et soldats ennemis peuvent blesser les joueurs, même en ville
+  vagues: {1: 2, 4: 3, 7: 4, 9: 5}   # nombre de vagues selon le palier de la ville
+  # Assaillants par vague : (base + par-palier × palier) × (1 + par-joueur × (joueurs connectés - 1)), max au plus
+  assaillants: {base: 4, par-palier: 1, par-joueur: 0.5, max: 40}
+  # Monstres possibles selon le palier (poids : plus il est grand, plus le monstre est fréquent)
+  monstres:
+    1: {ZOMBIE: 3, SKELETON: 2}
+    4: {ZOMBIE: 3, SKELETON: 2, SPIDER: 2, PILLAGER: 2, WITCH: 1}
+    7: {ZOMBIE: 2, SKELETON: 2, SPIDER: 2, PILLAGER: 3, WITCH: 1, VINDICATOR: 2, EVOKER: 1}
+    9: {ZOMBIE: 2, SKELETON: 2, SPIDER: 1, PILLAGER: 3, WITCH: 1, VINDICATOR: 3, EVOKER: 1, RAVAGER: 1}
+  # Champion : un ennemi nommé et coriace, avec la dernière vague (à partir de son palier)
+  champion: {palier: 9, type: VINDICATOR, nom: "Gorvak le Brise-Portes", vie: 120, arme: NETHERITE_AXE}
+  # Victoire : coins + coins-par-palier × palier dans la caisse ; XP de Roland de même
+  recompense: {coins: 150, coins-par-palier: 50, xp-roland: 40, xp-roland-par-palier: 10}
+  types: {monstres: 1, banniere: 1}  # type de chaque siège, au hasard selon ces poids : monstres, ou armée ennemie
+  banniere:
+    # Armée ennemie : des soldats PNJ comme la garde, d'une faction rivale. Un porte-étendard
+    # ouvre chaque vague, la bannière de sa faction sur la tête. Nombre : comme sieges.assaillants.
+    vitesse: 1.0           # vitesse de marche (1 = un joueur)
+    # Factions (une au hasard par siège) : nom, couleur (noir, rouge, vert, bleu, jaune, violet,
+    # orange, blanc, gris, marron, cyan : couleur des noms et de la bannière)
+    factions:
+      - {nom: "l'Ost du Corbeau", couleur: noir}
+      - {nom: "les Lames de Grisval", couleur: rouge}
+      - {nom: "la Horde des Marais", couleur: vert}
+    # Uniformes ennemis : value + signature de https://mineskin.org (comme soldats.skins), un par
+    # ligne, distribués à tour de rôle ; lignes vides ignorées (toutes vides = skins de Minecraft)
+    skins:
+      - {name: "", value: "ewogICJ0aW1lc3RhbXAiIDogMTc2MzcyMzYwNTkyMiwKICAicHJvZmlsZUlkIiA6ICI2YWVmMjM3Y2RhNDY0Y2QzYTdiZDcxYjg3YzFlMDEwNSIsCiAgInByb2ZpbGVOYW1lIiA6ICJCb25raWl6IiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzY4NGEzNWI2MmU4YWQ3NThiZDk1ZDVhMGJjY2YyNjg5NmM5YzUyYmM0YzU1NjA5ODY1YmY4MzQwNjRkYmRlYjEiCiAgICB9CiAgfQp9", signature: "KEsqzLLVk0mwt9cR39t9+ed709GCKnFjkdVB1Bv34JrLSg/Z2S+qBm/80fLzuimYfQRgJMjZGtFy9jXHq4P/isWdquslDfHLI0udnYco0ZbMKBzVvsJO4jjJRpIvoDH+/VxD8FVsSy5AxJeKIynqp9dnJHKDyyGd39bK7DQZrBu+t1ONyvJdonlbGEwpiL+/QV4dVQb20oJDLycDbn6ieFdLS8sdwDuSkztGNHUGBo8mtea98QlyY9cBpczHDQhszXc5/LPWEgcFDfHF0FDSC5tIJ0+qf6mWY1j3HOqbIe6tfNuO9VhBikoTUEHZEtAdreSgZuZaKO1yxwCzlZQzeaFekW0R+6LmoHyVsf5alJuhJktRtcsz4Epxkl+htB4cgnl8lzUw6yz/xGN4H8Lh5aTO9B53vR9UC1vRsF9qcz9AW8gjnBnYYiUJaQtWaoIrEeTaifHr24PKIw7N/QJ/bV5X88CUWOTkQn9vNa4S4D+ea2w6DvBcrXOdGluuMQ5rSGxMaEUDe4LA+EKIkG67qhLT7/DTts9JNFwj39lIrLtWhf8q1fXpPTJP5ii7Z3CIDz2vQuAgZSXbyyjn/Qn9I+YWc8xREk78BTNRijsyl1YzB9/r/FkBf130q3TKZLhYbb3OpDjh71qHI8esdz9LAoK9uI13Tc91ferVRF92f/w="}
+      - {name: "", value: "ewogICJ0aW1lc3RhbXAiIDogMTc3NDcxMTM4MDYzNSwKICAicHJvZmlsZUlkIiA6ICJlYTA4ZjhlZTdiOTg0YmFlYWM3N2JhYzk3ZWVkYzE4NSIsCiAgInByb2ZpbGVOYW1lIiA6ICJXYXlkZXJUTSIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS9kMjFiZjZlM2RlNmM3MzA5YTlkZTVmNWYwZTRkOTcwNThjYmQwM2IwN2Y5NmE4Y2NjNDI5MWM2MDc2NzBmNGEiCiAgICB9CiAgfQp9", signature: "nR9tSGlyqGYycKvIY89Smg+P1fmRdCXdOeC6roadfB64q/tw/qOt9JIV37Uy6Zp3hpnoIT9PxnNhcSQe1HHOP3EAa600PDY4KayskZs1tqMQ3AfiVfSJPIUqdha8Z3d4YCLgG9DDuu269gcjVBvGiE2FOYn+PJN46AFUAvU7HC9O1b0wZHRA7YMvxzxDIm+LeR2rRpFpuRBQwawiCCzykAM+SxoauXW8MM5DhTEMHF3YAMgcguNWrCycH98YhyBe85M072qZnY+mp9tEYlEF3yD1ZDmxqTuaGQwD+eSFgLUPEMr0TQ2b8ZGbJBSI83vG2kL2mYTWZJ3VaQxuRR2ieLXmaehUUtZqVse4GM9DvY5nf8AfgkKFs7GKx35XzdvC1Yyoo2TImHxUnsgat4TRrSo+c0hMSSFigtjAtd2UmW0PLLhIbqXvMYJ5QviSYPvRve4/MfRCDWqzK9OdsBbA3mctTb+Rkr1TqW2ku6al9MR0bZfmXfSzw4a/HwpUu+tPjLKtHtjAUIRIfOjhqblswQNypb3c8ndYdApcgTvcJPUP8AGkx0Ig0PtOd++Rv3wfH2XpSEFFcIqCNRmzhCtesQuQ8FJVZElbTVrcW+1a6QGRDyqgjdFvvVCEbtL1MhC/L//JbDBcVZN3o9hyN9T3Vm8Ol6U+hnSs8aERjUCWnPw="}
+      - {name: "", value: "ewogICJ0aW1lc3RhbXAiIDogMTc1NjI4NjMwMTc2NywKICAicHJvZmlsZUlkIiA6ICJmNDZkMmVmMmIzM2M0ZjRhODRkYTJhY2U5ZGJhYmU1MyIsCiAgInByb2ZpbGVOYW1lIiA6ICJKR3VldmFyYTEyIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlL2IzMmU3NGNhMGNjNDc2ZjI2ZDQ1MGQ3MDg5MmY1YjZlMjU1YzIwNjkwZjNjNDAyYmNiYTBmNWVmOWVkYzU3YjciCiAgICB9CiAgfQp9", signature: "wSsolSDQWtl66+2YY8yI5Zl3YvcY+kuy+EY4bnU4os5DSe9Rs6V/AlaJfeahKz60J/f8V2pF0KF2+YnhOLCNwiC3ZnYl8CYapZLbPaY3VB/oKFuLgY20jVOxMUAAYCjdTzkC4JINWpC/Db7gMMoGwmpIkvdYA24tRY5tiR2xpBRo4SLbUX9By10HdXC5knpQ6tekjL6A25piJBepw2vpvXFxUmeP/fxxR2jVIt73idTMn26UIcnLNgEVNc4316OcbWHCP0J/5GY0+/TMir1YOfH7zO/8emUezwcS0W+gsVhiIvRaK8A9loV7AGZaxuhvTMJ8zROegURyT3h9jW3k0CwqO+Un4TRfoVHJL9RM1RerwZclHLP1/YuE28T41MbuS/3rUVHuzgIN+68sVXVTQbR6f8Je5JaDJCJf2s1Y68CxDAmX353S3KgL7JboXcBxjnHj9jeaY+uhyQnc/3x1OHhJ9t/j4murxjH+4Dczz86Hq/lrVFLfzU9qInTKHnP2kLHZWhbUrlfY/YZWESlN6NiMo+EnpNfQO8Zo2vZq+6yEZMjsKJ8NqVJxnObXAC0EFyraOCJTkmee18TC0Ag3/NjKie1RFy3/aFhR0vEY5Gy+lOTPh4nlOpUPHX+c8HprKrdjlSun+25DuBPp5L32FW9pnZOGh16izA/P+ACiaVs="}
+    # Unités (comme les rôles de la garde) : nom, vie, combat melee ou distance, arme et armure
+    unites:
+      milicien:    {nom: "Milicien",    vie: 20, combat: melee,    arme: STONE_SWORD,   casque: LEATHER_HELMET,   plastron: LEATHER_CHESTPLATE,   jambieres: LEATHER_LEGGINGS,   bottes: LEATHER_BOOTS}
+      archer:      {nom: "Archer",      vie: 20, combat: distance, arme: BOW,           casque: LEATHER_HELMET,   plastron: LEATHER_CHESTPLATE}
+      soldat:      {nom: "Soldat",      vie: 30, combat: melee,    arme: IRON_SWORD,    casque: IRON_HELMET,      plastron: CHAINMAIL_CHESTPLATE, jambieres: CHAINMAIL_LEGGINGS, bottes: IRON_BOOTS}
+      arbaletrier: {nom: "Arbalétrier", vie: 26, combat: distance, arme: CROSSBOW,      casque: CHAINMAIL_HELMET, plastron: CHAINMAIL_CHESTPLATE, jambieres: LEATHER_LEGGINGS}
+      chevalier:   {nom: "Chevalier",   vie: 44, combat: melee,    arme: DIAMOND_SWORD, casque: DIAMOND_HELMET,   plastron: IRON_CHESTPLATE,      jambieres: IRON_LEGGINGS,      bottes: DIAMOND_BOOTS}
+    # Unités possibles selon le palier de la ville (poids : plus il est grand, plus l'unité est fréquente)
+    composition:
+      1: {milicien: 3, archer: 1}
+      4: {milicien: 2, soldat: 2, archer: 2}
+      7: {soldat: 3, archer: 2, arbaletrier: 1, chevalier: 1}
+      9: {soldat: 2, arbaletrier: 2, chevalier: 3}
+    # Champion : chef de l'armée, avec la dernière vague (à partir de son palier)
+    champion: {palier: 7, nom: "Morvan le Noir", vie: 140, combat: melee, arme: NETHERITE_SWORD, casque: NETHERITE_HELMET, plastron: NETHERITE_CHESTPLATE, jambieres: NETHERITE_LEGGINGS, bottes: NETHERITE_BOOTS}
 
 # ============================================================
 #  BÂTIMENTS — inspection des constructions (plan « Valmont vivante », phase 2)

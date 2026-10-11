@@ -214,6 +214,10 @@ public class DatabaseManager {
                 died_at     INTEGER
             )
         """);
+        // Garde (phase 5) : rôle (soldat, archer…), temps de formation restant (ms), uniforme
+        addColumn(stmt, "inhabitants", "role TEXT");
+        addColumn(stmt, "inhabitants", "training_left INTEGER NOT NULL DEFAULT 0");
+        addColumn(stmt, "inhabitants", "uniform INTEGER NOT NULL DEFAULT -1");
 
         stmt.close();
     }
