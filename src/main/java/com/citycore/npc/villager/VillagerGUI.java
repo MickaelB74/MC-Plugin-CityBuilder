@@ -109,6 +109,12 @@ public class VillagerGUI {
         switch (state) {
             case WANDERER -> openWanderer(player);
             case ARRIVED  -> openArrived(player);
+            case HOMELESS -> {
+                // Bâtiment supprimé : gestion fermée jusqu'au nouveau logis, rien n'est perdu
+                player.sendMessage("§6🏚 " + npcType.displayName + " §6n'a plus d'atelier. §7Choisissez-lui un"
+                        + " nouveau logis : ses quêtes, son stock et son rang l'attendent.");
+                openArrived(player);
+            }
             case ASSIGNED -> openAssigned(player);
         }
     }
@@ -220,13 +226,13 @@ public class VillagerGUI {
 
         if (availableBuildings.isEmpty()) {
             inv.setItem(4, makeItem(Material.BARRIER,
-                    "§cAucun bâtiment disponible",
+                    "§cAucun atelier disponible",
                     List.of(
-                            "§7Tous les bâtiments ont déjà",
-                            "§7un NPC assigné.",
+                            "§7Aucun atelier libre ou réservé",
+                            "§7à ce personnage.",
                             "",
-                            "§8Créez un nouveau bâtiment avec",
-                            "§8/city build new <nom>"
+                            "§8Créez-en un avec",
+                            "§8/city build new atelier " + npcType.skinId
                     )));
         } else {
             int slot = 0;
@@ -235,6 +241,8 @@ public class VillagerGUI {
                 inv.setItem(slot++, makeItem(Material.BRICKS,
                         "§e🏛 " + building.name(),
                         List.of(
+                                npcType.tag.equals(building.reservedFor())
+                                        ? "§6Atelier réservé à " + plainName() : "§aAtelier libre",
                                 "§7Zone : §fX(" + building.x1() + "§7→§f"
                                         + building.x2() + "§7) Z(§f"
                                         + building.z1() + "§7→§f"

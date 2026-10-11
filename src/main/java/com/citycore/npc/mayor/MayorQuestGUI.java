@@ -157,7 +157,7 @@ public class MayorQuestGUI {
                 }
             }
             case NPC_LEVEL -> {
-                boolean installed = npcDataManager.getState(quest.targetNpc()) == NPCState.ASSIGNED;
+                boolean installed = npcDataManager.getState(quest.targetNpc()).wasInstalled();
                 lore.add("§7Rang actuel : " + (installed
                         ? VillagerGUI.getLevelName(current) : "§cnon installé"));
                 lore.add("§7Rang requis : " + VillagerGUI.getLevelName(target));

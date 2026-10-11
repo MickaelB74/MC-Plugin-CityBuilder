@@ -39,11 +39,13 @@ public class ClaimProtectionListener implements Listener {
     /**
      * Annule TOUS les dégâts subis par un joueur dans un chunk claimé.
      * Couvre : PvE, eau, lave, chute, feu, explosion, poison, etc.
+     * Les PNJ Citizens de type joueur (métadonnée « NPC ») ne sont pas concernés : leur
+     * protection est réglée par Citizens, et les soldats de la garde doivent pouvoir être blessés.
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) return;
+        if (!(entity instanceof Player) || entity.hasMetadata("NPC")) return;
 
         Chunk chunk = entity.getLocation().getChunk();
         if (cityManager.isChunkClaimed(chunk)) {

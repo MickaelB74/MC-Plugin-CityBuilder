@@ -91,9 +91,20 @@ public class QuestListener implements Listener {
         if (active.isEmpty()) return;
         for (QuestGUI gui : questGUIs) {
             CityNPC npc = gui.getNpcType();
-            if (active.contains(QuestManager.activeKey(npc, false))) checkQuestCompletion(player, npc, false);
-            if (active.contains(QuestManager.activeKey(npc, true)))  checkQuestCompletion(player, npc, true);
+            boolean main = active.contains(QuestManager.activeKey(npc, false));
+            boolean special = active.contains(QuestManager.activeKey(npc, true));
+            if ((!main && !special) || paused(npc)) continue;
+            if (main)    checkQuestCompletion(player, npc, false);
+            if (special) checkQuestCompletion(player, npc, true);
         }
+    }
+
+    /**
+     * Artisan sans logis (son bâtiment a été supprimé) : ses quêtes sont en pause, rien ne
+     * progresse ; tout reprend tel quel quand il retrouve un atelier.
+     */
+    private boolean paused(CityNPC npc) {
+        return dataManager.getState(npc) == com.citycore.npc.NPCState.HOMELESS;
     }
 
     /**
@@ -139,6 +150,7 @@ public class QuestListener implements Listener {
             CityNPC npc = gui.getNpcType();
             for (boolean special : new boolean[]{false, true}) {
                 if (!active.contains(QuestManager.activeKey(npc, special))) continue;
+                if (paused(npc)) continue;
                 if (incrementKill(player, npc, special, entityName)) {
                     checkQuestCompletion(player, npc, special);
                 }
@@ -310,6 +322,7 @@ public class QuestListener implements Listener {
             if (npc == null) continue;
             NPCPersonalQuest quest = npc.getPersonalQuestById(entry.substring(sep + 1));
             if (quest == null || quest.trigger() != trigger) continue;
+            if (paused(npc)) continue; // sans logis : récit en pause
             triggerPersonalQuest(player, npc, quest, context, times);
         }
     }

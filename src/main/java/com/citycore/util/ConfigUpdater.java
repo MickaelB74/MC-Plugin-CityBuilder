@@ -174,6 +174,10 @@ public final class ConfigUpdater {
         String withMods = addMissingChildren(updated, lines, user, "mod-integrations");
         if (!withMods.equals(updated)) added.add("mod-integrations (nouveaux mods)");
         updated = withMods;
+        // Nouveaux réglages des habitants (vitesse, promenade…) : ajoutés sous habitants (section existante)
+        String withInhabitants = addMissingChildren(updated, lines, user, "habitants");
+        if (!withInhabitants.equals(updated)) added.add("habitants (nouveaux réglages)");
+        updated = withInhabitants;
         if (append.length() > 0) updated = updated.stripTrailing() + "\n" + append;
         return updated;
     }

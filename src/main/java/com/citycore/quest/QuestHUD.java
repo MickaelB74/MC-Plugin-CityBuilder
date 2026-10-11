@@ -62,6 +62,11 @@ public class QuestHUD {
         return integrations != null && !integrations.isAvailable(npc);
     }
 
+    /** Artisan sans logis (bâtiment supprimé) : ses quêtes sont en pause et ne s'affichent pas. */
+    private boolean paused(CityNPC npc) {
+        return dataManager.getState(npc) == com.citycore.npc.NPCState.HOMELESS;
+    }
+
     public QuestHUD(JavaPlugin plugin, QuestManager questManager,
                     NPCDataManager dataManager, List<QuestGUI> questGUIs) {
         this.plugin       = plugin;
@@ -184,8 +189,8 @@ public class QuestHUD {
         for (QuestGUI gui : questGUIs) {
             CityNPC npc = gui.getNpcType();
             if (hiddenByMod(npc)) continue;
-            if (active.contains(QuestManager.activeKey(npc, false))
-                    || active.contains(QuestManager.activeKey(npc, true))) list.add(npc);
+            if ((active.contains(QuestManager.activeKey(npc, false))
+                    || active.contains(QuestManager.activeKey(npc, true))) && !paused(npc)) list.add(npc);
         }
         return list;
     }
@@ -259,6 +264,7 @@ public class QuestHUD {
                     ? questManager.getActiveQuest(uuid, npc, true) : null;
 
             if (main == null && special == null) continue;
+            if (paused(npc)) continue; // sans logis : quêtes en pause
 
             lines.add(npc.displayName);
 
@@ -363,6 +369,7 @@ public class QuestHUD {
             QuestDefinition special = active.contains(QuestManager.activeKey(npc, true))
                     ? questManager.getActiveQuest(uuid, npc, true) : null;
             if (main == null && special == null) continue;
+            if (paused(npc)) continue; // sans logis : quêtes en pause
 
             rows.add(UiHud.Row.head(npc.displayName.replaceAll("§.", ""), UiHud.GOLD));
             if (main != null) addObjectives(rows, uuid, npc, main, false);

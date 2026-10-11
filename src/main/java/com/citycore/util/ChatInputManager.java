@@ -48,6 +48,22 @@ public class ChatInputManager implements Listener {
         instance.pending.put(player.getUniqueId(), callback);
     }
 
+    /**
+     * Variante avec une ligne d'aide cliquable sous la question (ex. un nom proposé que le clic
+     * recopie dans la zone de saisie du chat).
+     */
+    public static void prompt(Player player, String prompt, net.md_5.bungee.api.chat.BaseComponent hint,
+                              Consumer<String> callback) {
+        if (instance == null) throw new IllegalStateException("ChatInputManager non initialisé !");
+        player.closeInventory();
+        player.sendMessage("");
+        player.sendMessage(prompt);
+        player.spigot().sendMessage(hint);
+        player.sendMessage("§7(Tapez §cannuler §7pour annuler)");
+        player.sendMessage("");
+        instance.pending.put(player.getUniqueId(), callback);
+    }
+
     /** Annule une saisie en attente pour un joueur. */
     public static void cancel(Player player) {
         if (instance != null) instance.pending.remove(player.getUniqueId());

@@ -173,7 +173,31 @@ public class DatabaseManager {
             // colonne déjà présente
         }
 
+        // Bâtiments : type, atelier réservé, hauteur et niveau (phase 1 du plan « Valmont vivante »)
+        boolean typesAdded = addColumn(stmt, "buildings", "type TEXT NOT NULL DEFAULT 'DIVERS'");
+        addColumn(stmt, "buildings", "reserved_for TEXT");
+        addColumn(stmt, "buildings", "y_min INTEGER");
+        addColumn(stmt, "buildings", "y_max INTEGER");
+        addColumn(stmt, "buildings", "level INTEGER NOT NULL DEFAULT 0");
+        if (typesAdded) {
+            // Première fois : un bâtiment habité par un artisan devient son atelier, les autres « Divers »
+            int converted = stmt.executeUpdate(
+                    "UPDATE buildings SET type = 'ATELIER', reserved_for = npc_tag WHERE npc_tag IS NOT NULL");
+            plugin.getLogger().info("Bâtiments : types ajoutés (" + converted
+                    + " atelier(s) d'artisan, les autres en « Divers »).");
+        }
+
         stmt.close();
+    }
+
+    /** Ajoute une colonne si elle manque ; renvoie true si elle vient d'être créée. */
+    private static boolean addColumn(Statement stmt, String table, String definition) {
+        try {
+            stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + definition);
+            return true;
+        } catch (SQLException ignored) {
+            return false; // colonne déjà présente
+        }
     }
 
     public Connection getConnection() {

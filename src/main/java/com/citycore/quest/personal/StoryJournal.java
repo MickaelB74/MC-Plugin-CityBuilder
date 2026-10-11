@@ -125,7 +125,7 @@ public final class StoryJournal {
     private Status status(CityNPC npc) {
         return switch (data.getState(npc)) {
             case ASSIGNED -> integrations == null || integrations.isAvailable(npc) ? Status.AVAILABLE : Status.MOD_MISSING;
-            case ARRIVED  -> Status.IN_TOWN;
+            case ARRIVED, HOMELESS -> Status.IN_TOWN; // en ville sans atelier : récits en pause
             default       -> Status.LOCKED;
         };
     }

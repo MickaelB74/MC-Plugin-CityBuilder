@@ -59,6 +59,20 @@ public class CityCommand implements CommandExecutor {
         this.uiPack = uiPack;
     }
 
+    /** Création des bâtiments : choix du type, sélection, changement de type. */
+    private BuildingCreation buildingCreation;
+
+    public void setBuildingCreation(BuildingCreation buildingCreation) {
+        this.buildingCreation = buildingCreation;
+    }
+
+    /** Prototype de la phase 0 (/city proto) : PNJ blessables, foule, combat. Temporaire. */
+    private com.citycore.debug.NpcPrototype prototype;
+
+    public void setPrototype(com.citycore.debug.NpcPrototype prototype) {
+        this.prototype = prototype;
+    }
+
     /** Menu illustré « Quêtes suivies » (/city quests). */
     public void setQuestTracking(com.citycore.ui.screens.QuestTrackingScreen questTracking) {
         this.questTracking = questTracking;
@@ -345,6 +359,15 @@ public class CityCommand implements CommandExecutor {
                     }
                 }
 
+                // ── /city proto (phase 0, temporaire) ────────────
+                case PROTO -> {
+                    if (!player.isOp()) {
+                        player.sendMessage("§c❌ Réservé aux admins.");
+                        return true;
+                    }
+                    if (prototype != null) prototype.handle(player, args);
+                }
+
                 // ── /city npc ────────────────────────────────────
                 case NPC -> {
                     if (args.length < 3) {
@@ -434,34 +457,98 @@ public class CityCommand implements CommandExecutor {
                     if (args.length == 1) { buildingGUI.open(player); return true; }
 
                     switch (args[1].toLowerCase()) {
+                        // ── /city build new [type] [artisan|libre] [nom] ──
+                        // Le type d'abord, le nom ensuite (demandé dans le chat s'il manque)
                         case "new" -> {
-                            if (args.length < 3) {
-                                player.sendMessage("§cUsage : /city build new <nom>");
-                                return true;
-                            }
                             if (!cityManager.isCityInitialized()) {
                                 player.sendMessage("§c❌ Aucune ville n'existe encore.");
                                 return true;
                             }
-                            String name = args[2];
-                            if (buildingManager.nameExists(name)) {
-                                player.sendMessage("§c❌ Bâtiment §f" + name
-                                        + " §cdéjà existant.");
+                            // Sans type : menu de choix (ou boutons dans le chat sans le pack)
+                            if (args.length < 3) {
+                                buildingCreation.begin(player);
                                 return true;
                             }
-                            buildingSession.setPendingName(player.getUniqueId(), name);
-                            ItemStack stick = new ItemStack(BuildingListener.SELECTION_TOOL);
-                            ItemMeta meta   = stick.getItemMeta();
-                            meta.setDisplayName("§e🏗 Sélection : §f" + name);
-                            meta.setLore(List.of(
-                                    "§7Clic gauche §f: Coin 1",
-                                    "§7Clic droit §f: Coin 2",
-                                    "§7Les deux définis = bâtiment créé"
-                            ));
-                            stick.setItemMeta(meta);
-                            player.getInventory().addItem(stick);
-                            player.sendMessage("§a✅ Mode sélection activé pour §e"
-                                    + name + "§a !");
+                            BuildingType type = BuildingType.parse(args[2]);
+                            if (type == null) {
+                                player.sendMessage("§6Choisissez d'abord le type du bâtiment §7(le nom vient ensuite) :");
+                                buildingCreation.begin(player);
+                                return true;
+                            }
+                            CityNPC owner = null;
+                            int nameIndex = 3;
+                            if (type == BuildingType.ATELIER && args.length > 3) {
+                                if (args[3].equalsIgnoreCase("libre")) {
+                                    nameIndex = 4;
+                                } else if (BuildingCreation.parseArtisan(args[3]) != null) {
+                                    owner = BuildingCreation.parseArtisan(args[3]);
+                                    nameIndex = 4;
+                                }
+                            }
+                            if (args.length > nameIndex) {
+                                String name = String.join("_", Arrays.copyOfRange(args, nameIndex, args.length));
+                                buildingCreation.choose(player, name, type, owner);
+                            } else {
+                                buildingCreation.askName(player, type, owner);
+                            }
+                        }
+
+                        // ── /city build type <nom> <type> [artisan] ──
+                        case "type" -> {
+                            if (args.length < 4) {
+                                player.sendMessage("§cUsage : /city build type <nom> <habitation|atelier|mairie|divers> [artisan]");
+                                return true;
+                            }
+                            Building target = buildingManager.getByName(args[2]);
+                            if (target == null) {
+                                player.sendMessage("§c❌ Bâtiment §f" + args[2] + " §cintrouvable.");
+                                return true;
+                            }
+                            BuildingType type = BuildingType.parse(args[3]);
+                            if (type == null) {
+                                player.sendMessage("§c❌ Type inconnu : §f" + args[3] + "§c.");
+                                return true;
+                            }
+                            CityNPC owner = null;
+                            if (args.length >= 5) {
+                                owner = BuildingCreation.parseArtisan(args[4]);
+                                if (owner == null || type != BuildingType.ATELIER) {
+                                    player.sendMessage(type != BuildingType.ATELIER
+                                            ? "§c❌ Seul un atelier peut être réservé à un artisan."
+                                            : "§c❌ Artisan inconnu : §f" + args[4] + "§c.");
+                                    return true;
+                                }
+                            }
+                            buildingCreation.retype(player, target, type, owner);
+                        }
+
+                        // ── /city build hauteur <nom> <bas> <haut> ──
+                        case "hauteur", "height" -> {
+                            if (args.length < 5) {
+                                player.sendMessage("§cUsage : /city build hauteur <nom> <bas> <haut>");
+                                return true;
+                            }
+                            Building target = buildingManager.getByName(args[2]);
+                            if (target == null) {
+                                player.sendMessage("§c❌ Bâtiment §f" + args[2] + " §cintrouvable.");
+                                return true;
+                            }
+                            int low, high;
+                            try {
+                                low  = Integer.parseInt(args[3]);
+                                high = Integer.parseInt(args[4]);
+                            } catch (NumberFormatException e) {
+                                player.sendMessage("§c❌ Hauteurs invalides (nombres entiers attendus).");
+                                return true;
+                            }
+                            if (Math.abs(high - low) < 2 || Math.abs(high - low) > BuildingHeights.MAX_HEIGHT) {
+                                player.sendMessage("§c❌ La hauteur doit faire entre 2 et "
+                                        + BuildingHeights.MAX_HEIGHT + " blocs.");
+                                return true;
+                            }
+                            buildingManager.setHeight(target.id(), low, high);
+                            player.sendMessage("§a✅ §e" + target.name() + " §a: hauteur Y §f"
+                                    + Math.min(low, high) + " §a→ §f" + Math.max(low, high) + "§a.");
                         }
                         case "show"   -> buildingBorderTask.toggle(player);
                         case "remove" -> {
@@ -504,10 +591,7 @@ public class CityCommand implements CommandExecutor {
                                 player.sendMessage("§c❌ Bâtiment déjà assigné.");
                                 return true;
                             }
-                            CityNPC npc = Arrays.stream(CityNPC.values())
-                                    .filter(n -> n.tag.replace("citycore_", "")
-                                            .equalsIgnoreCase(args[3]))
-                                    .findFirst().orElse(null);
+                            CityNPC npc = BuildingCreation.parseArtisan(args[3]);
                             if (npc == null) {
                                 player.sendMessage("§c❌ NPC §f" + args[3]
                                         + " §cintrouvable.");
@@ -516,6 +600,21 @@ public class CityCommand implements CommandExecutor {
                             if (buildingManager.isNPCAlreadyAssigned(npc.tag)) {
                                 player.sendMessage("§c❌ §e" + npc.displayName
                                         + " §cdéjà assigné ailleurs.");
+                                return true;
+                            }
+                            // Même règle que « Choisir son logis » : un atelier libre ou réservé à lui
+                            if (!bTarget.acceptsArtisan(npc)) {
+                                player.sendMessage(bTarget.type() != BuildingType.ATELIER
+                                        ? "§c❌ §e" + bTarget.name() + " §cn'est pas un atelier ("
+                                          + bTarget.type().label + "). §7/city build type " + bTarget.name() + " atelier"
+                                        : "§c❌ §e" + bTarget.name() + " §cest réservé à "
+                                          + CityNPC.fromTag(bTarget.reservedFor()).displayName + "§c.");
+                                return true;
+                            }
+                            Building elsewhere = buildingManager.findReservedFor(npc.tag, bTarget.id());
+                            if (elsewhere != null) {
+                                player.sendMessage("§c❌ §e" + npc.displayName + " §ca déjà un atelier réservé : §e"
+                                        + elsewhere.name() + "§c.");
                                 return true;
                             }
                             buildingManager.assignNPC(bTarget.id(), npc.tag);
@@ -544,18 +643,13 @@ public class CityCommand implements CommandExecutor {
                             }
                             BuildingSession.PendingBuilding pending =
                                     buildingSession.getPendingBuilding(player.getUniqueId());
-                            buildingManager.createBuilding(
-                                    pending.name(), pending.world(),
-                                    pending.x1(), pending.z1(),
-                                    pending.x2(), pending.z2(),
-                                    null, null, null, null);
-                            player.sendMessage("§a✅ Bâtiment §e" + pending.name()
-                                    + " §acréé sans point NPC.");
+                            buildingCreation.finish(player, pending, null, null, null, null);
+                            player.sendMessage("§7(sans point NPC)");
                             buildingSession.clear(player.getUniqueId());
                             player.getInventory().setItemInMainHand(null);
                         }
                         default -> player.sendMessage(
-                                "§cUsage : /city build [new|show|remove|assign|skip]");
+                                "§cUsage : /city build [new|show|remove|assign|skip|type|hauteur]");
                     }
                 }
 

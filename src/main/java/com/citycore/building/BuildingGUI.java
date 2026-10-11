@@ -16,6 +16,8 @@ import java.util.List;
 public class BuildingGUI {
 
     public static final String TITLE = "§8Bâtiments de la ville";
+    /** Début du nom des objets « bâtiment » (leur icône dépend du type). */
+    public static final String NAME_PREFIX = "§e🏛 ";
 
     private final BuildingManager buildingManager;
 
@@ -45,8 +47,10 @@ public class BuildingGUI {
                     : "§7Aucun";
 
             List<String> lore = new ArrayList<>();
+            lore.add(building.typeLine());
             lore.add("§7Zone : §f(" + building.x1() + "§7, §f" + building.z1()
                     + "§7) → §f(" + building.x2() + "§7, §f" + building.z2() + "§7)");
+            lore.add(building.heightLine());
             lore.add("§7Monde : §f" + building.world());
             lore.add("");
             lore.add("§7NPC assigné : " + npcName);
@@ -57,14 +61,14 @@ public class BuildingGUI {
                 lore.add("§8Aucun point NPC défini");
             }
 
-            inv.setItem(slot++, makeItem(Material.BRICKS,
-                    "§e🏛 " + building.name(), lore));
+            inv.setItem(slot++, makeItem(building.type().icon,
+                    NAME_PREFIX + building.name(), lore));
         }
 
         if (buildings.isEmpty()) {
             inv.setItem(4, makeItem(Material.BARRIER,
                     "§cAucun bâtiment",
-                    List.of("§7Utilisez §f/city build new <nom>",
+                    List.of("§7Utilisez §f/city build new",
                             "§7pour créer un bâtiment.")));
         }
 

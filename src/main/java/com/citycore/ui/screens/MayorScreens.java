@@ -49,6 +49,13 @@ public final class MayorScreens {
         this.buildings  = buildings;
     }
 
+    /** Écrans du type des bâtiments (clic droit dans la liste : changer le type). */
+    private BuildingScreens screens;
+
+    public void setBuildingScreens(BuildingScreens screens) {
+        this.screens = screens;
+    }
+
     /* =========================
        POINTS D'ENTRÉE (false = menu classique)
        ========================= */
@@ -297,7 +304,8 @@ public final class MayorScreens {
             c.sprite(deleting ? "rib_supprimer" : "rib_batiments", sx(1), sy(0));
             info(c, 7, deleting ? "§c➖ Supprimer un bâtiment" : "§a🏗 Bâtiments de la ville",
                     deleting ? List.of("§7Cliquez sur un bâtiment", "§7pour le supprimer.", "§c§lDéfinitif.")
-                            : List.of("§7Cliquez sur un bâtiment pour", "§7voir ses bordures 5 secondes.", "",
+                            : List.of("§7Rangés par type : habitations,", "§7ateliers, mairie, divers.", "",
+                            "§eClic gauche §7: bordures 5 secondes", "§eClic droit §7: changer le type", "",
                             "§6■ §7habité par un artisan"));
             close(c);
 
@@ -308,13 +316,23 @@ public final class MayorScreens {
                 if (deleting) c.sprite("ring_red", sx(col), sy(row));
                 else if (b.npcTag() != null) c.sprite("ring_gold", sx(col), sy(row));
                 List<String> lore = new ArrayList<>(List.of(
-                        "§7Monde : §f" + b.world(),
+                        b.typeLine(),
                         "§7Zone  : §f" + b.x1() + "," + b.z1() + " §7→ §f" + b.x2() + "," + b.z2(),
+                        b.heightLine(),
                         "§7NPC   : " + buildingGUI().occupant(b), ""));
-                lore.add(deleting ? "§cCliquez pour supprimer" : "§eCliquez pour voir les bordures");
-                item(col, row, UiItems.shown(deleting ? Material.TNT : Material.BRICKS,
+                if (deleting) {
+                    lore.add("§cCliquez pour supprimer");
+                } else {
+                    lore.add("§eClic gauche §7: voir les bordures");
+                    if (screens != null) lore.add("§eClic droit §7: changer le type");
+                }
+                item(col, row, UiItems.shown(deleting ? Material.TNT : b.type().icon,
                                 (deleting ? "§c" : "§e") + b.name(), lore, false),
-                        t -> { if (deleting) buildingGUI().delete(player, b); else buildingGUI().showBorders(player, b); });
+                        t -> {
+                            if (deleting) buildingGUI().delete(player, b);
+                            else if (t.isRightClick() && screens != null) screens.openRetype(player, b, () -> openBuildings(player));
+                            else buildingGUI().showBorders(player, b);
+                        });
             }
 
             if (deleting) {
@@ -322,8 +340,9 @@ public final class MayorScreens {
                 zone(0, 5, 4, 1, "§7◀ Retour", List.of("§7Retourner à la liste"), t -> buildingGUI().open(player));
             } else {
                 c.sprite("fb_ajouter", sx(0), sy(5));
-                zone(0, 5, 4, 1, "§a➕ Ajouter un bâtiment", List.of("§7Entrez le nom du bâtiment",
-                        "§7puis sélectionnez la zone avec WorldEdit.", "", "§eCliquez pour saisir le nom"),
+                zone(0, 5, 4, 1, "§a➕ Ajouter un bâtiment", List.of("§7Choisissez le type, donnez un nom,",
+                        "§7puis délimitez la zone avec le bâton.", "",
+                        "§eCliquez pour choisir le type"),
                         t -> buildingGUI().promptAdd(player));
                 c.sprite("fb_supprimer", sx(5), sy(5));
                 zone(5, 5, 4, 1, "§c➖ Supprimer un bâtiment", List.of("§7Sélectionnez un bâtiment à retirer"),

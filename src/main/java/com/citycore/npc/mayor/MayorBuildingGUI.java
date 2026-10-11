@@ -4,7 +4,6 @@ import com.citycore.building.Building;
 import com.citycore.building.BuildingManager;
 import com.citycore.npc.CityNPC;
 import com.citycore.building.BuildingParticleTask;
-import com.citycore.util.ChatInputManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -56,15 +55,17 @@ public class MayorBuildingGUI {
         for (int i = 0; i < max; i++) {
             Building b = buildings.get(i);
             inv.setItem(i, makeItem(
-                    Material.BRICKS,
+                    b.type().icon,
                     "§e" + b.name(),
                     List.of(
-                            "§7Monde : §f" + b.world(),
+                            b.typeLine(),
                             "§7Zone  : §f" + b.x1() + "," + b.z1()
                                     + " §7→ §f" + b.x2() + "," + b.z2(),
+                            b.heightLine(),
                             "§7NPC   : " + npcDisplayName(b),
                             "",
-                            "§eCliquez pour voir les bordures"
+                            "§eCliquez pour voir les bordures",
+                            "§8Type : /city build type " + b.name() + " <type>"
                     )
             ));
         }
@@ -73,10 +74,10 @@ public class MayorBuildingGUI {
                 Material.LIME_DYE,
                 "§a➕ Ajouter un bâtiment",
                 List.of(
-                        "§7Entrez le nom du bâtiment",
-                        "§7puis sélectionnez la zone avec WorldEdit",
+                        "§7Choisissez le type, donnez un nom,",
+                        "§7puis délimitez la zone avec le bâton.",
                         "",
-                        "§eCliquez pour saisir le nom"
+                        "§eCliquez pour choisir le type"
                 )
         ));
 
@@ -169,22 +170,13 @@ public class MayorBuildingGUI {
         });
     }
 
-    /** Demande le nom d'un nouveau bâtiment dans le chat, puis lance la sélection WorldEdit. */
+    /**
+     * Nouveau bâtiment : choix du type d'abord (menu ou boutons dans le chat), puis le nom est
+     * demandé dans le chat avec une proposition adaptée au type (voir BuildingCreation).
+     * Lancé au tick suivant : le menu classique appelle ceci pendant un événement de clic.
+     */
     public void promptAdd(Player player) {
-        {
-            ChatInputManager.prompt(
-                    player,
-                    "§a➕ §7Entrez le §enom §7du nouveau bâtiment :",
-                    name -> {
-                        if (buildingManager.nameExists(name)) {
-                            player.sendMessage("§c❌ Un bâtiment nommé §e" + name + " §cexiste déjà.");
-                            open(player);
-                            return;
-                        }
-                        player.performCommand("city build new " + name);
-                    }
-            );
-        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> player.performCommand("city build new"));
     }
 
     /**

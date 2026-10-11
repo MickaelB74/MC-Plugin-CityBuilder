@@ -232,7 +232,7 @@ public class CityQuestManager {
             case BUILD_BUILDINGS -> buildingManager.getAllBuildings().size();
             case DEPOSIT_COINS, DELIVER_ITEMS, KILL_MOBS -> getProgress(quest.id()); // cumulatifs
             case FIND_NPC        -> recruitStage(quest);
-            case NPC_LEVEL       -> npcDataManager.getState(quest.targetNpc()) == NPCState.ASSIGNED
+            case NPC_LEVEL       -> npcDataManager.getState(quest.targetNpc()).wasInstalled()
                     ? npcDataManager.getLevel(quest.targetNpc()) : 0;
             case STOCK_LEVEL     -> npcDataManager.getInventoryAmount(quest.targetNpc(), quest.material());
         };
@@ -241,7 +241,7 @@ public class CityQuestManager {
     /** 0 = pas commencée, 1 = PNJ apparu, 2 = arrivé en ville, 3 = installé. */
     private int recruitStage(CityQuest quest) {
         NPCState state = npcDataManager.getState(quest.targetNpc());
-        if (state == NPCState.ASSIGNED) return 3;
+        if (state.wasInstalled()) return 3; // sans logis aujourd'hui : l'installation reste acquise
         if (state == NPCState.ARRIVED)  return 2;
         return Math.min(1, getProgress(quest.id()));
     }

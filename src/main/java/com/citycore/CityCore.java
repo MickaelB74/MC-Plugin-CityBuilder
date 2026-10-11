@@ -36,6 +36,7 @@ import com.citycore.util.DatabaseManager;
 import com.citycore.util.TypewriterUtil;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -58,6 +59,7 @@ public class CityCore extends JavaPlugin {
     private CityQuestManager       cityQuestManager;
     FindNpcQuestManager            findNpcQuestManager;
     private com.citycore.ui.UiPack uiPack;
+    private com.citycore.debug.NpcPrototype prototype;
 
     @Override
     public void onEnable() {
@@ -106,9 +108,39 @@ public class CityCore extends JavaPlugin {
         BuildingSession    buildingSession    = new BuildingSession();
         BuildingGUI        buildingGUI        = new BuildingGUI(buildingManager);
         BuildingBorderTask buildingBorderTask = new BuildingBorderTask(this, buildingManager);
+        // Un atelier ne se réserve qu'à un personnage trouvé : rencontré par un joueur, arrivé ou installé
+        BuildingCreation   buildingCreation   = new BuildingCreation(buildingManager, buildingSession,
+                npc -> npcDataManager.getState(npc) != NPCState.WANDERER || introManager.hasAnyoneMet(npc));
 
         getServer().getPluginManager().registerEvents(
-                new BuildingListener(buildingSession, buildingManager, cityManager), this);
+                new BuildingListener(buildingSession, buildingManager, cityManager, buildingCreation), this);
+        // Bâtiment d'un artisan supprimé : il passe « sans logis » (gestion fermée, quêtes en pause,
+        // rien n'est perdu) jusqu'à ce qu'on lui choisisse un nouvel atelier
+        buildingManager.setOnNpcEvicted(tag -> {
+            CityNPC evicted = CityNPC.fromTag(tag);
+            if (evicted == null || npcDataManager.getState(evicted) != NPCState.ASSIGNED) return;
+            npcDataManager.setState(evicted, NPCState.HOMELESS);
+            npcManager.setWandering(evicted, true); // il se promène en ville en attendant
+            net.citizensnpcs.api.npc.NPC citizen = npcManager.getNPC(evicted);
+            if (citizen != null && citizen.isSpawned()) citizen.getNavigator().cancelNavigation();
+            notificationManager.notifyAll(evicted, getServer(), npcManager);
+            Bukkit.broadcastMessage("§6🏚 " + evicted.displayName + " §6n'a plus d'atelier. §7Ses quêtes sont en pause"
+                    + " jusqu'à ce que vous lui choisissiez un nouveau logis (parlez-lui).");
+            getLogger().info(ChatColor.stripColor(evicted.displayName) + " : bâtiment supprimé, passe sans logis.");
+        });
+        // Rattrapage : artisans installés dont le bâtiment a été supprimé avant ce correctif
+        for (CityNPC type : CityNPC.values()) {
+            if (type == CityNPC.MAYOR || npcDataManager.getState(type) != NPCState.ASSIGNED) continue;
+            if (buildingManager.getAssignedBuilding(type.tag) != null) continue;
+            npcDataManager.setState(type, NPCState.HOMELESS);
+            npcManager.setWandering(type, true);
+            getLogger().info(ChatColor.stripColor(type.displayName) + " : aucun bâtiment, passe sans logis.");
+        }
+        // Bâtiments créés avant les types : hauteur estimée une fois (charge leurs chunks)
+        Bukkit.getScheduler().runTask(this, () -> {
+            int estimated = buildingManager.estimateMissingHeights(getServer());
+            if (estimated > 0) getLogger().info("Bâtiments : hauteur estimée pour " + estimated + " bâtiment(s).");
+        });
         getServer().getPluginManager().registerEvents(
                 new BuildingGUIListener(buildingManager, this), this);
         getServer().getPluginManager().registerEvents(
@@ -172,8 +204,14 @@ public class CityCore extends JavaPlugin {
                 buildingManager, economy, mayorQuestGUI, cityQuestManager, this);
         NPCGuiRegistry guiRegistry   = new NPCGuiRegistry();
         guiRegistry.register(CityNPC.MAYOR, mayorGUI);
-        mayorGUI.setThemed(new com.citycore.ui.screens.MayorScreens(
-                uiKit, mayorGUI, cityManager, cityQuestManager, npcManager, buildingManager));
+        // Choix du type des bâtiments : menu illustré (création, et clic droit dans la liste d'Alderic)
+        com.citycore.ui.screens.BuildingScreens buildingScreens =
+                new com.citycore.ui.screens.BuildingScreens(uiKit, buildingManager, buildingCreation, npcManager);
+        buildingCreation.setChooser(buildingScreens::openNew);
+        com.citycore.ui.screens.MayorScreens mayorScreens = new com.citycore.ui.screens.MayorScreens(
+                uiKit, mayorGUI, cityManager, cityQuestManager, npcManager, buildingManager);
+        mayorScreens.setBuildingScreens(buildingScreens);
+        mayorGUI.setThemed(mayorScreens);
 
         getServer().getPluginManager().registerEvents(
                 new MayorListener(npcManager, guiRegistry, introManager, cityManager, this), this);
@@ -291,8 +329,15 @@ public class CityCore extends JavaPlugin {
                 new com.citycore.ui.screens.QuestTrackingScreen(uiKit, questHUD, npcManager, storyJournal);
         questJournal.setClassic(questSelectionGUI::open, questSelectionGUI::openStories);
         cityCommand.setQuestTracking(questJournal);
+        cityCommand.setBuildingCreation(buildingCreation);
+        // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
+        prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
+        getServer().getPluginManager().registerEvents(prototype, this);
+        cityCommand.setPrototype(prototype);
         cityCmd.setExecutor(cityCommand);
-        cityCmd.setTabCompleter(new CityTabCompleter(cityManager, buildingManager, npcManager));
+        CityTabCompleter cityTabCompleter = new CityTabCompleter(cityManager, buildingManager, npcManager);
+        cityTabCompleter.setBuildingCreation(buildingCreation);
+        cityCmd.setTabCompleter(cityTabCompleter);
 
         // ── Summit — instancié APRÈS QuestListener ────────────────
         SummitListener summitListener = new SummitListener(this, questListener);
@@ -323,6 +368,7 @@ public class CityCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (prototype != null) prototype.clear(); // PNJ et zombies du prototype : rien ne doit rester
         if (cityHUD != null) cityHUD.stop();
         if (uiPack != null) uiPack.stop();
         databaseManager.closeDatabase();

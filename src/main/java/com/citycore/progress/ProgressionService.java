@@ -140,7 +140,7 @@ public class ProgressionService {
      */
     public int recruitStage(CityNPC npc) {
         return switch (npcDataManager.getState(npc)) {
-            case ASSIGNED -> 3;
+            case ASSIGNED, HOMELESS -> 3; // sans logis : l'installation reste acquise
             case ARRIVED  -> 2;
             default       -> introManager.hasAnyoneMet(npc) ? 1 : 0;
         };

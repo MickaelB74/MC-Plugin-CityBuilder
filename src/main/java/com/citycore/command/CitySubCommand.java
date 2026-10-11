@@ -15,13 +15,15 @@ public enum CitySubCommand {
             "progres", "avancement", "chroniques"),
     NPC("npc",         "npc <type> <spawn|levelUp|levelDown>", "Gérer les NPCs"),
     QUESTS("quests", "quests [toggle|recits]", "Journal de quêtes : suivi, récits des habitants, afficher/masquer le panneau"),
-    BUILD("build", "build [new <nom>|show|remove <nom|all>]",
-            "Gérer les bâtiments de la ville"),
+    BUILD("build", "build [new [type] [artisan] [nom]|type <nom> <type> [artisan]|hauteur <nom> <bas> <haut>|show|remove <nom|all>]",
+            "Gérer les bâtiments de la ville (habitation, atelier, mairie, divers)"),
     JOB("job", "job <joueur> <npc|clear>", "Gérer le job d'un joueur (op)"),
     PLAYER("player", "player <joueur> <levelUp|levelDown|setLevel>", "Gérer le niveau d'un joueur (op)"),
     ECO("eco", "eco check", "Contrôler l'économie des PNJ : arbitrages (op)"),
     UI("ui", "ui [valmont|classique]", "Style des menus des habitants (illustrés ou classiques)",
-            "interface", "menus");
+            "interface", "menus"),
+    PROTO("proto", "proto <habitant|soldat|former|zombie|foule|tps|skins|clear>",
+            "Prototype temporaire : PNJ blessables, foule, combat (op)");
 
 
     public final String label;

@@ -76,8 +76,8 @@ public class VillagerListener implements Listener {
         notificationManager.clearNotification(player.getUniqueId(), type,
                 plugin.getServer(), npcManager);
 
-        // Stop la balade si ARRIVED — face au joueur
-        if (dataManager.getState(type) == NPCState.ARRIVED && npc != null) {
+        // Stop la balade si en ville sans logis (ARRIVED ou HOMELESS) — face au joueur
+        if (dataManager.getState(type).needsHome() && npc != null) {
             npc.getNavigator().cancelNavigation();
             facePlayer(npc, player);
         }
@@ -226,11 +226,12 @@ public class VillagerListener implements Listener {
         assignBuilding(player, target);
     }
 
-    /** Bâtiments sans habitant (candidats pour ce PNJ). */
+    /**
+     * Logis possibles pour ce PNJ : les ateliers sans habitant, libres ou réservés à lui
+     * (ceux qui lui sont réservés d'abord). Habitations, mairie et « Divers » sont exclus.
+     */
     public List<Building> freeBuildings() {
-        return buildingManager.getAllBuildings().stream()
-                .filter(b -> b.npcTag() == null)
-                .collect(java.util.stream.Collectors.toList());
+        return buildingManager.freeAteliersFor(npcType);
     }
 
     /**
@@ -257,13 +258,24 @@ public class VillagerListener implements Listener {
             gui.openBuildingSearch(player, freeBuildings());
             return;
         }
+        // Le type a pu changer entre-temps (/city build type, autre joueur)
+        if (!target.acceptsArtisan(npcType)) {
+            player.sendMessage("§c❌ §e" + target.name() + " §cn'est plus un atelier disponible pour "
+                    + npcType.displayName + "§c.");
+            gui.openBuildingSearch(player, freeBuildings());
+            return;
+        }
 
         // Assigne directement le NPC au bâtiment (état changé seulement si l'écriture a réussi)
         if (!buildingManager.assignNPC(target.id(), npcType.tag)) {
             player.sendMessage("§c❌ Impossible d'installer " + npcType.displayName + " §cici.");
             return;
         }
+        boolean wasHomeless = dataManager.getState(npcType) == NPCState.HOMELESS;
         dataManager.setState(npcType, NPCState.ASSIGNED);
+        if (wasHomeless) {
+            player.sendMessage("§a▶ " + npcType.displayName + " §aretrouve un atelier : ses quêtes reprennent.");
+        }
 
         // Fin de la conversation : le PNJ cesse sa balade et rejoint son point de travail.
         // (Il avait été mis en pause pour faire face au joueur ; sans cela il restait figé.)
@@ -515,7 +527,7 @@ public class VillagerListener implements Listener {
         if (npcManager.isFollowing(player, npcType)) {
             npcManager.stopFollowing(player, npcType);
             player.sendMessage(npcType.displayName + " §7s'est arrêté de vous suivre.");
-            if (dataManager.getState(npcType) == NPCState.ARRIVED) {
+            if (dataManager.getState(npcType).needsHome()) {
                 NPC npc = npcManager.getNPC(npcType);
                 if (npc != null && npc.isSpawned())
                     npc.getNavigator().cancelNavigation();

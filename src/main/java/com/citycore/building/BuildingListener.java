@@ -21,15 +21,17 @@ public class BuildingListener implements Listener {
 
     public static final Material SELECTION_TOOL = Material.STICK;
 
-    private final BuildingSession session;
-    private final BuildingManager buildingManager;
-    private final CityManager     cityManager;
+    private final BuildingSession  session;
+    private final BuildingManager  buildingManager;
+    private final CityManager      cityManager;
+    private final BuildingCreation creation;
 
     public BuildingListener(BuildingSession session, BuildingManager buildingManager,
-                            CityManager cityManager) {
+                            CityManager cityManager, BuildingCreation creation) {
         this.session         = session;
         this.buildingManager = buildingManager;
         this.cityManager     = cityManager;
+        this.creation        = creation;
     }
 
     @EventHandler
@@ -69,17 +71,9 @@ public class BuildingListener implements Listener {
                     loc.getBlockX() + 0.5, npcY, loc.getBlockZ() + 0.5);
             float npcYaw = player.getLocation().getYaw();
 
-            // Crée le bâtiment avec le point NPC
-            buildingManager.createBuilding(
-                    pending.name(),
-                    pending.world(),
-                    pending.x1(), pending.z1(),
-                    pending.x2(), pending.z2(),
-                    npcPt.getX(), npcPt.getY(), npcPt.getZ(),
-                    npcYaw
-            );
+            // Crée le bâtiment avec le point NPC (type, réservation et hauteur choisis avant)
+            creation.finish(player, pending, npcPt.getX(), npcPt.getY(), npcPt.getZ(), npcYaw);
 
-            player.sendMessage("§a✅ Bâtiment §e" + pending.name() + " §acréé !");
             player.sendMessage("§d📍 Point NPC : §fX" + loc.getBlockX()
                     + " §7Z" + loc.getBlockZ());
 
@@ -141,16 +135,23 @@ public class BuildingListener implements Listener {
                 return;
             }
 
-            String name = session.getPendingName(uuid);
+            BuildingSession.Pending choice = session.getPending(uuid);
+            String name = choice.name();
+            // Hauteur : bas = sol autour de la zone ou coins cliqués, haut = bloc le plus haut de la zone
+            int[] height = BuildingHeights.estimate(player.getWorld(),
+                    p1.getBlockX(), p1.getBlockZ(), p2.getBlockX(), p2.getBlockZ(),
+                    Math.min(p1.getBlockY(), p2.getBlockY()), Math.max(p1.getBlockY(), p2.getBlockY()));
             player.sendMessage("§a✅ Zone définie pour §e" + name + "§a !");
             player.sendMessage("§7Zone : §fX(" + p1.getBlockX() + "§7→§f"
                     + p2.getBlockX() + "§7) Z(§f" + p1.getBlockZ()
-                    + "§7→§f" + p2.getBlockZ() + "§7)");
+                    + "§7→§f" + p2.getBlockZ() + "§7) Y(§f" + height[0] + "§7→§f" + height[1] + "§7)");
 
             // ✅ Passe en phase 2 — stocke les données en attente
-            session.startNpcPointPhase(uuid, name, player.getWorld().getName(),
+            session.startNpcPointPhase(uuid, new BuildingSession.PendingBuilding(
+                    name, player.getWorld().getName(),
                     p1.getBlockX(), p1.getBlockZ(),
-                    p2.getBlockX(), p2.getBlockZ());
+                    p2.getBlockX(), p2.getBlockZ(),
+                    choice.type(), choice.reservedFor(), height[0], height[1]));
 
             // ✅ Remplace le bâton par l'outil de point NPC
             player.getInventory().setItemInMainHand(null);

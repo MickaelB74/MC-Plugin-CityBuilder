@@ -21,20 +21,16 @@ public class BuildingGUIListener implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
-        plugin.getLogger().info("GUI title reçu : [" + event.getView().getTitle() + "]");
-        plugin.getLogger().info("GUI title attendu : [" + BuildingGUI.TITLE + "]");
-
         if (!BuildingGUI.TITLE.equals(event.getView().getTitle())) return;
 
         event.setCancelled(true);
 
+        // L'icône dépend du type du bâtiment : on le reconnaît à son nom
         if (event.getCurrentItem() == null) return;
-        if (event.getCurrentItem().getType() != Material.BRICKS) return;
         if (!event.getCurrentItem().hasItemMeta()) return;
-        if (event.getCurrentItem().getItemMeta().getDisplayName() == null) return;
-
         String rawName = event.getCurrentItem().getItemMeta().getDisplayName();
-        String name    = rawName.replace("§e🏛 ", "").trim();
+        if (rawName == null || !rawName.startsWith(BuildingGUI.NAME_PREFIX)) return;
+        String name    = rawName.substring(BuildingGUI.NAME_PREFIX.length()).trim();
 
         buildingManager.getAllBuildings().stream()
                 .filter(b -> b.name().equals(name))

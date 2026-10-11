@@ -66,7 +66,8 @@ public class NPCCityArrivalTask {
 
                     switch (state) {
                         case WANDERER -> handleWanderer(type, npc);
-                        case ARRIVED  -> handleArrived(type, npc);
+                        // Sans logis (bâtiment supprimé) : il se promène en ville comme à son arrivée
+                        case ARRIVED, HOMELESS -> handleArrived(type, npc);
                         case ASSIGNED -> handleAssigned(type, npc);
                     }
                 }

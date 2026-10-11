@@ -1,6 +1,7 @@
 package com.citycore.ui.screens;
 
 import com.citycore.building.Building;
+import com.citycore.building.BuildingType;
 import com.citycore.economy.ItemTags;
 import com.citycore.economy.MarketService;
 import com.citycore.npc.CityNPC;
@@ -75,7 +76,8 @@ public final class ArtisanScreens {
         if (!kit.active(p)) return false;
         return kit.show(switch (data.getState(npc)) {
             case WANDERER -> new Wanderer(p);
-            case ARRIVED  -> new Arrived(p);
+            // Sans logis (bâtiment supprimé) : même écran qu'à l'arrivée, la gestion attend un atelier
+            case ARRIVED, HOMELESS -> new Arrived(p);
             case ASSIGNED -> new Main(p);
         });
     }
@@ -291,19 +293,30 @@ public final class ArtisanScreens {
 
         @Override
         protected void draw(UiCanvas c) {
+            // Sans logis : installé autrefois, son bâtiment a été supprimé (tout est conservé, en pause)
+            boolean homeless = data.getState(npc) == NPCState.HOMELESS;
             c.background("bg_character");
             title(c);
-            c.text("EN VILLE", STATE_X, rowText(0), GREEN, true);
-            zone(0, 0, 6, 1, "§a" + plain(npc.displayName) + " — Dans la ville",
-                    List.of("§7Ce personnage a rejoint votre ville !", "§7Choisissez-lui un bâtiment pour",
-                            "§7ouvrir son commerce."), null);
+            if (homeless) {
+                c.text("SANS LOGIS", STATE_X, rowText(0), RED, true);
+                zone(0, 0, 6, 1, "§c" + plain(npc.displayName) + " — Sans logis",
+                        List.of("§7Son atelier a été supprimé.", "§7Choisissez-lui un nouveau logis pour",
+                                "§7rouvrir son commerce.", "",
+                                "§6⏸ Quêtes en pause §7: rang, stock et", "§7quêtes en cours sont conservés."), null);
+            } else {
+                c.text("EN VILLE", STATE_X, rowText(0), GREEN, true);
+                zone(0, 0, 6, 1, "§a" + plain(npc.displayName) + " — Dans la ville",
+                        List.of("§7Ce personnage a rejoint votre ville !", "§7Choisissez-lui un bâtiment pour",
+                                "§7ouvrir son commerce."), null);
+            }
             storyIcon(c, 6);
             followIcon(c, 7);
             close(c);
             portrait(c, false);
 
             bigButton(c, 1, "btn_logis", "§e🏠 Choisir son logis",
-                    List.of("§7Bâtiments libres de la ville.", "", "§eCliquez pour choisir"),
+                    List.of("§7Ateliers libres de la ville,", "§7ou réservés à ce personnage.", "",
+                            "§eCliquez pour choisir"),
                     t -> gui.openBuildingSearch(player, actions.freeBuildings()));
             boolean wandering = npcManager.isWandering(npc);
             bigButton(c, 2, wandering ? "btn_rester" : "btn_promener",
@@ -312,9 +325,16 @@ public final class ArtisanScreens {
                     t -> actions.toggleWander(player));
             bigButton(c, 3, "btn_histoire", "§6📖 Son histoire", storyLore(), t -> tellStory(player));
 
-            bar(c, 2 / 3.0, false, "CHOISISSEZ SON LOGIS");
-            zone(0, 5, 9, 1, "§eRecrutement", List.of("§a✔ §71. Le rencontrer", "§a✔ §72. Le ramener en ville",
-                    "§8○ §73. L'installer dans un bâtiment"), null);
+            if (homeless) {
+                bar(c, 1, false, "EN PAUSE : NOUVEAU LOGIS");
+                zone(0, 5, 9, 1, "§6⏸ En attente d'un logis", List.of("§a✔ §71. Le rencontrer",
+                        "§a✔ §72. Le ramener en ville", "§a✔ §73. L'installer §8(atelier supprimé)", "",
+                        "§7Ses quêtes reprendront dès qu'il", "§7aura un nouvel atelier."), null);
+            } else {
+                bar(c, 2 / 3.0, false, "CHOISISSEZ SON LOGIS");
+                zone(0, 5, 9, 1, "§eRecrutement", List.of("§a✔ §71. Le rencontrer", "§a✔ §72. Le ramener en ville",
+                        "§8○ §73. L'installer dans un bâtiment"), null);
+            }
         }
     }
 
@@ -342,25 +362,31 @@ public final class ArtisanScreens {
             title(c);
             back(c, 0, "Retour", () -> gui.open(player));
             c.sprite("rib_logis", sx(1), sy(0));
-            info(c, 7, "§e🏠 Logis libres", List.of("§7Bâtiments sans habitant.",
-                    "§7Créez-en un : §f/city build new <nom>"));
+            info(c, 7, "§e🏠 Ateliers disponibles", List.of(
+                    "§7Ateliers sans habitant, libres",
+                    "§7ou réservés à " + plain(npc.displayName) + ".",
+                    "§7Créez-en un : §f/city build new",
+                    "§fatelier " + npc.skinId + " §7(ou chez Alderic)", "",
+                    "§6■ §7réservé à " + plain(npc.displayName) + "   §a■ §7atelier libre"));
             close(c);
 
             int start = page * GRID;
             for (int i = 0; i < GRID && start + i < list.size(); i++) {
                 Building b = list.get(start + i);
-                c.sprite(b.hasNpcPoint() ? "ring_green" : "ring_amber", sx(col(i)), sy(row(i)));
+                boolean reserved = npc.tag.equals(b.reservedFor());
+                c.sprite(reserved ? "ring_gold" : b.hasNpcPoint() ? "ring_green" : "ring_amber", sx(col(i)), sy(row(i)));
                 List<String> lore = List.of(
+                        reserved ? "§6Atelier réservé à " + plain(npc.displayName) : "§aAtelier libre",
                         "§7Zone : §fX(" + b.x1() + "§7→§f" + b.x2() + "§7) Z(§f" + b.z1() + "§7→§f" + b.z2() + "§7)",
-                        "§7Monde : §f" + b.world(), "",
+                        b.heightLine(), "",
                         b.hasNpcPoint() ? "§a✔ Point NPC défini" : "§c✘ Aucun point NPC", "",
                         "§eCliquez pour installer §f" + plain(npc.displayName));
-                item(col(i), row(i), UiItems.shown(Material.BRICKS, "§e🏛 " + b.name(), lore, false),
+                item(col(i), row(i), UiItems.shown(BuildingType.ATELIER.icon, "§e🏛 " + b.name(), lore, reserved),
                         t -> actions.assignBuilding(player, b));
             }
             pager(c, page, pages(list.size()), p -> kit.show(new Buildings(player, actions.freeBuildings(), p)));
-            footer(c, false, list.isEmpty() ? "AUCUN BÂTIMENT LIBRE"
-                    : list.size() + (list.size() > 1 ? " BÂTIMENTS LIBRES" : " BÂTIMENT LIBRE"));
+            footer(c, false, list.isEmpty() ? "AUCUN ATELIER DISPONIBLE"
+                    : list.size() + (list.size() > 1 ? " ATELIERS DISPONIBLES" : " ATELIER DISPONIBLE"));
         }
     }
 
