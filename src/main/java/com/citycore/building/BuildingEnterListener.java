@@ -51,7 +51,8 @@ public class BuildingEnterListener implements Listener {
                         : "Ville";
 
                 com.citycore.util.TypewriterUtil.actionBar(player, "§e" + cityName + " : §f" + building.name()
-                        + " §8· " + BuildingCreation.label(building.type(), building.reservedNpc()));
+                        + " §8· " + BuildingCreation.label(building.type(), building.reservedNpc())
+                        + " §8· " + (building.level() > 0 ? Inspection.stars(building.level()) : "§cincomplet"));
             }
         } else {
             // Joueur hors de tout bâtiment

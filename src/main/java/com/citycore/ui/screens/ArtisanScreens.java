@@ -212,7 +212,16 @@ public final class ArtisanScreens {
             jobIcon(c);
             followIcon(c, 7);
             close(c);
-            portrait(c, false);
+            // Portrait : son histoire, l'état de son atelier, et un clic ouvre l'écran « Son atelier »
+            kit.portraits().draw(c, npc, false);
+            List<String> portraitLore = new ArrayList<>(gui.backstoryLore());
+            if (actions.inspector() != null) {
+                portraitLore.add("");
+                portraitLore.addAll(actions.inspector().atelierLore(npc));
+                portraitLore.add("§eCliquez : son atelier §7(ce qu'il faut pour monter de niveau)");
+            }
+            zone(0, 1, 4, 4, npc.displayName + " §8— §7" + npc.function, portraitLore,
+                    actions.inspector() == null ? null : t -> kit.show(new AtelierView(player)));
 
             bigButton(c, 1, "btn_vendre", "§a💰 Vendre",
                     List.of("§7Vendez vos ressources.", "§7Le prix baisse quand son", "§7entrepôt se remplit."),
@@ -245,6 +254,99 @@ public final class ArtisanScreens {
             c.sprite(sprite, sx(6), sy(0));
             ItemMeta tip = gui.makeJobButton(player).getItemMeta();
             zone(6, 0, 1, 1, tip.getDisplayName(), tip.getLore(), t -> actions.toggleJob(player));
+        }
+    }
+
+    /* =========================
+       SON ATELIER — inspection détaillée (phase 2)
+       Rangée 1 : exigences ✔/✘ ; rangée 2 : bonus du métier ; rangée 3 : points de détail ;
+       pied de page : ce qu'il faut pour le niveau suivant. Les blocs sont relus à l'ouverture.
+       ========================= */
+
+    private final class AtelierView extends ArtisanMenu {
+
+        AtelierView(Player p) { super(p); }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            com.citycore.building.BuildingInspector inspector = actions.inspector();
+            com.citycore.building.Inspection insp = inspector == null ? null : inspector.freshAtelierInspection(npc);
+
+            c.background("bg_grid");
+            title(c);
+            back(c, 0, "Retour", () -> gui.open(player));
+            c.sprite("rib_logis", sx(1), sy(0));
+            close(c);
+            pager(c, 0, 1, p -> { });
+
+            if (insp == null) {
+                info(c, 7, "§e🏠 Son atelier", List.of("§7Aucun atelier : choisissez-lui", "§7un logis."));
+                footer(c, false, "AUCUN ATELIER");
+                return;
+            }
+            List<String> help = new ArrayList<>(List.of("§f" + insp.building().name() + " §8— " + insp.levelLabel(), "",
+                    "§7Rangée 1 : §fce qu'il doit contenir", "§7Rangée 2 : §fbonus du métier §8(+points)",
+                    "§7Rangée 3 : §fpoints de détail", "",
+                    "§7Chaque niveau au-delà du 1er agrandit", "§7son entrepôt de §f+"
+                            + Math.round(inspector.requirements().storageBonus() * 100) + " %§7."));
+            info(c, 7, "§e🏠 Son atelier", help);
+
+            // Rangée 1 : exigences
+            List<com.citycore.building.Inspection.Check> checks = insp.checks();
+            for (int i = 0; i < Math.min(9, checks.size()); i++) {
+                com.citycore.building.Inspection.Check ch = checks.get(i);
+                c.sprite(ch.ok() ? "ring_green" : "ring_red", sx(i), sy(1));
+                item(i, 1, UiItems.shown(ch.icon(), (ch.ok() ? "§a✔ " : "§c✘ ") + "§f" + ch.label(),
+                        List.of("§7" + ch.detail(), ch.ok() ? "§aFait" : "§cÀ ajouter dans l'atelier"), false), null);
+            }
+
+            // Rangée 2 : bonus du métier
+            List<com.citycore.building.Inspection.Check> bonus = insp.bonusChecks();
+            int perBonus = inspector.requirements().points().bonus();
+            for (int i = 0; i < Math.min(9, bonus.size()); i++) {
+                com.citycore.building.Inspection.Check ch = bonus.get(i);
+                c.sprite(ch.ok() ? "ring_green" : "ring_gray", sx(i), sy(2));
+                item(i, 2, UiItems.shown(ch.icon(), (ch.ok() ? "§a★ " : "§7☆ ") + "§f" + ch.label(),
+                        List.of("§7Bonus du métier : §f+" + perBonus + " pts",
+                                ch.ok() ? "§aPrésent" : "§7Ajoutez-en un dans l'atelier"), ch.ok()), null);
+            }
+
+            // Rangée 3 : points de detail
+            com.citycore.building.BuildingRequirements.Points pts = inspector.requirements().points();
+            pointTile(c, 0, Material.BRICKS, "§fVariété", insp.variety(), pts.varietyMax(),
+                    List.of("§7+" + pts.variety() + " pt par type de bloc de construction", "§7différent (terre, pierre brute, eau",
+                            "§7et feuillage ne comptent pas)."));
+            pointTile(c, 1, Material.FLOWER_POT, "§fDécor", insp.decorations(), pts.decorationMax(),
+                    List.of("§7Pots de fleurs, tapis, bannières, bougies,", "§7panneaux, trappes, lanternes, chaînes,",
+                            "§7bibliothèques, poteries ; cadres, tableaux,", "§7porte-armures. §f" + pts.decorationPerType()
+                                    + " §7du même type au plus."));
+            pointTile(c, 2, Material.EMERALD, "§fBonus du métier", insp.bonus(), perBonus * bonus.size(),
+                    List.of("§7Blocs de la rangée du dessus :", "§7+" + perBonus + " pts chacun."));
+            pointTile(c, 3, Material.OAK_PLANKS, "§fSurface couverte", insp.surface(), pts.surfaceMax(),
+                    List.of("§7+" + pts.surface() + " pt par 10 blocs de sol", "§7sous un toit."));
+            List<String> totalLore = new ArrayList<>(List.of("§7Total : §f" + insp.points() + " pts", ""));
+            for (var e : inspector.requirements().levels().entrySet()) {
+                totalLore.add((insp.level() >= e.getKey() ? "§a✔ " : "§8○ ") + "§7Niveau " + e.getKey() + " : §f"
+                        + e.getValue() + " pts");
+            }
+            if (!insp.compliant()) totalLore.add("§cExigences de la rangée 1 d'abord.");
+            c.sprite("ring_gold", sx(5), sy(3));
+            item(5, 3, UiItems.shown(Material.NETHER_STAR, "§6" + insp.points() + " points", totalLore, false), null);
+
+            // Pied de page : la prochaine étape
+            String next = !insp.compliant() ? "INCOMPLET : " + insp.checks().stream().filter(ch -> !ch.ok()).count() + " À AJOUTER"
+                    : insp.nextLevelPoints() < 0 ? "NIVEAU MAXIMAL ★★★★★"
+                    : "NIV. " + insp.level() + " → " + (insp.level() + 1) + " : +" + insp.nextLevelPoints() + " PTS";
+            footer(c, false, next);
+            zone(1, 5, 7, 1, insp.levelLabel(), insp.lore(), null);
+        }
+
+        /** Case de points : icône, valeur sur le maximum (anneau vert au maximum). */
+        private void pointTile(UiCanvas c, int col, Material icon, String name, int value, int max, List<String> help) {
+            c.sprite(value >= max && max > 0 ? "ring_green" : "ring_amber", sx(col), sy(3));
+            List<String> lore = new ArrayList<>(List.of("§f" + value + " §7/ §f" + max + " pts", ""));
+            lore.addAll(help);
+            item(col, 3, UiItems.shown(icon, name, lore, false), null);
         }
     }
 
@@ -314,9 +416,12 @@ public final class ArtisanScreens {
             close(c);
             portrait(c, false);
 
-            bigButton(c, 1, "btn_logis", "§e🏠 Choisir son logis",
-                    List.of("§7Ateliers libres de la ville,", "§7ou réservés à ce personnage.", "",
-                            "§eCliquez pour choisir"),
+            List<String> logisLore = new ArrayList<>(List.of("§7Ateliers libres de la ville,", "§7ou réservés à ce personnage.",
+                    "", "§7Son atelier doit contenir :"));
+            if (actions.inspector() != null) logisLore.addAll(com.citycore.building.BuildingRequirements.lore(
+                    actions.inspector().requirements().specFor(npc)));
+            logisLore.addAll(List.of("", "§eCliquez pour choisir"));
+            bigButton(c, 1, "btn_logis", "§e🏠 Choisir son logis", logisLore,
                     t -> gui.openBuildingSearch(player, actions.freeBuildings()));
             boolean wandering = npcManager.isWandering(npc);
             bigButton(c, 2, wandering ? "btn_rester" : "btn_promener",
@@ -362,26 +467,35 @@ public final class ArtisanScreens {
             title(c);
             back(c, 0, "Retour", () -> gui.open(player));
             c.sprite("rib_logis", sx(1), sy(0));
-            info(c, 7, "§e🏠 Ateliers disponibles", List.of(
-                    "§7Ateliers sans habitant, libres",
-                    "§7ou réservés à " + plain(npc.displayName) + ".",
-                    "§7Créez-en un : §f/city build new",
-                    "§fatelier " + npc.skinId + " §7(ou chez Alderic)", "",
-                    "§6■ §7réservé à " + plain(npc.displayName) + "   §a■ §7atelier libre"));
+            // Ce que demande ce personnage (phase 2 : inspection des constructions)
+            com.citycore.building.BuildingInspector inspector = actions.inspector();
+            List<String> help = new ArrayList<>(List.of("§7Son atelier doit contenir :"));
+            if (inspector != null) help.addAll(com.citycore.building.BuildingRequirements.lore(
+                    inspector.requirements().specFor(npc)));
+            help.addAll(List.of("", "§7Ateliers sans habitant, libres ou", "§7réservés à " + plain(npc.displayName)
+                            + ". Créez-en un chez Alderic", "§7ou : §f/city build new atelier " + npc.skinId, "",
+                    "§a■ §7conforme  §6■ §7réservé à lui  §c■ §7incomplet"));
+            info(c, 7, "§e🏠 Atelier de " + plain(npc.displayName), help);
             close(c);
 
             int start = page * GRID;
             for (int i = 0; i < GRID && start + i < list.size(); i++) {
                 Building b = list.get(start + i);
                 boolean reserved = npc.tag.equals(b.reservedFor());
-                c.sprite(reserved ? "ring_gold" : b.hasNpcPoint() ? "ring_green" : "ring_amber", sx(col(i)), sy(row(i)));
-                List<String> lore = List.of(
-                        reserved ? "§6Atelier réservé à " + plain(npc.displayName) : "§aAtelier libre",
-                        "§7Zone : §fX(" + b.x1() + "§7→§f" + b.x2() + "§7) Z(§f" + b.z1() + "§7→§f" + b.z2() + "§7)",
-                        b.heightLine(), "",
-                        b.hasNpcPoint() ? "§a✔ Point NPC défini" : "§c✘ Aucun point NPC", "",
-                        "§eCliquez pour installer §f" + plain(npc.displayName));
-                item(col(i), row(i), UiItems.shown(BuildingType.ATELIER.icon, "§e🏛 " + b.name(), lore, reserved),
+                com.citycore.building.Inspection insp = inspector == null ? null : inspector.inspectFor(b, npc);
+                boolean ok = insp == null || insp.compliant();
+                c.sprite(!ok ? "ring_red" : reserved ? "ring_gold" : "ring_green", sx(col(i)), sy(row(i)));
+                List<String> lore = new ArrayList<>();
+                lore.add(reserved ? "§6Atelier réservé à " + plain(npc.displayName) : "§aAtelier libre");
+                lore.add("§7Zone : §fX(" + b.x1() + "§7→§f" + b.x2() + "§7) Z(§f" + b.z1() + "§7→§f" + b.z2() + "§7)");
+                if (insp != null) {
+                    lore.add("");
+                    lore.addAll(insp.lore());
+                }
+                lore.add("");
+                lore.add(ok ? "§eCliquez pour installer §f" + plain(npc.displayName)
+                        : "§cIncomplet : complétez-le d'abord");
+                item(col(i), row(i), UiItems.shown(BuildingType.ATELIER.icon, "§e🏛 " + b.name(), lore, reserved && ok),
                         t -> actions.assignBuilding(player, b));
             }
             pager(c, page, pages(list.size()), p -> kit.show(new Buildings(player, actions.freeBuildings(), p)));

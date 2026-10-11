@@ -42,6 +42,16 @@ public class VillagerListener implements Listener {
     private final BuildingManager        buildingManager;
     private final PlayerDataManager      playerDataManager;
     private final MarketService          market;
+    /** Inspection des constructions (phase 2) : un artisan ne s'installe que dans un atelier conforme. */
+    private com.citycore.building.BuildingInspector inspector;
+
+    public void setInspector(com.citycore.building.BuildingInspector inspector) {
+        this.inspector = inspector;
+    }
+
+    public com.citycore.building.BuildingInspector inspector() {
+        return inspector;
+    }
 
     public VillagerListener(CityNPC npcType, VillagerGUI gui, NPCManager npcManager,
                             NPCDataManager dataManager, Economy economy,
@@ -265,6 +275,17 @@ public class VillagerListener implements Listener {
             gui.openBuildingSearch(player, freeBuildings());
             return;
         }
+        // Inspection : l'atelier doit contenir ce que demande ce personnage (phase 2)
+        if (inspector != null) {
+            inspector.invalidate(target.id()); // état du bâtiment à l'instant du clic
+            com.citycore.building.Inspection insp = inspector.inspectFor(target, npcType);
+            if (!insp.compliant()) {
+                player.sendMessage("§c❌ " + npcType.displayName + " §cne peut pas s'installer dans §e"
+                        + target.name() + "§c : il manque §f" + insp.missing() + "§c.");
+                gui.openBuildingSearch(player, freeBuildings());
+                return;
+            }
+        }
 
         // Assigne directement le NPC au bâtiment (état changé seulement si l'écriture a réussi)
         if (!buildingManager.assignNPC(target.id(), npcType.tag)) {
@@ -273,6 +294,7 @@ public class VillagerListener implements Listener {
         }
         boolean wasHomeless = dataManager.getState(npcType) == NPCState.HOMELESS;
         dataManager.setState(npcType, NPCState.ASSIGNED);
+        if (inspector != null) inspector.onAssigned(npcType, target); // entrepôt selon le niveau de l'atelier
         if (wasHomeless) {
             player.sendMessage("§a▶ " + npcType.displayName + " §aretrouve un atelier : ses quêtes reprennent.");
         }

@@ -79,6 +79,16 @@ public class VillagerGUI {
         this.themed = themed;
     }
 
+    /**
+     * Inspection des constructions (phase 2) : exigences des ateliers proposés, état de son atelier.
+     * Pas de message dans le chat : tout est dans les menus (écran « Son atelier » avec le pack).
+     */
+    private com.citycore.building.BuildingInspector inspector;
+
+    public void setInspector(com.citycore.building.BuildingInspector inspector) {
+        this.inspector = inspector;
+    }
+
     public VillagerGUI(CityNPC npcType, VillagerConfig config,
                        NPCDataManager dataManager, NPCManager npcManager,
                        PlayerDataManager playerDataManager, MarketService market,
@@ -238,23 +248,25 @@ public class VillagerGUI {
             int slot = 0;
             for (Building building : availableBuildings) {
                 if (slot == size - 1) break; // Réserve le dernier slot pour retour
-                inv.setItem(slot++, makeItem(Material.BRICKS,
-                        "§e🏛 " + building.name(),
-                        List.of(
-                                npcType.tag.equals(building.reservedFor())
-                                        ? "§6Atelier réservé à " + plainName() : "§aAtelier libre",
-                                "§7Zone : §fX(" + building.x1() + "§7→§f"
-                                        + building.x2() + "§7) Z(§f"
-                                        + building.z1() + "§7→§f"
-                                        + building.z2() + "§7)",
-                                "§7Monde : §f" + building.world(),
-                                "",
-                                building.hasNpcPoint()
-                                        ? "§a✔ Point NPC défini"
-                                        : "§c✘ Aucun point NPC",
-                                "",
-                                "§eCliquez pour assigner §f" + plainName()
-                        )));
+                List<String> lore = new ArrayList<>(List.of(
+                        npcType.tag.equals(building.reservedFor())
+                                ? "§6Atelier réservé à " + plainName() : "§aAtelier libre",
+                        "§7Zone : §fX(" + building.x1() + "§7→§f"
+                                + building.x2() + "§7) Z(§f"
+                                + building.z1() + "§7→§f"
+                                + building.z2() + "§7)",
+                        ""));
+                // Inspection selon les exigences de ce personnage (phase 2)
+                com.citycore.building.Inspection insp = inspector == null ? null
+                        : inspector.inspectFor(building, npcType);
+                if (insp != null) {
+                    lore.addAll(insp.lore());
+                    lore.add("");
+                }
+                lore.add(insp == null || insp.compliant()
+                        ? "§eCliquez pour assigner §f" + plainName()
+                        : "§cIncomplet : complétez-le d'abord");
+                inv.setItem(slot++, makeItem(Material.BRICKS, "§e🏛 " + building.name(), lore));
             }
         }
 
@@ -279,6 +291,13 @@ public class VillagerGUI {
         headLore.add(buildStarLevel(level));
         headLore.add(buildNativeBar(level, xp, xpNext));
         headLore.add("§7XP : §f" + xp + (xpNext > 0 ? " §7/ §f" + xpNext : " §7(max)"));
+        // Son atelier : niveau, ce qui manque pour le suivant (phase 2 ; détail complet avec le pack)
+        com.citycore.building.Inspection atelier = inspector == null ? null : inspector.freshAtelierInspection(npcType);
+        if (atelier != null) {
+            headLore.add("");
+            headLore.add("§7Atelier : §f" + atelier.building().name());
+            headLore.addAll(atelier.lore());
+        }
         headLore.add("");
         headLore.addAll(backstoryLore());
         inv.setItem(0, makeItem(Material.PLAYER_HEAD,

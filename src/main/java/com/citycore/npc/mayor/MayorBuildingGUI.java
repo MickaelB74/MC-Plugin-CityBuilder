@@ -59,6 +59,7 @@ public class MayorBuildingGUI {
                     "§e" + b.name(),
                     List.of(
                             b.typeLine(),
+                            b.levelLine(),
                             "§7Zone  : §f" + b.x1() + "," + b.z1()
                                     + " §7→ §f" + b.x2() + "," + b.z2(),
                             b.heightLine(),

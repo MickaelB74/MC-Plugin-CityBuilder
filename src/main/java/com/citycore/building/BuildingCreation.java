@@ -71,6 +71,31 @@ public class BuildingCreation {
         this.chooser = chooser;
     }
 
+    /** Inspection des constructions (phase 2) : rapport après création ou changement de type. */
+    private BuildingInspector inspector;
+
+    public void setInspector(BuildingInspector inspector) {
+        this.inspector = inspector;
+    }
+
+    /** Une ligne : niveau du bâtiment, ou ce qu'il faut encore y mettre (détail : /city build inspect). */
+    private void reportInspection(Player player, String name) {
+        if (inspector == null) return;
+        inspector.refreshBuildings();
+        Building b = buildings.getByName(name);
+        if (b == null) return;
+        Inspection insp = inspector.recheck(b.id(), null);
+        if (insp == null) return;
+        player.sendMessage("§6🏗 " + insp.summary());
+        player.sendMessage("§8Détail : /city build inspect " + b.name()
+                + (b.type() == BuildingType.ATELIER ? " — ou l'écran « Son atelier » de l'artisan" : ""));
+    }
+
+    /** Exigences des bâtiments (null avant l'inspection) : affichées dans les écrans de choix. */
+    public BuildingRequirements requirements() {
+        return inspector == null ? null : inspector.requirements();
+    }
+
     /** Le personnage a-t-il été trouvé (rencontré par un joueur, arrivé ou installé) ? */
     public boolean isFound(CityNPC npc) {
         return found.test(npc);
@@ -156,6 +181,7 @@ public class BuildingCreation {
             player.sendMessage("§8Hauteur plafonnée à " + BuildingHeights.MAX_HEIGHT
                     + " blocs. Corrigez-la avec /city build hauteur " + p.name() + " <bas> <haut>.");
         }
+        reportInspection(player, p.name());
     }
 
     /* =========================
@@ -178,6 +204,7 @@ public class BuildingCreation {
         }
         buildings.setType(b.id(), type, owner != null ? owner.tag : null);
         player.sendMessage("§a✅ §e" + b.name() + " §a: " + label(type, owner) + "§a.");
+        reportInspection(player, b.name()); // nouvelles exigences : nouveau niveau
         return true;
     }
 
@@ -231,10 +258,18 @@ public class BuildingCreation {
     private void sendChatChoices(Player player) {
         player.sendMessage("§6🏗 Quel bâtiment construire ? §7(cliquez)");
         TextComponent types = new TextComponent("  ");
+        BuildingRequirements req = requirements();
         for (BuildingType type : BuildingType.values()) {
             String label = type == BuildingType.ATELIER ? "Atelier libre" : type.label;
+            List<String> hover = new ArrayList<>(type.description);
+            if (req != null) { // prérequis du type (phase 2)
+                hover.add("");
+                hover.add("§6Prérequis :");
+                List<String> lines = BuildingRequirements.lore(req.specFor(type));
+                hover.addAll(lines.isEmpty() ? List.of("aucun") : lines);
+            }
             types.addExtra(button(type.color + "[" + label + "]", ClickEvent.Action.RUN_COMMAND,
-                    "/city build new " + type.key(), type.description));
+                    "/city build new " + type.key(), hover));
             types.addExtra(" ");
         }
         player.spigot().sendMessage(types);
@@ -243,9 +278,14 @@ public class BuildingCreation {
         int locked = 0;
         for (CityNPC npc : artisans()) {
             if (!isFound(npc)) { locked++; continue; }
+            List<String> hover = new ArrayList<>(List.of("Atelier de " + ChatColor.stripColor(npc.displayName), npc.function));
+            if (req != null) { // ce que devra contenir son atelier (phase 2)
+                hover.add("");
+                hover.add("§6Son atelier devra contenir :");
+                hover.addAll(BuildingRequirements.lore(req.specFor(npc)));
+            }
             artisans.addExtra(button("§6[" + ChatColor.stripColor(npc.displayName) + "]", ClickEvent.Action.RUN_COMMAND,
-                    "/city build new atelier " + npc.skinId,
-                    List.of("Atelier de " + ChatColor.stripColor(npc.displayName), npc.function)));
+                    "/city build new atelier " + npc.skinId, hover));
             artisans.addExtra(" ");
         }
         if (locked > 0) artisans.addExtra(new TextComponent(TextComponent.fromLegacyText(

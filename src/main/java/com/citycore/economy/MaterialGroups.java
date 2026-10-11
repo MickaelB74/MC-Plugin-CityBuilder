@@ -33,13 +33,17 @@ public final class MaterialGroups {
     public static final Set<Material> STAINED_GLASS = bySuffix("_STAINED_GLASS");
     public static final Set<Material> WOOL          = bySuffix("_WOOL");
 
+    /** Verre sous toutes ses formes : blocs, vitres, teintés (exigences des bâtiments). */
+    public static final Set<Material> GLASS = glass();
+
     private static final Map<String, Set<Material>> BY_NAME = Map.of(
             "LOGS", LOGS,
             "STEMS", STEMS,
             "STONE_BRICKS", STONE_BRICKS,
             "COOKED_FOOD", COOKED_FOOD,
             "STAINED_GLASS", STAINED_GLASS,
-            "WOOL", WOOL);
+            "WOOL", WOOL,
+            "GLASS", GLASS);
 
     private MaterialGroups() {}
 
@@ -56,6 +60,13 @@ public final class MaterialGroups {
         if (token.startsWith("#")) return get(token.substring(1));
         Material mat = Material.matchMaterial(token);
         return mat == null ? null : EnumSet.of(mat);
+    }
+
+    private static Set<Material> glass() {
+        Set<Material> set = EnumSet.of(Material.GLASS, Material.TINTED_GLASS, Material.GLASS_PANE);
+        set.addAll(bySuffix("_STAINED_GLASS"));
+        set.addAll(bySuffix("_STAINED_GLASS_PANE"));
+        return Collections.unmodifiableSet(set);
     }
 
     private static Set<Material> bySuffix(String suffix) {

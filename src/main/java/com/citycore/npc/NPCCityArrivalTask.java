@@ -52,6 +52,13 @@ public class NPCCityArrivalTask {
         this.findNpcQuestManager = findNpcQuestManager;
     }
 
+    /** Ce que demande l'atelier d'un personnage, en une phrase (phase 2 : inspection des constructions). */
+    private java.util.function.Function<CityNPC, String> atelierRequest = npc -> "";
+
+    public void setAtelierRequest(java.util.function.Function<CityNPC, String> atelierRequest) {
+        this.atelierRequest = atelierRequest;
+    }
+
     public void start() {
         new BukkitRunnable() {
             @Override
@@ -99,8 +106,12 @@ public class NPCCityArrivalTask {
             }
         });
 
-        // Dialogue city_arrival
-        List<String> lines = type.getDialogue("city_arrival");
+        // Dialogue city_arrival, suivi de ce que demande son atelier (phase 2 : inspection des constructions)
+        List<String> lines = new java.util.ArrayList<>(type.getDialogue("city_arrival"));
+        String request = atelierRequest.apply(type);
+        if (!request.isEmpty()) {
+            lines.add(type.displayName + " §f: §oPour mon atelier, il me faudra " + request + ".");
+        }
         if (lines.isEmpty()) return;
 
         npc.getEntity().getLocation().getWorld().getPlayers().stream()

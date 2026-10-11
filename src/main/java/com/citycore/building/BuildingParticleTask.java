@@ -1,6 +1,5 @@
 package com.citycore.building;
 
-import com.citycore.building.Building;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
@@ -9,19 +8,26 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
+/**
+ * Affiche quelques secondes le contour d'un bâtiment, pour le joueur seul : les arêtes de la
+ * boîte qui l'enveloppe, posées sur la face EXTÉRIEURE de ses blocs (une zone de x1 à x2 va de la
+ * coordonnée x1 à x2 + 1). Arêtes du bas et du haut (hauteur du bâtiment), une ceinture à hauteur
+ * des yeux du joueur, et les quatre arêtes verticales des coins.
+ */
 public class BuildingParticleTask {
 
     private final JavaPlugin plugin;
     private final Player     player;
     private final Building   building;
 
-    private static final long   REFRESH_TICKS  = 2L;
-    private static final double STEP           = 1.0;
-    private static final int    HEIGHT_RANGE   = 10;
-    private static final double PARTICLE_STEP_Y = 1.0;
+    private static final long   REFRESH_TICKS = 5L;
+    /** Écart entre deux particules d'une arête (agrandi pour les très grands bâtiments). */
+    private static final double MIN_STEP      = 0.5;
+    /** Nombre maximal de particules par arête horizontale. */
+    private static final int    MAX_POINTS    = 160;
 
     private static final Particle.DustOptions DUST = new Particle.DustOptions(
-            Color.fromRGB(0, 150, 255), 0.8f // Bleu, taille 0.8
+            Color.fromRGB(0, 150, 255), 1.0f // Bleu
     );
 
     public BuildingParticleTask(JavaPlugin plugin, Player player, Building building) {
@@ -51,50 +57,49 @@ public class BuildingParticleTask {
         }.runTaskTimer(plugin, 0L, REFRESH_TICKS);
     }
 
-    /**
-     * Dessine les 4 murs de bordure du bâtiment sur ±10 blocs autour du joueur.
-     */
+    /** Arêtes de la boîte du bâtiment, sur l'extérieur de ses blocs. */
     private void drawBuildingBorder() {
         World world = player.getWorld();
-
-        // Vérifie que le joueur est dans le même monde que le bâtiment
         if (!world.getName().equals(building.world())) return;
 
+        // Faces extérieures : le bloc x2 s'étend jusqu'à x2 + 1
+        double minX = building.x1(), maxX = building.x2() + 1;
+        double minZ = building.z1(), maxZ = building.z2() + 1;
+
+        // Hauteur du bâtiment si elle est connue, sinon une tranche autour du joueur
         double playerY = player.getLocation().getY();
-        double yMin    = playerY - HEIGHT_RANGE;
-        double yMax    = playerY + HEIGHT_RANGE;
+        double bottom = building.hasHeight() ? building.yMin() : Math.floor(playerY) - 2;
+        double top    = building.hasHeight() ? building.yMax() + 1 : Math.floor(playerY) + 6;
+        double eyes   = Math.max(bottom, Math.min(top, player.getEyeLocation().getY()));
 
-        int x1 = building.x1();
-        int z1 = building.z1();
-        int x2 = building.x2();
-        int z2 = building.z2();
+        double step = Math.max(MIN_STEP, Math.max(maxX - minX, maxZ - minZ) / MAX_POINTS);
+        rectangle(world, minX, maxX, minZ, maxZ, bottom, step);
+        rectangle(world, minX, maxX, minZ, maxZ, top, step);
+        if (eyes - bottom > 1 && top - eyes > 1) rectangle(world, minX, maxX, minZ, maxZ, eyes, step);
 
-        // Bordure Nord : z = z1
-        for (double x = x1; x <= x2; x += STEP) {
-            drawVerticalLine(world, x, z1, yMin, yMax);
-        }
-        // Bordure Sud : z = z2
-        for (double x = x1; x <= x2; x += STEP) {
-            drawVerticalLine(world, x, z2, yMin, yMax);
-        }
-        // Bordure Ouest : x = x1
-        for (double z = z1; z <= z2; z += STEP) {
-            drawVerticalLine(world, x1, z, yMin, yMax);
-        }
-        // Bordure Est : x = x2
-        for (double z = z1; z <= z2; z += STEP) {
-            drawVerticalLine(world, x2, z, yMin, yMax);
+        // Arêtes verticales aux quatre coins
+        for (double y = bottom; y <= top; y += MIN_STEP) {
+            dot(world, minX, y, minZ);
+            dot(world, maxX, y, minZ);
+            dot(world, minX, y, maxZ);
+            dot(world, maxX, y, maxZ);
         }
     }
 
-    private void drawVerticalLine(World world, double x, double z, double yMin, double yMax) {
-        for (double y = yMin; y <= yMax; y += PARTICLE_STEP_Y) {
-            world.spawnParticle(
-                    Particle.DUST,
-                    new Location(world, x, y, z),
-                    1, 0, 0, 0, 0,
-                    DUST
-            );
+    /** Contour horizontal de la zone à la hauteur y. */
+    private void rectangle(World world, double minX, double maxX, double minZ, double maxZ, double y, double step) {
+        for (double x = minX; x <= maxX; x += step) {
+            dot(world, x, y, minZ);
+            dot(world, x, y, maxZ);
         }
+        for (double z = minZ; z <= maxZ; z += step) {
+            dot(world, minX, y, z);
+            dot(world, maxX, y, z);
+        }
+    }
+
+    /** Une particule, visible du seul joueur concerné. */
+    private void dot(World world, double x, double y, double z) {
+        player.spawnParticle(Particle.DUST, new Location(world, x, y, z), 1, 0, 0, 0, 0, DUST);
     }
 }

@@ -12,10 +12,10 @@ Aperçus : `docs/ui-previews/*.png` (agrandis 3 fois).
 | Habitant | Écrans |
 |---|---|
 | Artisan rencontré hors de la ville | Portrait sur décor de route, « Suivez-moi / Attendez ici », son histoire, étapes du recrutement |
-| Artisan arrivé en ville | « Son logis » (ateliers libres ou réservés à lui ; anneau doré = réservé), « Promenade / Restez ici », son histoire |
+| Artisan arrivé en ville | « Son logis » (ateliers libres ou réservés à lui ; anneau doré = réservé, rouge = incomplet ; chaque atelier montre son inspection : blocs requis ✔/✘, porte, toit, lumière, niveau et points), « Promenade / Restez ici », son histoire |
 | Artisan sans logis (son atelier a été supprimé) | Même écran, marqué « SANS LOGIS » : gestion fermée et quêtes en pause (rien n'est perdu) jusqu'au choix d'un nouvel atelier |
-| Nouveau bâtiment (`/city build new`) | Choix du type (habitation, atelier, mairie, divers), puis de l'artisan pour un atelier (atelier libre ou réservé ; cadenas = personnage pas encore trouvé) ; le nom est ensuite demandé dans le chat avec un nom proposé. Sans le pack, boutons cliquables dans le chat |
-| Artisan installé | Portrait, rang (étoiles), barre d'expérience, travail, suivi, Vendre, Entrepôt, Boutique, Quêtes |
+| Nouveau bâtiment (`/city build new`) | Choix du type (habitation, atelier, mairie, divers), puis de l'artisan pour un atelier (atelier libre ou réservé ; cadenas = personnage pas encore trouvé) ; chaque type et chaque personnage affiche ses prérequis dans sa bulle ; le nom est ensuite demandé dans le chat avec un nom proposé. Sans le pack, boutons cliquables dans le chat (prérequis au survol) |
+| Artisan installé | Portrait, rang (étoiles), barre d'expérience, travail, suivi, Vendre, Entrepôt, Boutique, Quêtes ; un clic sur le portrait ouvre « Son atelier » (exigences ✔/✘, bonus du métier, points de détail, ce qu'il faut pour le niveau suivant) |
 | Vendre / Entrepôt / Boutique | Grille 9 × 4 avec pagination, cadres de couleur (prix plein, prix réduit, entrepôt plein, rupture, cadenas pour les articles d'un rang supérieur), bourse du joueur |
 | Quêtes d'un artisan | Cartes « principale » et « spéciale » : récompense ou temps de repos, objectifs avec progression, bouton Accepter / Valider / En cours / En repos, accès aux récits |
 | Récits (quêtes personnelles) | Les cinq récits, un par rang : progression et état (accompli, en cours, à accepter) ; ceux d'un rang pas encore atteint sont verrouillés (cadenas, titre illisible, rang requis) |

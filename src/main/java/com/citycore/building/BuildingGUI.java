@@ -48,6 +48,7 @@ public class BuildingGUI {
 
             List<String> lore = new ArrayList<>();
             lore.add(building.typeLine());
+            lore.add(building.levelLine());
             lore.add("§7Zone : §f(" + building.x1() + "§7, §f" + building.z1()
                     + "§7) → §f(" + building.x2() + "§7, §f" + building.z2() + "§7)");
             lore.add(building.heightLine());

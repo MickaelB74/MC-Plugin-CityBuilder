@@ -133,6 +133,30 @@ public class BuildingManager {
         return list;
     }
 
+    /** Bâtiment par son identifiant, ou null. */
+    public Building getById(int id) {
+        try (PreparedStatement ps = db.getConnection().prepareStatement("SELECT * FROM buildings WHERE id = ?")) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? buildFromResultSet(rs) : null;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /** Niveau de construction (phase 2 : calculé par BuildingInspector). */
+    public void setLevel(int buildingId, int level) {
+        try (PreparedStatement ps = db.getConnection().prepareStatement("UPDATE buildings SET level = ? WHERE id = ?")) {
+            ps.setInt(1, level);
+            ps.setInt(2, buildingId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     /** Bâtiment par son nom (casse ignorée), ou null. */
     public Building getByName(String name) {
         return getAllBuildings().stream()

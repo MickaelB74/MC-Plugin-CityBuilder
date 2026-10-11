@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 9
+config-version: 10
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -1854,3 +1854,233 @@ habitants:
 soldats:
   skins:
     - {name: "", value: "ewogICJ0aW1lc3RhbXAiIDogMTYxNDg5NDc2NzMxNiwKICAicHJvZmlsZUlkIiA6ICJhYTZhNDA5NjU4YTk0MDIwYmU3OGQwN2JkMzVlNTg5MyIsCiAgInByb2ZpbGVOYW1lIiA6ICJiejE0IiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzhiMmFiNmE0MjNlMzU1YWFiNjgwOWFjNDlmZjIwMmQ5ZmYxMjEwY2JhMjJiZWRkN2RmZTNkNTkyN2I4ZGI4MyIKICAgIH0KICB9Cn0=", signature: "Lp0BSj3H9YgBjyGAfqyO8mIY5OF01VckpOer5zWgBwT/bxls4SUmYA80C8cnHkm7/qYwLHyYC1dcqailFCksGAOr5n0BLB9/LJ1syRYOd6VpZ7GAiB/6edmk987zCrXZKkpPg/zQJRhGvsDKqGQGOPQwck0L+indTM1xPUsYakO3oASRH3yhGw1/tNkRpEEVLQ15bR1Blj+IzapXXX0DWNQ4arY9ooDUULgQG5s+a+N1egLLNZ3DoCFh7PLQEXwRPrrCv78jBnveVVfDHavPPV1XDbwbLsgXF6tEJPVfY/dQwOFh+RQGQbDG5EgPUmcCvSVWZzG7o2qcLC9Tc3k5/l/uXZDS3neDD0g13YEEw0i4z5nCAaZubgXn6kpCKCBRpr7rsLlgYPFYdTxRZB9oOLg691JSEC2B5AF+/YRVmvBEZohSBVp23ZZMVo+mvREUg/bq9Sfj85w/AdZB+yBzDg1v7nCvgmfJVuvt3nlsIXs3HD9jPd0PYRkWYkQShqwmnenDll02fyRLP7JWZFzkPh5HXyHFSoeAns5LKSLfEhZ8+meYY1ROKgstxxo7LF6PdLaaGN0bIjwz1HvCpKkBWXQYnnqH8eJK6q6g6pjFoCHSH6+HWHvsGLFDerT8t5601ENn7ljWuJtrzzfILUWLi1hcDQI8EzsesTCM9I71/WE="}
+
+# ============================================================
+#  BÂTIMENTS — inspection des constructions (plan « Valmont vivante », phase 2)
+#  Chaque bâtiment est inspecté : blocs requis selon son type (et l'artisan d'un atelier),
+#  porte, toit, lumière. Niveau 0 = incomplet (aucun artisan ne s'y installe), 1 = conforme,
+#  2 à 5 selon les points de détail. Le niveau de l'atelier d'un artisan agrandit son entrepôt.
+#  Un bloc : MATERIAU, #GROUPE du plugin (#LOGS, #GLASS, #WOOL, #STONE_BRICKS…) ou tag de blocs
+#  de Minecraft (#beds, #anvil, #candles, #cauldrons, #fences…), plusieurs séparés par « , ».
+#  nombre = minimum requis ; nom / pluriel = texte affiché aux joueurs.
+#  Vérifier un bâtiment : /city build inspect <nom>.
+# ============================================================
+batiments:
+  # Points de détail nécessaires pour chaque niveau (un bâtiment conforme est au moins niveau 1)
+  niveaux: {2: 15, 3: 30, 4: 50, 5: 75}
+  points:
+    variete: 1              # par type de bloc de construction différent (terre, pierre brute… exclues)
+    variete-max: 30
+    decoration: 1           # par décoration (liste ci-dessous) ou objet accroché / porte-armure
+    decoration-par-type: 4  # au plus 4 décorations identiques comptées (variez !)
+    decoration-max: 40
+    bonus: 5                # par bloc « bonus » du métier présent
+    surface: 1              # par tranche de 10 blocs de sol sous un toit
+    surface-max: 15
+  # Entrepôt de l'artisan : +25 % de capacité par niveau de son atelier au-delà du 1er
+  bonus-entrepot: 0.25
+  decorations: ["#flower_pots", "#wool_carpets", "#banners", "#candles", "#all_signs", "#trapdoors",
+                LANTERN, SOUL_LANTERN, CHAIN, BOOKSHELF, CHISELED_BOOKSHELF, DECORATED_POT, BELL]
+  # Exigences communes (habitations, ateliers, mairie) ; chaque section peut les remplacer.
+  # toit = part du sol (en %) qui doit être sous un toit ; 0 = pas d'exigence.
+  commun: {porte: 1, lumiere: 2, toit: 60}
+  habitation:
+    requis:
+      - {bloc: "#beds", nombre: 1, nom: "lit", pluriel: "lits"}
+    bonus:
+      - {bloc: CHEST, nom: "coffre"}
+      - {bloc: CRAFTING_TABLE, nom: "établi"}
+      - {bloc: "FURNACE,SMOKER", nom: "four"}
+  mairie:
+    requis:
+      - {bloc: LECTERN, nombre: 1, nom: "pupitre (pour la Charte)"}
+      - {bloc: "#banners", nombre: 1, nom: "bannière de Valmont", pluriel: "bannières"}
+    bonus:
+      - {bloc: BELL, nom: "cloche"}
+      - {bloc: BOOKSHELF, nom: "bibliothèque"}
+  # Ateliers : un par personnage (clé = prénom). Un atelier libre n'a que les exigences communes.
+  ateliers:
+    bastien:
+      requis:
+        - {bloc: CRAFTING_TABLE, nombre: 1, nom: "établi"}
+        - {bloc: "#campfires", nombre: 1, nom: "feu de charbonnier", pluriel: "feux"}
+        - {bloc: "#logs", nombre: 6, nom: "bûche", pluriel: "bûches"}
+      bonus:
+        - {bloc: FURNACE, nom: "four à charbon de bois"}
+        - {bloc: GRINDSTONE, nom: "meule à aiguiser"}
+        - {bloc: BARREL, nom: "tonneau"}
+    helene:
+      toit: 30
+      requis:
+        - {bloc: COMPOSTER, nombre: 1, nom: "composteur"}
+        - {bloc: BARREL, nombre: 2, nom: "tonneau", pluriel: "tonneaux"}
+        - {bloc: HAY_BLOCK, nombre: 2, nom: "botte de foin", pluriel: "bottes de foin"}
+      bonus:
+        - {bloc: "#crops", nom: "cultures"}
+        - {bloc: BEEHIVE, nom: "ruche"}
+        - {bloc: SMOKER, nom: "four à pain"}
+    brennan:
+      requis:
+        - {bloc: STONECUTTER, nombre: 1, nom: "tailleur de pierre"}
+        - {bloc: "#STONE_BRICKS", nombre: 8, nom: "brique de pierre", pluriel: "briques de pierre"}
+      bonus:
+        - {bloc: CHISELED_STONE_BRICKS, nom: "pierre sculptée"}
+        - {bloc: GRINDSTONE, nom: "meule"}
+        - {bloc: "#walls", nom: "muret"}
+    martin:
+      toit: 20
+      requis:
+        - {bloc: BARREL, nombre: 2, nom: "tonneau à poisson", pluriel: "tonneaux à poisson"}
+        - {bloc: WATER, nombre: 4, nom: "bloc d'eau", pluriel: "blocs d'eau (accès à l'eau)"}
+      bonus:
+        - {bloc: SMOKER, nom: "fumoir"}
+        - {bloc: "#campfires", nom: "feu de séchage"}
+        - {bloc: DRIED_KELP_BLOCK, nom: "algues séchées"}
+    godefroy:
+      porte: 0
+      requis:
+        - {bloc: RAIL, nombre: 4, nom: "rail", pluriel: "rails"}
+        - {bloc: CHEST, nombre: 1, nom: "coffre à minerai"}
+      bonus:
+        - {bloc: POWERED_RAIL, nom: "rail de propulsion"}
+        - {bloc: CHAIN, nom: "chaîne (treuil)"}
+        - {bloc: GRINDSTONE, nom: "meule"}
+    rosalie:
+      requis:
+        - {bloc: "#cauldrons", nombre: 1, nom: "chaudron"}
+        - {bloc: SMOKER, nombre: 1, nom: "fumoir de cuisine"}
+        - {bloc: BARREL, nombre: 2, nom: "tonneau de cervoise", pluriel: "tonneaux de cervoise"}
+      bonus:
+        - {bloc: CAKE, nom: "gâteau"}
+        - {bloc: "#beds", nom: "lit d'auberge"}
+        - {bloc: "#campfires", nom: "âtre"}
+    thorvald:
+      requis:
+        - {bloc: "#anvil", nombre: 1, nom: "enclume"}
+        - {bloc: BLAST_FURNACE, nombre: 1, nom: "haut-fourneau"}
+        - {bloc: SMITHING_TABLE, nombre: 1, nom: "table de forgeron"}
+      bonus:
+        - {bloc: GRINDSTONE, nom: "meule"}
+        - {bloc: LAVA_CAULDRON, nom: "chaudron de lave"}
+        - {bloc: CHAIN, nom: "chaîne"}
+    agathe:
+      requis:
+        - {bloc: LOOM, nombre: 1, nom: "métier à tisser"}
+        - {bloc: "#cauldrons", nombre: 1, nom: "cuve de teinture"}
+        - {bloc: "#WOOL", nombre: 6, nom: "bloc de laine", pluriel: "blocs de laine"}
+      bonus:
+        - {bloc: "#banners", nom: "bannière"}
+        - {bloc: "#wool_carpets", nom: "tapis"}
+        - {bloc: "#flower_pots", nom: "plantes tinctoriales en pot"}
+    edmond:
+      toit: 30
+      requis:
+        - {bloc: HAY_BLOCK, nombre: 3, nom: "botte de foin", pluriel: "bottes de foin"}
+        - {bloc: "#fences", nombre: 6, nom: "barrière", pluriel: "barrières"}
+        - {bloc: "#cauldrons", nombre: 1, nom: "abreuvoir (chaudron)"}
+      bonus:
+        - {bloc: "#fence_gates", nom: "portillon"}
+        - {bloc: COMPOSTER, nom: "composteur"}
+        - {bloc: BARREL, nom: "tonneau"}
+    roland:
+      requis:
+        - {bloc: TARGET, nombre: 1, nom: "cible d'entraînement"}
+        - {bloc: FLETCHING_TABLE, nombre: 1, nom: "table d'archerie"}
+      bonus:
+        - {bloc: "#banners", nom: "bannière de la garde"}
+        - {bloc: BELL, nom: "cloche d'alarme"}
+        - {bloc: GRINDSTONE, nom: "meule"}
+    anselme:
+      requis:
+        - {bloc: BREWING_STAND, nombre: 1, nom: "alambic"}
+        - {bloc: "#candles", nombre: 2, nom: "bougie", pluriel: "bougies"}
+      bonus:
+        - {bloc: BEEHIVE, nom: "ruche"}
+        - {bloc: LECTERN, nom: "pupitre"}
+        - {bloc: BOOKSHELF, nom: "bibliothèque"}
+    isabeau:
+      requis:
+        - {bloc: LECTERN, nombre: 1, nom: "pupitre"}
+        - {bloc: BOOKSHELF, nombre: 4, nom: "bibliothèque", pluriel: "bibliothèques"}
+        - {bloc: CARTOGRAPHY_TABLE, nombre: 1, nom: "table de cartographie"}
+      bonus:
+        - {bloc: CHISELED_BOOKSHELF, nom: "bibliothèque sculptée"}
+        - {bloc: "#candles", nom: "bougies"}
+        - {bloc: DECORATED_POT, nom: "poterie"}
+    leon:
+      requis:
+        - {bloc: FURNACE, nombre: 2, nom: "four de verrier", pluriel: "fours de verrier"}
+        - {bloc: "#GLASS", nombre: 6, nom: "bloc de verre ou vitre", pluriel: "blocs de verre ou vitres"}
+      bonus:
+        - {bloc: "#terracotta", nom: "terre cuite"}
+        - {bloc: DECORATED_POT, nom: "poterie"}
+        - {bloc: BRICKS, nom: "briques"}
+    beatrice:
+      requis:
+        - {bloc: SMITHING_TABLE, nombre: 1, nom: "table de forgeron (gabarits)"}
+        - {bloc: CHEST, nombre: 2, nom: "coffre du trésor", pluriel: "coffres du trésor"}
+      bonus:
+        - {bloc: GOLD_BLOCK, nom: "bloc d'or"}
+        - {bloc: AMETHYST_BLOCK, nom: "bloc d'améthyste"}
+        - {bloc: BELL, nom: "cloche"}
+    robin:
+      requis:
+        - {bloc: FLETCHING_TABLE, nombre: 1, nom: "table d'archerie"}
+        - {bloc: BARREL, nombre: 2, nom: "tonneau de butin", pluriel: "tonneaux de butin"}
+      bonus:
+        - {bloc: TARGET, nom: "cible"}
+        - {bloc: "#banners", nom: "bannière"}
+    jacksparrow:
+      toit: 30
+      requis:
+        - {bloc: BARREL, nombre: 3, nom: "tonneau de rhum", pluriel: "tonneaux de rhum"}
+        - {bloc: WATER, nombre: 4, nom: "bloc d'eau", pluriel: "blocs d'eau (accès à la mer)"}
+      bonus:
+        - {bloc: CHEST, nom: "coffre au trésor"}
+        - {bloc: "#banners", nom: "pavillon"}
+        - {bloc: BELL, nom: "cloche de bord"}
+    indiana:
+      requis:
+        - {bloc: DECORATED_POT, nombre: 1, nom: "poterie ancienne"}
+        - {bloc: BOOKSHELF, nombre: 2, nom: "bibliothèque", pluriel: "bibliothèques"}
+      bonus:
+        - {bloc: LECTERN, nom: "pupitre"}
+        - {bloc: CARTOGRAPHY_TABLE, nom: "table de cartographie"}
+        - {bloc: "#candles", nom: "bougies"}
+    docbrown:
+      requis:
+        - {bloc: REDSTONE_LAMP, nombre: 1, nom: "lampe de redstone"}
+        - {bloc: LEVER, nombre: 1, nom: "levier"}
+        - {bloc: REPEATER, nombre: 1, nom: "répéteur"}
+      bonus:
+        - {bloc: OBSERVER, nom: "observateur"}
+        - {bloc: "PISTON,STICKY_PISTON", nom: "piston"}
+        - {bloc: DAYLIGHT_DETECTOR, nom: "capteur de lumière"}
+    gandalf:
+      requis:
+        - {bloc: ENCHANTING_TABLE, nombre: 1, nom: "table d'enchantement"}
+        - {bloc: BOOKSHELF, nombre: 4, nom: "bibliothèque", pluriel: "bibliothèques"}
+      bonus:
+        - {bloc: AMETHYST_CLUSTER, nom: "améthyste"}
+        - {bloc: END_ROD, nom: "bâton de l'End"}
+        - {bloc: "#candles", nom: "bougies"}
+    geralt:
+      requis:
+        - {bloc: GRINDSTONE, nombre: 1, nom: "meule"}
+        - {bloc: BREWING_STAND, nombre: 1, nom: "alambic (potions de sorceleur)"}
+      bonus:
+        - {bloc: "#anvil", nom: "enclume"}
+        - {bloc: TARGET, nom: "cible"}
+        - {bloc: "#candles", nom: "bougies"}
+    harold:
+      porte: 0
+      toit: 0
+      lumiere: 1
+      requis:
+        - {bloc: MAGMA_BLOCK, nombre: 2, nom: "bloc de magma", pluriel: "blocs de magma"}
+        - {bloc: PACKED_ICE, nombre: 2, nom: "bloc de glace compactée", pluriel: "blocs de glace compactée"}
+        - {bloc: HAY_BLOCK, nombre: 2, nom: "botte de foin (nid)", pluriel: "bottes de foin (nid)"}
+      bonus:
+        - {bloc: BLUE_ICE, nom: "glace bleue"}
+        - {bloc: OBSIDIAN, nom: "obsidienne"}
+        - {bloc: DRAGON_HEAD, nom: "tête de dragon"}

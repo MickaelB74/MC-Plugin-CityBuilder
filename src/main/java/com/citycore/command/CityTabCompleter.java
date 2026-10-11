@@ -63,7 +63,7 @@ public class CityTabCompleter implements TabCompleter {
                 case "proto"    -> player.isOp()
                         ? List.of("habitant", "soldat", "former", "zombie", "foule", "tps", "skins", "clear")
                         : new ArrayList<>();
-                case "build"    -> List.of("new", "type", "hauteur", "show", "remove", "assign", "skip");
+                case "build"    -> List.of("new", "inspect", "type", "hauteur", "show", "remove", "assign", "skip");
                 case "player"   -> player.isOp()
                         ? Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
@@ -102,7 +102,7 @@ public class CityTabCompleter implements TabCompleter {
                         names.add("all");
                         yield names;
                     }
-                    case "assign", "type", "hauteur" -> buildingManager.getAllBuildings()
+                    case "assign", "type", "hauteur", "inspect" -> buildingManager.getAllBuildings()
                             .stream().map(Building::name)
                             .collect(Collectors.toList());
                     default -> new ArrayList<>();

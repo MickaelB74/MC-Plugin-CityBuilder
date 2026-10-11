@@ -54,6 +54,29 @@ public class FindNpcQuestManager {
         this.questManager   = questManager;
     }
 
+    /** Ce que demandera l'atelier d'un personnage, en une phrase (phase 2 : inspection des constructions). */
+    private java.util.function.Function<CityNPC, String> atelierRequest = npc -> "";
+
+    public void setAtelierRequest(java.util.function.Function<CityNPC, String> atelierRequest) {
+        this.atelierRequest = atelierRequest;
+    }
+
+    /** Coupe un texte en lignes de bulle d'environ width caractères. */
+    private static List<String> wrap(String text, int width) {
+        List<String> lines = new java.util.ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (String word : text.split(" ")) {
+            if (line.length() > 0 && line.length() + word.length() + 1 > width) {
+                lines.add("§7" + line);
+                line.setLength(0);
+            }
+            if (line.length() > 0) line.append(' ');
+            line.append(word);
+        }
+        if (line.length() > 0) lines.add("§7" + line);
+        return lines;
+    }
+
     /* =========================
        DÉCLENCHEMENT QUÊTE
        ========================= */
@@ -157,6 +180,8 @@ public class FindNpcQuestManager {
                 p.sendMessage("§a🏰 " + npc.displayName + " §aest arrivé en ville !");
                 p.sendMessage("§7Parlez-lui pour l'installer dans un bâtiment et terminer : "
                         + quest.displayName());
+                String request = atelierRequest.apply(npc);
+                if (!request.isEmpty()) p.sendMessage("§6Son atelier : §7" + request + ".");
                 p.sendMessage("");
             }
             break;
@@ -176,10 +201,18 @@ public class FindNpcQuestManager {
         ItemStack item = new ItemStack(Material.PAPER);
         ItemMeta  meta = item.getItemMeta();
         meta.setDisplayName("§e🗺 " + quest.displayName());
-        meta.setLore(List.of(
+        List<String> lore = new java.util.ArrayList<>(List.of(
                 "§7Trouver §e" + quest.targetNpc().displayName,
                 "§7Suivez la barre en haut de l'écran."
         ));
+        // Préparer son atelier pendant la recherche (phase 2 : inspection des constructions)
+        String request = atelierRequest.apply(quest.targetNpc());
+        if (!request.isEmpty()) {
+            lore.add("");
+            lore.add("§6Son atelier devra contenir :");
+            lore.addAll(wrap(request, 34));
+        }
+        meta.setLore(lore);
         item.setItemMeta(meta);
         ItemStack current = player.getInventory().getItem(COMPASS_SLOT);
         if (current == null || current.getType().isAir()) {

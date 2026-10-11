@@ -235,11 +235,33 @@ public class VillagerConfig {
        GETTERS
        ========================= */
 
+    /**
+     * Multiplicateur de la capacité de l'entrepôt : le niveau de l'atelier de l'artisan
+     * (phase 2 du plan « Valmont vivante », voir BuildingInspector). 1 par défaut.
+     */
+    private java.util.function.DoubleSupplier capacityMultiplier = () -> 1.0;
+
+    public void setCapacityMultiplier(java.util.function.DoubleSupplier capacityMultiplier) {
+        this.capacityMultiplier = capacityMultiplier;
+    }
+
+    /** Prix de rachat avec la capacité de l'entrepôt ajustée au niveau de l'atelier. */
+    private SellPrice scaled(SellPrice sp) {
+        double m = capacityMultiplier.getAsDouble();
+        if (sp == null || sp.capacity() <= 0 || m == 1.0) return sp;
+        return new SellPrice(sp.price(), sp.quantity(), (int) Math.round(sp.capacity() * m));
+    }
+
     public String                    getConfigKey()              { return configKey; }
-    public Map<Material, SellPrice>  getSellPrices()             { return sellPrices; }
+    /** Prix de rachat (capacités ajustées au niveau de l'atelier), dans l'ordre de config.yml. */
+    public Map<Material, SellPrice>  getSellPrices() {
+        Map<Material, SellPrice> view = new LinkedHashMap<>();
+        sellPrices.forEach((mat, sp) -> view.put(mat, scaled(sp)));
+        return view;
+    }
     public Map<Integer, Integer>     getXpThresholds()           { return xpThresholds; }
     public List<ShopItem>            getShopItemsForLevel(int l) { return shopItems.getOrDefault(l, List.of()); }
-    public SellPrice                 getSellPrice(Material mat)  { return sellPrices.get(mat); }
+    public SellPrice                 getSellPrice(Material mat)  { return scaled(sellPrices.get(mat)); }
     public boolean                   isSellable(Material mat)    { return sellPrices.containsKey(mat); }
     public int                       getXpPerStack()             { return xpPerStack; }
     public int                       getXpPerCoin()              { return xpPerCoin; }

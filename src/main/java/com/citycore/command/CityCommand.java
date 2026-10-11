@@ -66,6 +66,13 @@ public class CityCommand implements CommandExecutor {
         this.buildingCreation = buildingCreation;
     }
 
+    /** Inspection des constructions (phase 2) : /city build inspect, contrôle de /city build assign. */
+    private com.citycore.building.BuildingInspector buildingInspector;
+
+    public void setBuildingInspector(com.citycore.building.BuildingInspector buildingInspector) {
+        this.buildingInspector = buildingInspector;
+    }
+
     /** Prototype de la phase 0 (/city proto) : PNJ blessables, foule, combat. Temporaire. */
     private com.citycore.debug.NpcPrototype prototype;
 
@@ -493,6 +500,22 @@ public class CityCommand implements CommandExecutor {
                             }
                         }
 
+                        // ── /city build inspect [nom] : bâtiment où l'on se trouve, ou par son nom ──
+                        case "inspect", "inspecter" -> {
+                            if (buildingInspector == null) return true;
+                            Building target = args.length >= 3 ? buildingManager.getByName(args[2])
+                                    : buildingManager.getBuildingAt(player.getWorld().getName(),
+                                    player.getLocation().getBlockX(), player.getLocation().getBlockZ());
+                            if (target == null) {
+                                player.sendMessage(args.length >= 3
+                                        ? "§c❌ Bâtiment §f" + args[2] + " §cintrouvable."
+                                        : "§c❌ Vous n'êtes dans aucun bâtiment. §7/city build inspect <nom>");
+                                return true;
+                            }
+                            com.citycore.building.Inspection insp = buildingInspector.recheck(target.id(), player);
+                            if (insp != null) com.citycore.building.BuildingInspector.report(player, insp);
+                        }
+
                         // ── /city build type <nom> <type> [artisan] ──
                         case "type" -> {
                             if (args.length < 4) {
@@ -617,9 +640,20 @@ public class CityCommand implements CommandExecutor {
                                         + elsewhere.name() + "§c.");
                                 return true;
                             }
+                            // Inspection : l'atelier doit contenir ce que demande ce personnage (phase 2)
+                            if (buildingInspector != null) {
+                                buildingInspector.invalidate(bTarget.id());
+                                com.citycore.building.Inspection insp = buildingInspector.inspectFor(bTarget, npc);
+                                if (!insp.compliant()) {
+                                    player.sendMessage("§c❌ §e" + bTarget.name() + " §cest incomplet pour "
+                                            + npc.displayName + "§c : il manque §f" + insp.missing() + "§c.");
+                                    return true;
+                                }
+                            }
                             buildingManager.assignNPC(bTarget.id(), npc.tag);
                             notificationManager.notifyAll(npc, getServer(), npcManager);
                             npcDataManager.setState(npc, NPCState.ASSIGNED);
+                            if (buildingInspector != null) buildingInspector.onAssigned(npc, bTarget);
                             List<String> lines = npc.getDialogue("building_assign");
                             if (!lines.isEmpty()) {
                                 net.citizensnpcs.api.npc.NPC citizensNPC =

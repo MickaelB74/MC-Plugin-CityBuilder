@@ -3,6 +3,7 @@ package com.citycore.ui.screens;
 import com.citycore.building.Building;
 import com.citycore.building.BuildingCreation;
 import com.citycore.building.BuildingManager;
+import com.citycore.building.BuildingRequirements;
 import com.citycore.building.BuildingType;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCManager;
@@ -47,6 +48,36 @@ public final class BuildingScreens {
     /** Changement de type d'un bâtiment existant ; {@code back} rouvre l'écran d'origine. */
     public boolean openRetype(Player p, Building building, Runnable back) {
         return kit.active(p) && kit.show(new TypeChooser(p, building, back));
+    }
+
+    /* =========================
+       PRÉREQUIS (phase 2 : inspection des constructions)
+       ========================= */
+
+    /** Bulle : ce que doit contenir un bâtiment de ce type (atelier : exigences communes, l'artisan précise). */
+    private List<String> prerequisites(BuildingType type) {
+        BuildingRequirements req = creation.requirements();
+        if (req == null) return List.of();
+        BuildingRequirements.Spec spec = req.specFor(type);
+        List<String> lines = new ArrayList<>();
+        if (type == BuildingType.ATELIER) {
+            lines.add("§6Prérequis : §7ceux de l'artisan choisi,");
+            lines.add("§7et au minimum :");
+        } else {
+            lines.add("§6Prérequis :");
+        }
+        List<String> details = BuildingRequirements.lore(spec);
+        lines.addAll(details.isEmpty() ? List.of("§7• aucun (niveau selon le détail)") : details);
+        return lines;
+    }
+
+    /** Bulle : ce que doit contenir l'atelier de ce personnage. */
+    private List<String> prerequisites(CityNPC npc) {
+        BuildingRequirements req = creation.requirements();
+        if (req == null) return List.of();
+        List<String> lines = new ArrayList<>(List.of("§6Son atelier devra contenir :"));
+        lines.addAll(BuildingRequirements.lore(req.specFor(npc)));
+        return lines;
     }
 
     /* =========================
@@ -98,6 +129,8 @@ public final class BuildingScreens {
 
                 List<String> lore = new ArrayList<>();
                 for (String line : type.description) lore.add("§7" + line);
+                lore.add("");
+                lore.addAll(prerequisites(type));
                 lore.add("");
                 if (blocked) {
                     lore.add("§cLa ville a déjà une mairie : §e" + mairie.name());
@@ -172,9 +205,10 @@ public final class BuildingScreens {
             // Case 0 : atelier libre
             boolean freeNow = existing != null && existing.type() == BuildingType.ATELIER && existing.reservedFor() == null;
             c.sprite(freeNow ? "ring_gold" : "ring_green", sx(0), sy(1));
-            item(0, 1, UiItems.shown(Material.CRAFTING_TABLE, "§6Atelier libre",
-                    List.of("§7Le premier artisan qui s'y", "§7installe le réserve.", "",
-                            "§eCliquez pour choisir"), freeNow),
+            List<String> freeLore = new ArrayList<>(List.of("§7Le premier artisan qui s'y", "§7installe le réserve.", ""));
+            freeLore.addAll(prerequisites(BuildingType.ATELIER));
+            freeLore.addAll(List.of("", "§eCliquez pour choisir"));
+            item(0, 1, UiItems.shown(Material.CRAFTING_TABLE, "§6Atelier libre", freeLore, freeNow),
                     t -> parent.apply(BuildingType.ATELIER, null));
 
             // Cases suivantes : chaque artisan, dans l'ordre de la trame
@@ -184,12 +218,14 @@ public final class BuildingScreens {
                 int cell = i + 1, col = cell % 9, row = 1 + cell / 9;
                 String name = ChatColor.stripColor(npc.displayName);
 
-                // Pas encore trouvé : cadenas, aucune réservation possible
+                // Pas encore trouvé : cadenas, aucune réservation possible (ses exigences restent lisibles)
                 if (!creation.isFound(npc)) {
                     c.sprite("ring_gray", sx(col), sy(row));
                     c.sprite("lock", sx(col) + 3, sy(row) + 3);
-                    zone(col, row, 1, 1, "§8🔒 §7" + name, List.of("§7" + npc.function, "",
-                            "§8Pas encore trouvé : retrouvez-le", "§8pour lui réserver un atelier."), null);
+                    List<String> locked = new ArrayList<>(List.of("§7" + npc.function, ""));
+                    locked.addAll(prerequisites(npc));
+                    locked.addAll(List.of("", "§8Pas encore trouvé : retrouvez-le", "§8pour lui réserver un atelier."));
+                    zone(col, row, 1, 1, "§8🔒 §7" + name, locked, null);
                     continue;
                 }
 
@@ -199,6 +235,8 @@ public final class BuildingScreens {
 
                 List<String> lore = new ArrayList<>();
                 lore.add("§7" + npc.function);
+                lore.add("");
+                lore.addAll(prerequisites(npc));
                 lore.add("");
                 if (other != null) {
                     lore.add("§cA déjà un atelier : §e" + other.name());

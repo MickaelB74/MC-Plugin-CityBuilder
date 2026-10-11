@@ -60,6 +60,7 @@ public class CityCore extends JavaPlugin {
     FindNpcQuestManager            findNpcQuestManager;
     private com.citycore.ui.UiPack uiPack;
     private com.citycore.debug.NpcPrototype prototype;
+    private BuildingInspector buildingInspector;
 
     @Override
     public void onEnable() {
@@ -111,12 +112,18 @@ public class CityCore extends JavaPlugin {
         // Un atelier ne se réserve qu'à un personnage trouvé : rencontré par un joueur, arrivé ou installé
         BuildingCreation   buildingCreation   = new BuildingCreation(buildingManager, buildingSession,
                 npc -> npcDataManager.getState(npc) != NPCState.WANDERER || introManager.hasAnyoneMet(npc));
+        // Inspection des constructions (phase 2) : exigences de config.yml (batiments), niveau, entrepôt
+        buildingInspector = new BuildingInspector(this, buildingManager, new BuildingRequirements(this));
+        buildingCreation.setInspector(buildingInspector);
+        getServer().getPluginManager().registerEvents(buildingInspector, this);
 
         getServer().getPluginManager().registerEvents(
                 new BuildingListener(buildingSession, buildingManager, cityManager, buildingCreation), this);
         // Bâtiment d'un artisan supprimé : il passe « sans logis » (gestion fermée, quêtes en pause,
         // rien n'est perdu) jusqu'à ce qu'on lui choisisse un nouvel atelier
         buildingManager.setOnNpcEvicted(tag -> {
+            buildingInspector.onEvicted(tag); // plus de bonus d'entrepôt sans atelier
+            buildingInspector.refreshBuildings();
             CityNPC evicted = CityNPC.fromTag(tag);
             if (evicted == null || npcDataManager.getState(evicted) != NPCState.ASSIGNED) return;
             npcDataManager.setState(evicted, NPCState.HOMELESS);
@@ -164,6 +171,8 @@ public class CityCore extends JavaPlugin {
 
         findNpcQuestManager = new FindNpcQuestManager(
                 this, npcManager, npcDataManager, cityManager, cityQuestManager);
+        // Piste de recrutement et annonce d'arrivée : ce que demandera l'atelier du personnage
+        findNpcQuestManager.setAtelierRequest(buildingInspector::requestSentence);
 
         getServer().getPluginManager().registerEvents(
                 new FindNpcQuestListener(findNpcQuestManager), this);
@@ -211,6 +220,7 @@ public class CityCore extends JavaPlugin {
         com.citycore.ui.screens.MayorScreens mayorScreens = new com.citycore.ui.screens.MayorScreens(
                 uiKit, mayorGUI, cityManager, cityQuestManager, npcManager, buildingManager);
         mayorScreens.setBuildingScreens(buildingScreens);
+        mayorScreens.setInspector(buildingInspector);
         mayorGUI.setThemed(mayorScreens);
 
         getServer().getPluginManager().registerEvents(
@@ -234,10 +244,13 @@ public class CityCore extends JavaPlugin {
             if (npcType == CityNPC.MAYOR) continue;
 
             VillagerConfig config      = new VillagerConfig(this, npcType.skinId);
+            // Entrepôt agrandi selon le niveau de son atelier (phase 2 : inspection des constructions)
+            config.setCapacityMultiplier(() -> buildingInspector.capacityMultiplier(npcType));
             market.register(npcType, config);
             VillagerGUI    gui         = new VillagerGUI(npcType, config,
                     npcDataManager, npcManager, playerDataManager, market, this);
             gui.setIntegrations(modIntegrations); // habitant lié à un mod absent : pas de menu
+            gui.setInspector(buildingInspector);
             QuestConfig    questConfig = new QuestConfig(this, npcType.skinId, market);
             questConfigs.add(questConfig);
 
@@ -255,6 +268,7 @@ public class CityCore extends JavaPlugin {
                     npcDataManager, economy, cityManager, introManager,
                     questGUI, this, notificationManager,
                     buildingManager, playerDataManager, market);
+            villagerListener.setInspector(buildingInspector); // logis : atelier conforme exigé
             getServer().getPluginManager().registerEvents(villagerListener, this);
             gui.setThemed(new com.citycore.ui.screens.ArtisanScreens(uiKit, npcType, gui, npcDataManager,
                     npcManager, playerDataManager, market, villagerListener, questGUI));
@@ -330,6 +344,7 @@ public class CityCore extends JavaPlugin {
         questJournal.setClassic(questSelectionGUI::open, questSelectionGUI::openStories);
         cityCommand.setQuestTracking(questJournal);
         cityCommand.setBuildingCreation(buildingCreation);
+        cityCommand.setBuildingInspector(buildingInspector);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);
@@ -356,8 +371,10 @@ public class CityCore extends JavaPlugin {
         // ── Restauration NPCs ─────────────────────────────────────
         Bukkit.getScheduler().runTaskLater(this, () -> npcManager.restoreNPCs(), 20L);
 
-        new NPCCityArrivalTask(npcManager, npcDataManager, cityManager,
-                this, buildingManager, notificationManager, findNpcQuestManager).start();
+        NPCCityArrivalTask arrivalTask = new NPCCityArrivalTask(npcManager, npcDataManager, cityManager,
+                this, buildingManager, notificationManager, findNpcQuestManager);
+        arrivalTask.setAtelierRequest(buildingInspector::requestSentence); // dialogue d'arrivée : ses exigences
+        arrivalTask.start();
         npcManager.startFollowSupervisor();
 
         // ── WorldEdit ─────────────────────────────────────────────

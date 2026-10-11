@@ -8,9 +8,9 @@ sièges par vagues, fêtes, soldats de la garde. Pas de monuments ni d'autre ges
 
 | Phase | Contenu | Dépend de | Taille | État |
 |---|---|---|---|---|
-| 0 | Prototype technique sur Youer | — | petite | **codée, à tester en jeu** |
-| 1 | Types de bâtiments | — | petite | **codée, à tester en jeu** |
-| 2 | Inspection des constructions | 1 | moyenne | à faire |
+| 0 | Prototype technique sur Youer | — | petite | **validée** (plafond de PNJ affichés à relever) |
+| 1 | Types de bâtiments | — | petite | **validée** |
+| 2 | Inspection des constructions | 1 | moyenne | **codée, à tester en jeu** |
 | 3 | Habitations et habitants (+ impôt simple) | 0, 2 | grosse | à faire |
 | 4 | Protection renforcée, calendrier d'événements, sièges | 3 | moyenne à grosse | à faire |
 | 5 | La garde (soldats) | 3, 4 | moyenne à grosse | à faire |
@@ -199,8 +199,93 @@ artisan arrivé en ville ne pourra s'y installer qu'une fois le bâtiment passé
 - **Option** : les quêtes « N bâtiments » ne comptent que les bâtiments conformes.
 - **Commande** : `/city build inspect`.
 
-À tester : forge sans enclume refusée avec la liste ; installation après ajout ; niveau qui monte
-en décorant et retombe en cassant l'enclume ; pas de ralentissement sur une zone 30×30×20.
+### Ce qui est codé
+
+Classes `BuildingRequirements` (lecture de config.yml), `BuildingInspector` (lecture des blocs,
+cache, nouvelle inspection, annonces, entrepôt) et `Inspection` (résultat et bulles).
+
+**Réglages : section `batiments` de config.yml** (`config-version` 10, ajoutée d'elle-même) :
+- `commun` : porte (1), lumière (2 sources), toit (60 % du sol) ; chaque section peut les remplacer
+  (le ponton de Martin : toit 20 % ; la mine de Godefroy : pas de porte ; le nid de Harold : ni
+  porte ni toit…) ;
+- `habitation` (un lit), `mairie` (un pupitre pour la Charte et une bannière), et un atelier par
+  personnage (`ateliers.<prénom>`) : `requis` (bloc, nombre, nom affiché) et `bonus` du métier.
+  Les 21 ateliers ont des exigences par défaut tirées de leur métier, à ajuster librement
+  (ex. Thorvald : enclume, haut-fourneau, table de forgeron ; Hélène : composteur, 2 tonneaux,
+  2 bottes de foin ; Isabeau : pupitre, 4 bibliothèques, table de cartographie). « Divers » n'a
+  aucune exigence ; un atelier libre n'a que les exigences communes ;
+- `niveaux` (points pour les niveaux 2 à 5 : 15, 30, 50, 75), `points` (variété : 1 par type de
+  bloc de construction, terre et pierre brute exclues, 30 max ; décor : 1 par décoration, 4 du même
+  type au plus, objets accrochés et porte-armures compris, 40 max ; bonus du métier : 5 chacun ;
+  surface : 1 par 10 blocs de sol sous un toit, 15 max), `decorations` (liste), `bonus-entrepot`
+  (+25 % par niveau au-delà du 1er).
+
+**Fonctionnement** :
+- Lecture des blocs sur une copie des chunks, sur le fil principal : rapide pour des bâtiments de
+  taille normale. La lecture hors du fil principal n'a pas été jugée utile à ce stade ; à revoir
+  si des ralentissements apparaissent sur de très grandes zones.
+- Toit : pour chaque colonne de la zone, au point le plus bas où l'on peut se tenir, y a-t-il un
+  bloc plein au-dessus ? Les murs et piliers ne comptent ni dedans ni dehors ; le feuillage ne
+  compte pas comme toit. Lits et portes comptent une fois (tête / bas).
+- Résultats gardés en cache ; un bloc posé ou cassé, un seau vidé, un cadre ou un porte-armure posé
+  dans la zone relance l'inspection une demi-seconde plus tard (les poses rapides sont regroupées).
+- **Pas de message à chaque bloc** : seul le joueur qui fait changer le niveau est prévenu, et
+  seulement à ce moment-là — titre + son quand le niveau monte (« Forge est conforme »,
+  « Niveau 3 ★★★ »), simple barre d'action quand il baisse. Rien dans le chat.
+- Le niveau est enregistré en base (colonne `level`) : l'entrepôt garde son bonus après un
+  redémarrage.
+
+**Où les joueurs voient les exigences** :
+- piste de recrutement (bulle « Son atelier devra contenir : … ») et annonce d'arrivée en ville ;
+- dialogue d'arrivée du personnage : « Pour mon atelier, il me faudra 1 enclume, 1 haut-fourneau
+  et 1 table de forgeron, avec une porte, un toit (60 % du sol couvert) et 2 sources de lumière » ;
+- « Choisir son logis » : la bulle du bouton et l'icône d'info listent ses exigences ; chaque
+  atelier proposé montre son inspection pour ce personnage (✔/✘, niveau, points, prochain
+  niveau), anneau rouge s'il est incomplet ; le clic est refusé avec la liste de ce qui manque ;
+- **écran « Son atelier »** chez l'artisan installé (clic sur son portrait ; la bulle du portrait
+  résume déjà l'état) : rangée 1 = exigences ✔/✘ avec leur icône, rangée 2 = bonus du métier
+  présents ou à ajouter, rangée 3 = points de détail (variété, décor, bonus, surface, total et
+  paliers), pied de page = ce qu'il faut pour le niveau suivant (« NIV. 2 → 3 : +12 PTS »). Les
+  blocs sont relus à l'ouverture. Sans le pack : même détail dans la bulle de sa tête ;
+- choix du type d'un nouveau bâtiment et choix de l'artisan d'un atelier (menu, et boutons du chat
+  sans le pack) : chaque type et chaque personnage affiche ses prérequis dans sa bulle (les
+  personnages pas encore trouvés aussi, sous cadenas) ;
+- liste des bâtiments d'Alderic : inspection détaillée si la zone est chargée, sinon dernier
+  niveau connu ; anneau rouge = incomplet ; barre d'action en entrant dans un bâtiment ;
+- `/city build inspect [nom]` (bâtiment où l'on se trouve, ou par son nom) : rapport complet ;
+  une seule ligne à la création d'un bâtiment et au changement de type.
+
+**Bordures (affichage 5 secondes depuis la liste)** : les arêtes sont posées sur la face
+extérieure des blocs du bâtiment (la ligne est ou sud passait auparavant à l'intérieur du dernier
+bloc), en contour : bas et haut du bâtiment, une ceinture à hauteur des yeux, arêtes des coins ;
+visibles du seul joueur qui les a demandées.
+
+Écarts avec le plan : le panneau de quêtes n'affiche pas le recrutement (il ne montre que les
+quêtes des habitants) ; les exigences sont donc sur la piste de recrutement à la place. L'option
+« quêtes N bâtiments = bâtiments conformes » n'est pas faite (à décider).
+
+### À tester en jeu
+
+1. Démarrage : aucune ligne « [Bâtiments] bloc inconnu » dans la console.
+2. Recrutement de Thorvald : la piste (papier 🗺) liste son atelier ; à son arrivée, il annonce
+   ses exigences.
+3. « Choisir son logis » avec un atelier vide : anneau rouge, bulle ✘ enclume / haut-fourneau /
+   table de forgeron / porte / toit / lumière ; clic refusé avec la liste.
+4. Poser les blocs un à un dans l'atelier : aucun message tant que rien ne change ; à la pose du
+   dernier bloc requis, titre « … est conforme » + son ; l'installation passe.
+5. Décorer (pots, tapis, bannières, cadres), varier les blocs, ajouter meule / chaudron de lave :
+   titre à chaque niveau franchi ; clic sur le portrait de Thorvald → écran « Son atelier »
+   (exigences, bonus, points, « NIV. x → y : +n PTS »).
+6. Casser l'enclume : barre d'action « incomplet — il manque 1 enclume », rien dans le chat ;
+   Thorvald reste installé, son écran d'atelier montre l'enclume en rouge.
+6 bis. Choix du type puis de l'artisan d'un nouvel atelier : chaque bulle liste les prérequis.
+6 ter. Bordures (clic sur un bâtiment dans la liste d'Alderic) : les lignes longent l'extérieur
+   des murs sur les quatre côtés.
+7. Entrepôt : au niveau 3, la capacité affichée dans « Vendre » / « Entrepôt » augmente de 50 % ;
+   `/city eco check` reste sans alerte.
+8. Toit : un abri sans toit ou un enclos ouvert → « toit ✘ (x % du sol couvert) » ; une maison
+   fermée → ✔.
+9. Zone de 30×30×20 inspectée plusieurs fois : pas de ralentissement visible (`/city proto tps`).
 
 ## Phase 3 — Habitations et habitants
 

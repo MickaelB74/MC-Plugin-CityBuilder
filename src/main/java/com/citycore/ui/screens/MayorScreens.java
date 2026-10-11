@@ -56,6 +56,13 @@ public final class MayorScreens {
         this.screens = screens;
     }
 
+    /** Inspection des constructions (phase 2) : niveau et exigences dans la liste des bâtiments. */
+    private com.citycore.building.BuildingInspector inspector;
+
+    public void setInspector(com.citycore.building.BuildingInspector inspector) {
+        this.inspector = inspector;
+    }
+
     /* =========================
        POINTS D'ENTRÉE (false = menu classique)
        ========================= */
@@ -306,20 +313,31 @@ public final class MayorScreens {
                     deleting ? List.of("§7Cliquez sur un bâtiment", "§7pour le supprimer.", "§c§lDéfinitif.")
                             : List.of("§7Rangés par type : habitations,", "§7ateliers, mairie, divers.", "",
                             "§eClic gauche §7: bordures 5 secondes", "§eClic droit §7: changer le type", "",
-                            "§6■ §7habité par un artisan"));
+                            "§6■ §7habité par un artisan  §c■ §7incomplet",
+                            "§8Détail d'un bâtiment : /city build inspect <nom>"));
             close(c);
 
             List<Building> list = buildings.getAllBuildings();
             for (int i = 0; i < Math.min(GRID, list.size()); i++) {
                 Building b = list.get(i);
                 int col = i % 9, row = 1 + i / 9;
-                if (deleting) c.sprite("ring_red", sx(col), sy(row));
+                // Inspection (phase 2) : détail si la zone est chargée, sinon le dernier niveau connu
+                com.citycore.building.Inspection insp = inspector == null || deleting ? null : inspector.peek(b);
+                boolean incomplete = insp != null ? !insp.compliant() : b.level() == 0;
+                if (deleting || incomplete) c.sprite("ring_red", sx(col), sy(row));
                 else if (b.npcTag() != null) c.sprite("ring_gold", sx(col), sy(row));
                 List<String> lore = new ArrayList<>(List.of(
                         b.typeLine(),
                         "§7Zone  : §f" + b.x1() + "," + b.z1() + " §7→ §f" + b.x2() + "," + b.z2(),
                         b.heightLine(),
                         "§7NPC   : " + buildingGUI().occupant(b), ""));
+                if (insp != null) {
+                    lore.addAll(insp.lore());
+                    lore.add("");
+                } else if (!deleting) {
+                    lore.add(b.levelLine());
+                    lore.add("");
+                }
                 if (deleting) {
                     lore.add("§cCliquez pour supprimer");
                 } else {

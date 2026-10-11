@@ -60,6 +60,12 @@ public record Building(
         return "§7Type : " + type.coloredLabel() + (owner != null ? " §7de " + owner.displayName : " §8(libre)");
     }
 
+    /** Ligne de bulle sur le niveau enregistré à la dernière inspection (phase 2). */
+    public String levelLine() {
+        return level > 0 ? "§7Niveau : " + Inspection.stars(level) + " §8(" + level + "/5)"
+                : "§7Niveau : §cincomplet §8(ou pas encore inspecté)";
+    }
+
     /** Ligne de bulle sur la hauteur (« Hauteur : Y 63 → 75 »). */
     public String heightLine() {
         return hasHeight() ? "§7Hauteur : §fY " + yMin + " §7→ §f" + yMax : "§7Hauteur : §8non estimée";
