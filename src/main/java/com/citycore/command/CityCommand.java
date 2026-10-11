@@ -66,6 +66,13 @@ public class CityCommand implements CommandExecutor {
         this.buildingCreation = buildingCreation;
     }
 
+    /** Habitants de la ville (phase 3) : /city habitants. */
+    private com.citycore.inhabitant.InhabitantManager inhabitants;
+
+    public void setInhabitants(com.citycore.inhabitant.InhabitantManager inhabitants) {
+        this.inhabitants = inhabitants;
+    }
+
     /** Inspection des constructions (phase 2) : /city build inspect, contrôle de /city build assign. */
     private com.citycore.building.BuildingInspector buildingInspector;
 
@@ -366,6 +373,40 @@ public class CityCommand implements CommandExecutor {
                     }
                 }
 
+                // ── /city habitants (phase 3) ────────────────────
+                case HABITANTS -> {
+                    if (inhabitants == null) return true;
+                    String action = args.length >= 2 ? args[1].toLowerCase() : "list";
+                    if (!action.equals("list") && !player.isOp()) {
+                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                        return true;
+                    }
+                    switch (action) {
+                        case "list", "liste" -> inhabitants.list(player);
+                        case "arrivee", "arrivée" -> player.sendMessage(inhabitants.arrive()
+                                ? "§a✅ Un habitant arrive." : "§7Aucun lit libre dans une habitation conforme.");
+                        case "kill", "tuer" -> {
+                            if (args.length < 3) {
+                                player.sendMessage("§cUsage : /city habitants kill <nom>");
+                                return true;
+                            }
+                            String target = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                            if (!inhabitants.kill(target)) player.sendMessage("§c❌ Habitant §f" + target + " §cintrouvable.");
+                        }
+                        case "impot", "impôt" -> {
+                            int paid = inhabitants.payTax();
+                            if (paid == 0) player.sendMessage("§7Aucun habitant : aucun impôt versé.");
+                        }
+                        case "deuil" -> player.sendMessage("§a✅ " + inhabitants.endAllMourning()
+                                + " lit(s) libéré(s) : de nouveaux habitants pourront arriver.");
+                        case "recharger", "reload" -> {
+                            inhabitants.loadSettings();
+                            player.sendMessage("§a✅ Réglages des habitants relus (section habitants de config.yml).");
+                        }
+                        default -> player.sendMessage("§cUsage : /city habitants [list|arrivee|kill <nom>|impot|deuil|recharger]");
+                    }
+                }
+
                 // ── /city proto (phase 0, temporaire) ────────────
                 case PROTO -> {
                     if (!player.isOp()) {
@@ -546,9 +587,14 @@ public class CityCommand implements CommandExecutor {
                         }
 
                         // ── /city build hauteur <nom> <bas> <haut> ──
+                        // ── /city build hauteur <nom> auto | <sol> | <bas> <haut> ──
+                        // Zone de recherche : par défaut profondeur sous le sol de définition et
+                        // hauteur au-dessus (config.yml) ; la hauteur construite se mesure seule.
                         case "hauteur", "height" -> {
-                            if (args.length < 5) {
-                                player.sendMessage("§cUsage : /city build hauteur <nom> <bas> <haut>");
+                            if (args.length < 4) {
+                                player.sendMessage("§cUsage : /city build hauteur <nom> auto §7(règle de config.yml)");
+                                player.sendMessage("§c       /city build hauteur <nom> <sol> §7(nouveau sol de définition)");
+                                player.sendMessage("§c       /city build hauteur <nom> <bas> <haut> §7(zone manuelle)");
                                 return true;
                             }
                             Building target = buildingManager.getByName(args[2]);
@@ -556,21 +602,41 @@ public class CityCommand implements CommandExecutor {
                                 player.sendMessage("§c❌ Bâtiment §f" + args[2] + " §cintrouvable.");
                                 return true;
                             }
+                            org.bukkit.World w = Bukkit.getWorld(target.world());
+                            if (w == null) return true;
                             int low, high;
                             try {
-                                low  = Integer.parseInt(args[3]);
-                                high = Integer.parseInt(args[4]);
+                                if (args[3].equalsIgnoreCase("auto")) {
+                                    int ref = target.refY() != null ? target.refY()
+                                            : BuildingHeights.groundLevel(w, target.x1(), target.z1(), target.x2(), target.z2());
+                                    int[] h = BuildingHeights.range(w, ref, ref);
+                                    buildingManager.setReference(target.id(), ref);
+                                    low = h[0];
+                                    high = h[1];
+                                } else if (args.length == 4) {
+                                    int ref = Integer.parseInt(args[3]);
+                                    int[] h = BuildingHeights.range(w, ref, ref);
+                                    buildingManager.setReference(target.id(), ref);
+                                    low = h[0];
+                                    high = h[1];
+                                } else {
+                                    low  = Integer.parseInt(args[3]);
+                                    high = Integer.parseInt(args[4]);
+                                }
                             } catch (NumberFormatException e) {
                                 player.sendMessage("§c❌ Hauteurs invalides (nombres entiers attendus).");
                                 return true;
                             }
-                            if (Math.abs(high - low) < 2 || Math.abs(high - low) > BuildingHeights.MAX_HEIGHT) {
-                                player.sendMessage("§c❌ La hauteur doit faire entre 2 et "
-                                        + BuildingHeights.MAX_HEIGHT + " blocs.");
+                            if (Math.abs(high - low) < 2) {
+                                player.sendMessage("§c❌ La zone doit faire au moins 2 blocs de haut.");
                                 return true;
                             }
                             buildingManager.setHeight(target.id(), low, high);
-                            player.sendMessage("§a✅ §e" + target.name() + " §a: hauteur Y §f"
+                            if (buildingInspector != null) {
+                                buildingInspector.refreshBuildings();
+                                buildingInspector.recheck(target.id(), null);
+                            }
+                            player.sendMessage("§a✅ §e" + target.name() + " §a: zone de recherche Y §f"
                                     + Math.min(low, high) + " §a→ §f" + Math.max(low, high) + "§a.");
                         }
                         case "show"   -> buildingBorderTask.toggle(player);

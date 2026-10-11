@@ -12,6 +12,8 @@ import com.citycore.npc.CityNPC;
  * @param yMin        bas de la zone (sol), null si pas encore estimé
  * @param yMax        haut de la zone (toit), null si pas encore estimé
  * @param level       niveau de construction (calculé à partir de la phase 2 ; 0 = non inspecté)
+ * @param refY        point de définition (Y le plus bas des coins cliqués, au sol), null si inconnu ;
+ *                    la zone va de batiments.profondeur blocs dessous à batiments.hauteur au-dessus
  */
 public record Building(
         int id,
@@ -28,7 +30,8 @@ public record Building(
         String reservedFor,
         Integer yMin,
         Integer yMax,
-        int level
+        int level,
+        Integer refY
 ) {
     public boolean hasNpcPoint() {
         return npcX != null && npcY != null && npcZ != null;
@@ -68,6 +71,7 @@ public record Building(
 
     /** Ligne de bulle sur la hauteur (« Hauteur : Y 63 → 75 »). */
     public String heightLine() {
-        return hasHeight() ? "§7Hauteur : §fY " + yMin + " §7→ §f" + yMax : "§7Hauteur : §8non estimée";
+        return hasHeight() ? "§7Hauteur : §fY " + yMin + " §7→ §f" + yMax + (refY != null ? " §8(sol Y " + refY + ")" : "")
+                : "§7Hauteur : §8non estimée";
     }
 }

@@ -10,8 +10,8 @@ sièges par vagues, fêtes, soldats de la garde. Pas de monuments ni d'autre ges
 |---|---|---|---|---|
 | 0 | Prototype technique sur Youer | — | petite | **validée** (plafond de PNJ affichés à relever) |
 | 1 | Types de bâtiments | — | petite | **validée** |
-| 2 | Inspection des constructions | 1 | moyenne | **codée, à tester en jeu** |
-| 3 | Habitations et habitants (+ impôt simple) | 0, 2 | grosse | à faire |
+| 2 | Inspection des constructions | 1 | moyenne | **validée** |
+| 3 | Habitations et habitants (+ impôt simple) | 0, 2 | grosse | **codée, à tester en jeu** |
 | 4 | Protection renforcée, calendrier d'événements, sièges | 3 | moyenne à grosse | à faire |
 | 5 | La garde (soldats) | 3, 4 | moyenne à grosse | à faire |
 | 6 | Besoins et satisfaction | 3, 5 | moyenne | à faire |
@@ -117,8 +117,7 @@ Résultat attendu : feu vert (ou non) pour Citizens, plafond de PNJ affichés.
 - **Base de données** : colonnes `type`, `reserved_for`, `y_min`, `y_max` et `level` dans
   `buildings` (migration automatique).
 - **Bâtiments existants** : ceux qui ont un PNJ deviennent « Atelier » réservé à ce PNJ, les
-  autres « Divers ». Leur hauteur est estimée automatiquement au démarrage (sol autour de la zone,
-  bloc le plus haut dans la zone).
+  autres « Divers ». Sans hauteur connue, le sol autour de la zone sert de sol de définition.
 - **Types fixes** (leur comportement est codé) : **Habitation**, **Atelier**, **Mairie** (une seule),
   **Divers**. Un atelier peut être réservé à un personnage ou laissé libre : le premier artisan
   qui s'y installe le réserve.
@@ -130,11 +129,19 @@ Résultat attendu : feu vert (ou non) pour Citizens, plafond de PNJ affichés.
   Le nom est ensuite demandé dans le chat avec une question adaptée (« Nom de l'atelier de
   Thorvald (Forgeron) : ») et un nom proposé cliquable (Forge, Grange, Taverne, Maison_2…).
   Raccourci : `/city build new <type> [personnage|libre] [nom]` (personnage = prénom :
-  `thorvald`, `helene`…). Bas de la zone : le plus bas entre les coins cliqués et le sol autour ;
-  haut : le bloc le plus haut de la zone (64 blocs au plus).
+  `thorvald`, `helene`…).
+- **Hauteur (révisée)** : plus d'estimation figée à la création (elle ne suivait pas un bâtiment
+  construit ensuite). Les coins cliqués, au sol, donnent le **sol de définition** ; la **zone de
+  recherche** va de `batiments.profondeur` (40) blocs dessous à `batiments.hauteur` (100) blocs
+  au-dessus. La **hauteur réellement construite** (du bloc construit le plus bas, cave comprise,
+  au plus haut ; terrain naturel exclu) est mesurée à chaque inspection et affichée
+  (« Construit : Y 62 → 78 »). Le toit est mesuré à partir du sol de définition : une grotte sous
+  la maison ne le fausse pas. Les bordures affichées vont du sol au sommet construit.
 - **Changer le type** : clic droit sur le bâtiment dans la liste d'Alderic, ou
   `/city build type <nom> <type> [personnage]`. Un bâtiment habité par un artisan reste son atelier.
-- **Hauteur** : `/city build hauteur <nom> <bas> <haut>` corrige l'estimation.
+- **Hauteur** : `/city build hauteur <nom> auto` (règle de config.yml), `… <sol>` (nouveau sol de
+  définition) ou `… <bas> <haut>` (zone de recherche manuelle). Au premier démarrage avec cette
+  règle, les bâtiments existants la reçoivent (ancien bas de zone = sol de définition).
 - **Affichage** : type et hauteur dans les bulles des listes ; le type s'affiche aussi dans la
   barre d'action quand on entre dans un bâtiment.
 - **Rangement** : les listes de bâtiments (Alderic, `/city build`) sont triées par type, puis par
@@ -214,8 +221,13 @@ cache, nouvelle inspection, annonces, entrepôt) et `Inspection` (résultat et b
   (ex. Thorvald : enclume, haut-fourneau, table de forgeron ; Hélène : composteur, 2 tonneaux,
   2 bottes de foin ; Isabeau : pupitre, 4 bibliothèques, table de cartographie). « Divers » n'a
   aucune exigence ; un atelier libre n'a que les exigences communes ;
+- `terrain` : blocs naturels (tags de Minecraft : roche, terre, sable, gravier, minerais, glace,
+  neige, végétation, plus les blocs des grottes) exclus de la **variété** et de la hauteur
+  construite — ils comptent toujours pour les exigences (eau du ponton de Martin, glace du nid de
+  Harold) et les bonus. Limite connue : une structure souterraine naturelle (mine abandonnée,
+  donjon) dans les 40 blocs sous un bâtiment compterait comme construite ;
 - `niveaux` (points pour les niveaux 2 à 5 : 15, 30, 50, 75), `points` (variété : 1 par type de
-  bloc de construction, terre et pierre brute exclues, 30 max ; décor : 1 par décoration, 4 du même
+  bloc de construction, terrain exclu, 30 max ; décor : 1 par décoration, 4 du même
   type au plus, objets accrochés et porte-armures compris, 40 max ; bonus du métier : 5 chacun ;
   surface : 1 par 10 blocs de sol sous un toit, 15 max), `decorations` (liste), `bonus-entrepot`
   (+25 % par niveau au-delà du 1er).
@@ -286,6 +298,11 @@ quêtes des habitants) ; les exigences sont donc sur la piste de recrutement à 
 8. Toit : un abri sans toit ou un enclos ouvert → « toit ✘ (x % du sol couvert) » ; une maison
    fermée → ✔.
 9. Zone de 30×30×20 inspectée plusieurs fois : pas de ralentissement visible (`/city proto tps`).
+10. Hauteur (révisée) : délimiter une parcelle vide, puis y construire une tour de 30 blocs et une
+    cave de 6 blocs sous terre : `/city build inspect` affiche « Construit : Y (cave) → Y (sommet) »
+    sans rien régler ; la variété ne compte ni la pierre ni la terre creusées ; une grotte
+    naturelle sous la maison ne change pas le pourcentage de toit ; les bordures (liste d'Alderic)
+    vont du sol au sommet de la tour.
 
 ## Phase 3 — Habitations et habitants
 
@@ -304,8 +321,77 @@ quêtes des habitants) ; les exigences sont donc sur la piste de recrutement à 
 - **Affichage** : « Habitants 12/16 » dans le panneau Tab (compteur séparé de `residents`).
 - **Commandes** : `/city habitants spawn|kill|list`, accélérateur des délais.
 
-À tester : maison à 3 lits = 3 arrivées ; lit cassé = départ ; habitant tué puis remplacé ;
-impôt au lever du jour ; habitants restaurés après redémarrage.
+### Ce qui est codé
+
+Classe `com.citycore.inhabitant.InhabitantManager` (table `inhabitants`), avec `InhabitantSkins`
+et `city.ClaimCache` (chunks de la ville en cache).
+
+- **Places** : chaque lit (tête) d'une **habitation conforme** (inspection de la phase 2 : lit,
+  porte, toit, lumière) accueille un habitant. Une habitation devenue incomplète garde ses
+  habitants mais n'en accueille plus de nouveaux.
+- **Arrivée** : toutes les `arrivee-minutes` (5), s'il reste un lit libre et qu'un joueur est
+  connecté, un habitant au prénom médiéval (Jehan, Margot, Guillemette…) s'installe : une ligne
+  dans le chat (« Jehan s'installe à Valmont (Maison, lit 2/3) »). Il apparaît sur un chunk de la
+  lisière proche et marche jusqu'à sa maison (téléporté si la lisière est à plus de 48 blocs).
+- **Vie quotidienne** : le jour, promenade autour de sa maison (réglages de la phase 0 : vitesse,
+  pause, rayon), jamais hors de la ville ; la nuit, il rentre et **dort dans son lit** (trait
+  « sommeil » de Citizens) ; il se lève au matin. Portes ouvertes par les habitants.
+- **Plafond d'affichage** : `max-visibles` (24, faute du relevé de TPS de la phase 0) ; les plus
+  proches des joueurs sont affichés, les autres sont comptés (impôt, population) sans PNJ.
+- **Dangers** : seuls les monstres peuvent les blesser (coups et flèches des joueurs annulés). La
+  nuit (`attaques-nocturnes`), un monstre sans cible à moins de 16 blocs d'un habitant le prend
+  pour cible. Mort : une ligne dans le chat, ni butin ni message de mort ; son lit reste **en
+  deuil** `remplacement-minutes` (20), puis accueille un nouvel habitant.
+- **Départs** : lit cassé (immédiat), maison supprimée ou changée de type → l'habitant quitte la
+  ville (une ligne dans le chat).
+- **Impôt** : à chaque aube (nouveau jour de jeu), `impot` (2) pièces par habitant vivant versées
+  à la caisse, une ligne dans le chat ; un seul versement si le temps saute plusieurs jours.
+- **Affichage** : panneau Tab de la cité, ligne « Habitants » = vivants / places (elle comptait
+  jusqu'ici les artisans installés) ; liste des bâtiments d'Alderic : « Habitants : 2 / 3 lits
+  (1 en deuil) » sur chaque habitation.
+- **Persistance** : habitants en base, PNJ recréés chez eux au démarrage (registre Citizens en
+  mémoire, rien dans les sauvegardes de Citizens).
+- **Commande** `/city habitants` (alias `population`) : bilan pour tous ; actions de test (op) :
+  `arrivee` (arrivée immédiate), `kill <nom>` (mort par les mêmes événements qu'un coup de
+  monstre), `impot` (versement immédiat), `deuil` (fin de tous les deuils), `recharger` (relit la
+  section habitants de config.yml).
+- **config.yml** (`config-version` 11, réglages ajoutés d'eux-mêmes sous `habitants`) :
+  `arrivee-minutes`, `remplacement-minutes`, `impot`, `max-visibles`, `attaques-nocturnes`.
+
+Le prototype `/city proto` reste en place pour la mesure des TPS et les soldats (phase 5).
+
+### À tester en jeu
+
+1. Une habitation conforme à 3 lits (lits, porte, toit, lumière) : `/city habitants arrivee` trois
+   fois (ou attendre) → trois habitants arrivent de la lisière et marchent jusqu'à la maison ; une
+   quatrième demande répond « aucun lit libre ».
+2. `/city habitants` : bilan « 3/3 », la maison et ses habitants ; panneau Tab « Habitants 3/3 ».
+3. Journée : ils flânent autour de la maison sans quitter la ville ; nuit (`/time set night`) :
+   ils rentrent et se couchent dans leur lit ; au matin ils se lèvent.
+4. Frapper un habitant : aucun dégât. Un zombie la nuit : il le prend pour cible.
+5. `/city habitants kill <nom>` : « … a été tué », lit en deuil (bilan) ; `/city habitants deuil`
+   puis `arrivee` → un remplaçant arrive.
+6. Casser un lit : son habitant quitte la ville aussitôt.
+7. `/time set 23000` puis attendre l'aube : « Impôt de l'aube : 3 habitants → +6 coins ».
+8. Redémarrer : les habitants réapparaissent chez eux, deuils et bilan conservés.
+9. Avec `max-visibles: 2` (`/city habitants recharger`) : 2 PNJ affichés, le bilan en compte 3.
+10. Relever `/city proto tps` avec la ville peuplée pour régler `max-visibles`.
+
+### Correctifs (dialogues, point des artisans)
+
+- **Dialogues lettre par lettre** : la barre d'action ne tient que sur une ligne ; une réplique
+  plus longue que `dialogues.largeur` (58 caractères, config.yml version 13) est coupée entre deux
+  mots et affichée en morceaux successifs, le nom du personnage et la mise en forme repris à
+  chaque morceau, « … » en fin de morceau.
+- **Artisans qui ne rejoignaient pas leur point** : le point du PNJ et les points de repli étaient
+  pris sur le bloc le plus haut de la colonne, donc **sur le toit** des ateliers couverts. Le point
+  est désormais posé au-dessus du bloc cliqué (le sol de l'atelier) ; un point enregistré avant ce
+  correctif, sans toit au-dessus, est ramené au sol de l'atelier (recherche à partir du sol de
+  définition) ; les points de repli suivent la même règle. Les artisans ouvrent aussi les portes.
+
+À tester : une réplique longue (Alderic, Bastien) s'affiche en deux ou trois morceaux sans sortir
+de l'écran ; un artisan installé dans un atelier couvert, créé avant ou après ce correctif,
+rejoint son point à l'intérieur (y compris après « suivre » puis « arrêter »), en passant la porte.
 
 ## Phase 4 — Sièges
 

@@ -30,6 +30,12 @@ public class CityTabCompleter implements TabCompleter {
         this.buildingCreation = buildingCreation;
     }
 
+    private com.citycore.inhabitant.InhabitantManager inhabitants;
+
+    public void setInhabitants(com.citycore.inhabitant.InhabitantManager inhabitants) {
+        this.inhabitants = inhabitants;
+    }
+
     public CityTabCompleter(CityManager cityManager,
                             BuildingManager buildingManager, NPCManager npcManager) {
         this.cityManager     = cityManager;
@@ -60,6 +66,9 @@ public class CityTabCompleter implements TabCompleter {
                 case "quests"   -> List.of("toggle", "recits");
                 case "ui"       -> List.of("valmont", "classique");
                 case "eco"      -> player.isOp() ? List.of("check") : new ArrayList<>();
+                case "habitants", "population" -> player.isOp()
+                        ? List.of("list", "arrivee", "kill", "impot", "deuil", "recharger")
+                        : List.of("list");
                 case "proto"    -> player.isOp()
                         ? List.of("habitant", "soldat", "former", "zombie", "foule", "tps", "skins", "clear")
                         : new ArrayList<>();
@@ -110,6 +119,10 @@ public class CityTabCompleter implements TabCompleter {
                 case "player" -> player.isOp()
                         ? List.of("levelUp", "levelDown", "setLevel")
                         : new ArrayList<>();
+                case "habitants", "population" -> player.isOp() && inhabitants != null
+                        && (args[1].equalsIgnoreCase("kill") || args[1].equalsIgnoreCase("tuer"))
+                        ? inhabitants.livingNames()
+                        : new ArrayList<>();
                 case "job" -> player.isOp()
                         ? Arrays.stream(CityNPC.values())
                         .filter(n -> n != CityNPC.MAYOR)
@@ -140,7 +153,7 @@ public class CityTabCompleter implements TabCompleter {
                             .map(BuildingType::key)
                             .filter(k -> k.startsWith(args[3].toLowerCase()))
                             .collect(Collectors.toList());
-                    case "hauteur" -> List.of(String.valueOf(player.getLocation().getBlockY()));
+                    case "hauteur" -> List.of("auto", String.valueOf(player.getLocation().getBlockY() - 1));
                     default -> new ArrayList<String>();
                 };
                 case "player" -> {
@@ -163,7 +176,7 @@ public class CityTabCompleter implements TabCompleter {
             return List.of("<nom>");
         }
         if (args.length == 5 && args[0].equalsIgnoreCase("build") && args[1].equalsIgnoreCase("hauteur")) {
-            return List.of(String.valueOf(player.getLocation().getBlockY() + 8));
+            return args[3].equalsIgnoreCase("auto") ? new ArrayList<>() : List.of(String.valueOf(player.getLocation().getBlockY() + 20));
         }
 
         return new ArrayList<>();

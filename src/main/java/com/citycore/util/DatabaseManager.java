@@ -186,6 +186,34 @@ public class DatabaseManager {
             plugin.getLogger().info("Bâtiments : types ajoutés (" + converted
                     + " atelier(s) d'artisan, les autres en « Divers »).");
         }
+        // Point de définition (sol) : la hauteur devient « profondeur dessous, hauteur au-dessus ».
+        // Première fois : l'ancien bas de zone (sol estimé ou coins cliqués) sert de point de définition.
+        if (addColumn(stmt, "buildings", "ref_y INTEGER")) {
+            int up   = Math.max(1, plugin.getConfig().getInt("batiments.hauteur", 100));
+            int down = Math.max(0, plugin.getConfig().getInt("batiments.profondeur", 40));
+            int moved = stmt.executeUpdate("UPDATE buildings SET ref_y = y_min, y_min = y_min - " + down
+                    + ", y_max = y_min + " + up + " WHERE y_min IS NOT NULL");
+            plugin.getLogger().info("Bâtiments : hauteur recalculée pour " + moved + " bâtiment(s) ("
+                    + down + " blocs sous le sol, " + up + " au-dessus).");
+        }
+
+        // Habitants de la ville (phase 3 du plan « Valmont vivante ») : un par lit d'habitation.
+        // state : HABITANT, FORMATION, SOLDAT, MORT (un mort garde son lit le temps du deuil)
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS inhabitants (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT    NOT NULL,
+                skin        INTEGER NOT NULL DEFAULT -1,
+                building_id INTEGER NOT NULL,
+                world       TEXT    NOT NULL,
+                bed_x       INTEGER NOT NULL,
+                bed_y       INTEGER NOT NULL,
+                bed_z       INTEGER NOT NULL,
+                state       TEXT    NOT NULL DEFAULT 'HABITANT',
+                arrived_at  INTEGER NOT NULL,
+                died_at     INTEGER
+            )
+        """);
 
         stmt.close();
     }

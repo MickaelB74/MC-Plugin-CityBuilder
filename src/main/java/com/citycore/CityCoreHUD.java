@@ -30,6 +30,13 @@ public class CityCoreHUD {
     /** Interfaces illustrées « Valmont » (null tant qu'elles ne sont pas prêtes). */
     private com.citycore.ui.UiKit ui;
 
+    /** Population « 12/16 » (habitants / lits, phase 3) ; null = nombre d'artisans installés. */
+    private java.util.function.Supplier<String> population;
+
+    public void setPopulation(java.util.function.Supplier<String> population) {
+        this.population = population;
+    }
+
     public void setUi(com.citycore.ui.UiKit ui) {
         this.ui = ui;
     }
@@ -78,7 +85,8 @@ public class CityCoreHUD {
         // pas de la table city — c'est lui qui est mis à jour lors du level-up via le GUI maire.
         String cityLevel = String.valueOf(cityLevelValue);
         String cityCoins = city != null ? String.valueOf(city.getCoins())          : "—";
-        String cityPop   = city != null ? String.valueOf(city.getResidentCount())  : "—";
+        String cityPop   = city == null ? "—" : population != null ? population.get()
+                : String.valueOf(city.getResidentCount());
         String citySize  = city != null ? city.getClaimedChunks() + "/" + city.getMaxChunks() : "—";
 
         // Joueur équipé du pack : panneaux dessinés de part et d'autre de la liste des joueurs
@@ -157,7 +165,9 @@ public class CityCoreHUD {
             cityTitle = city.getName();
             String tier = com.citycore.quest.city.CityTier.fromLevel(cityLevel).tierName.replaceAll("§.", "");
             cityRows.add(new UiHud.Row(UiHud.Kind.HEAD, tier, UiHud.CREAM, "Niv. " + cityLevel, UiHud.GOLD, 0, false));
-            cityRows.add(UiHud.Row.value("Habitants", String.valueOf(city.getResidentCount()), UiHud.CREAM));
+            // Habitants (phase 3) : vivants / lits des habitations conformes ; avant, les artisans installés
+            cityRows.add(UiHud.Row.value("Habitants", population != null ? population.get()
+                    : String.valueOf(city.getResidentCount()), UiHud.CREAM));
             cityRows.add(UiHud.Row.value("Trésor", fmt(city.getCoins()), UiHud.GOLD));
             int max = Math.max(1, city.getMaxChunks());
             cityRows.add(UiHud.Row.bar("Parcelles", UiHud.MUTED, city.getClaimedChunks() + "/" + city.getMaxChunks(),

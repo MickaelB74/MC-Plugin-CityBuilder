@@ -64,9 +64,12 @@ public class BuildingSession {
         pendingBuilding.remove(uuid);
     }
 
-    /** Zone choisie, en attente du point du PNJ. */
+    /**
+     * Zone choisie, en attente du point du PNJ. yMin / yMax : zone de recherche (profondeur sous
+     * le sol de définition refY, hauteur au-dessus) ; refY : Y le plus bas des coins cliqués.
+     */
     public record PendingBuilding(String name, String world,
                                   int x1, int z1, int x2, int z2,
                                   BuildingType type, String reservedFor,
-                                  int yMin, int yMax) {}
+                                  int yMin, int yMax, int refY) {}
 }

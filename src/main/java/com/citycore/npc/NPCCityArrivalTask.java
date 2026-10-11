@@ -172,8 +172,12 @@ public class NPCCityArrivalTask {
                 world.getChunkAtAsync(point).whenComplete((c, err) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     pendingNavigation.remove(type);
                     if (c != null && npc.isSpawned() && !npcManager.isFollowingSomeone(type)) {
+                        // Chunk chargé : le sol de l'atelier (pas le toit d'un ancien point)
+                        Location dest = workPoint(world, building);
+                        dest.setYaw(getFacingYaw(building));
+                        dest.setPitch(0f);
                         npc.getNavigator().cancelNavigation();
-                        npc.teleport(point, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN);
+                        npc.teleport(dest, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN);
                     }
                 }));
             }
@@ -181,14 +185,15 @@ public class NPCCityArrivalTask {
         }
 
         if (building.hasNpcPoint()) {
-            Location defined = new Location(world,
-                    building.npcX(), building.npcY(), building.npcZ());
-            if (isAccessible(world, defined)) {
+            Location defined = workPoint(world, building);
+            if (defined != null && isAccessible(world, defined)) {
                 target = defined;
                 if (blockedNPCs.remove(type))
                     notificationManager.setBlocked(type, npcManager, false);
             } else {
-                target = findClosestAccessible(world, building, defined);
+                Location around = defined != null ? defined
+                        : new Location(world, building.npcX(), building.npcY(), building.npcZ());
+                target = findClosestAccessible(world, building, around);
                 if (blockedNPCs.add(type))
                     notificationManager.setBlocked(type, npcManager, true);
             }
@@ -288,15 +293,57 @@ public class NPCCityArrivalTask {
                 && !world.getBlockAt(x, y + 1, z).getType().isSolid();
     }
 
+    /**
+     * Point de travail du PNJ : le point défini s'il est à l'abri (bloc plein au-dessus : à
+     * l'intérieur, même à l'étage) ; sinon — point d'avant ce correctif posé sur le toit, ou
+     * atelier à ciel ouvert — l'endroit où se tenir le plus bas de la colonne, à partir du sol
+     * de définition. null s'il n'y en a pas.
+     */
+    private Location workPoint(World world, Building building) {
+        Location stored = new Location(world, building.npcX(), building.npcY(), building.npcZ());
+        if (isAccessible(world, stored) && covered(world, stored)) return stored;
+        int x = stored.getBlockX(), z = stored.getBlockZ();
+        Location floor = lowestSpot(world, x, z, floorBase(building), stored.getBlockY());
+        return floor != null ? floor : stored;
+    }
+
+    /** Un bloc plein au-dessus du point (dans les 16 blocs) : il est à l'intérieur. */
+    private boolean covered(World world, Location loc) {
+        for (int dy = 2; dy <= 16; dy++) {
+            if (world.getBlockAt(loc.getBlockX(), loc.getBlockY() + dy, loc.getBlockZ()).getType().isSolid()) return true;
+        }
+        return false;
+    }
+
+    /** Bas de la recherche du sol : juste sous le sol de définition du bâtiment. */
+    private int floorBase(Building building) {
+        if (building.refY() != null) return building.refY() - 2;
+        if (building.hasNpcPoint()) return (int) Math.floor(building.npcY()) - 16;
+        return building.hasHeight() ? building.yMin() : 0;
+    }
+
+    /** Endroit où se tenir le plus bas d'une colonne entre les hauteurs from et to (le sol), ou null. */
+    private Location lowestSpot(World world, int x, int z, int from, int to) {
+        for (int y = from; y <= to; y++) {
+            Location candidate = new Location(world, x + 0.5, y, z + 0.5);
+            if (isAccessible(world, candidate)) return candidate;
+        }
+        return null;
+    }
+
+    /**
+     * Endroit accessible du bâtiment le plus proche de origin, au niveau du sol de l'atelier
+     * (et non sur le toit, comme le faisait le bloc le plus haut de chaque colonne).
+     */
     private Location findClosestAccessible(World world, Building building, Location origin) {
         Location best     = null;
         double   bestDist = Double.MAX_VALUE;
+        int      base     = floorBase(building);
 
         for (int x = building.x1(); x <= building.x2(); x++) {
             for (int z = building.z1(); z <= building.z2(); z++) {
-                int      y         = world.getHighestBlockYAt(x, z);
-                Location candidate = new Location(world, x + 0.5, y + 1, z + 0.5);
-                if (!isAccessible(world, candidate)) continue;
+                Location candidate = lowestSpot(world, x, z, base, base + 14);
+                if (candidate == null) continue;
                 double dist = origin.distanceSquared(candidate);
                 if (dist < bestDist) { bestDist = dist; best = candidate; }
             }
@@ -309,24 +356,9 @@ public class NPCCityArrivalTask {
                 && loc.getBlockZ() >= building.z1() && loc.getBlockZ() <= building.z2();
     }
 
+    /** Bâtiment sans point défini : l'endroit du sol de l'atelier le plus proche du PNJ. */
     private Location findAccessibleLocation(World world, Building building, Location npcLoc) {
-        Location best     = null;
-        double   bestDist = Double.MAX_VALUE;
-
-        for (int x = building.x1(); x <= building.x2(); x++) {
-            for (int z = building.z1(); z <= building.z2(); z++) {
-                int      y         = world.getHighestBlockYAt(x, z);
-                Location candidate = new Location(world, x + 0.5, y + 1, z + 0.5);
-
-                if (!world.getBlockAt(x, y,     z).getType().isSolid()) continue;
-                if ( world.getBlockAt(x, y + 1, z).getType().isSolid()) continue;
-                if ( world.getBlockAt(x, y + 2, z).getType().isSolid()) continue;
-
-                double dist = npcLoc.distanceSquared(candidate);
-                if (dist < bestDist) { bestDist = dist; best = candidate; }
-            }
-        }
-        return best;
+        return findClosestAccessible(world, building, npcLoc);
     }
 
     /**

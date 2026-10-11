@@ -66,10 +66,13 @@ public class BuildingParticleTask {
         double minX = building.x1(), maxX = building.x2() + 1;
         double minZ = building.z1(), maxZ = building.z2() + 1;
 
-        // Hauteur du bâtiment si elle est connue, sinon une tranche autour du joueur
+        // Du sol de définition au sommet de ce qui est construit (pas toute la zone de recherche,
+        // qui descend sous terre et monte très haut) ; sinon une tranche autour du joueur
         double playerY = player.getLocation().getY();
-        double bottom = building.hasHeight() ? building.yMin() : Math.floor(playerY) - 2;
-        double top    = building.hasHeight() ? building.yMax() + 1 : Math.floor(playerY) + 6;
+        if (top == null) top = builtTop(world);
+        double bottom = building.refY() != null ? building.refY()
+                : building.hasHeight() ? building.yMin() : Math.floor(playerY) - 2;
+        double top = Math.max(bottom + 3, this.top);
         double eyes   = Math.max(bottom, Math.min(top, player.getEyeLocation().getY()));
 
         double step = Math.max(MIN_STEP, Math.max(maxX - minX, maxZ - minZ) / MAX_POINTS);
@@ -84,6 +87,21 @@ public class BuildingParticleTask {
             dot(world, minX, y, maxZ);
             dot(world, maxX, y, maxZ);
         }
+    }
+
+    /** Sommet : bloc le plus haut de la zone (calculé une fois), sans dépasser la zone de recherche. */
+    private Double top;
+
+    private double builtTop(World world) {
+        int highest = Integer.MIN_VALUE;
+        for (int x = building.x1(); x <= building.x2(); x++) {
+            for (int z = building.z1(); z <= building.z2(); z++) {
+                highest = Math.max(highest, world.getHighestBlockYAt(x, z,
+                        org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES));
+            }
+        }
+        if (building.hasHeight()) highest = Math.min(highest, building.yMax());
+        return highest + 1;
     }
 
     /** Contour horizontal de la zone à la hauteur y. */

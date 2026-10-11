@@ -14,10 +14,19 @@ import java.util.List;
  * @param points          total des points de détail
  * @param levelFloor      points demandés pour le niveau actuel (0 au niveau 1)
  * @param nextThreshold   points demandés pour le niveau suivant (-1 = niveau maximal ou incomplet)
+ * @param beds            position de la tête de chaque lit (une place d'habitant par lit, phase 3)
+ * @param builtLow        Y du bloc construit le plus bas (terrain exclu) ; sol de définition si rien
+ * @param builtHigh       Y du bloc construit le plus haut (terrain exclu) ; sol de définition si rien
  */
 public record Inspection(Building building, String target, List<Check> checks, List<Check> bonusChecks,
                          int level, int points, int variety, int decorations, int bonus, int surface,
-                         int levelFloor, int nextThreshold) {
+                         int levelFloor, int nextThreshold, List<org.bukkit.util.BlockVector> beds,
+                         int builtLow, int builtHigh) {
+
+    /** « Construit de Y 62 à Y 78 (17 blocs) ». */
+    public String heightLine() {
+        return "§7Construit : §fY " + builtLow + " §7→ §f" + builtHigh + " §8(" + (builtHigh - builtLow + 1) + " blocs)";
+    }
 
     /** Une exigence ou un bonus : libellé, rempli ou non, détail (« 0/1 », « 35 % »), icône. */
     public record Check(String label, boolean ok, String detail, Material icon) {}
@@ -70,6 +79,7 @@ public record Inspection(Building building, String target, List<Check> checks, L
         }
         lines.add("§7Détail : §f" + points + " pts §8(variété " + variety + ", décor " + decorations
                 + ", bonus " + bonus + ", surface " + surface + ")");
+        lines.add(heightLine());
         if (!compliant()) {
             lines.add("§cComplétez les exigences pour atteindre le niveau 1.");
         } else if (nextLevelPoints() < 0) {

@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 10
+config-version: 13
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -1824,12 +1824,18 @@ pirate:
 #  skins par défaut de Minecraft (Steve, Alex…), différents d'un habitant à l'autre.
 #  Promenade : les habitants flânent autour de leur maison, jamais hors des chunks de la ville
 #  (un habitant qui en sort rentre chez lui).
-#  Test sans redémarrer : /city proto skins (relit cette section).
+#  Une place par lit d'habitation conforme ; l'habitant arrive, flâne le jour, dort la nuit,
+#  paie l'impôt à l'aube. Bilan : /city habitants. Relire ces réglages : /city habitants recharger.
 # ============================================================
 habitants:
   vitesse: 0.4             # vitesse de marche (1 = celle d'un joueur ; les artisans flânent à 0.4)
   pause-promenade: 6       # secondes d'arrêt entre deux trajets (varie de moitié en plus ou en moins)
   rayon-promenade: 12      # distance maximale (blocs) autour de la maison, dans la ville uniquement
+  arrivee-minutes: 5       # un nouvel habitant au plus toutes les 5 min (lit libre, joueur connecté)
+  remplacement-minutes: 20 # deuil : délai avant qu'un lit dont l'habitant est mort accueille quelqu'un
+  impot: 2                 # pièces versées à la caisse par chaque habitant, à chaque aube
+  max-visibles: 24         # habitants affichés à la fois (les plus proches des joueurs) ; les autres comptent
+  attaques-nocturnes: true # la nuit, les monstres proches s'en prennent aux habitants
   skins:
     - {name: "", value: "ewogICJ0aW1lc3RhbXAiIDogMTc0MDUwMjM4NzU1MCwKICAicHJvZmlsZUlkIiA6ICI4YmM3MjdlYThjZjA0YWUzYTI4MDVhY2YzNjRjMmQyNCIsCiAgInByb2ZpbGVOYW1lIiA6ICJub3RpbnZlbnRpdmUiLAogICJzaWduYXR1cmVSZXF1aXJlZCIgOiB0cnVlLAogICJ0ZXh0dXJlcyIgOiB7CiAgICAiU0tJTiIgOiB7CiAgICAgICJ1cmwiIDogImh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOTRiZGFhODM0ZjgxZDk2ZGIxYjM2Mzg2ZWI4MWFkYWY0OTY3NjQwMTAwMGY0ZmFkMDk2ZjIyZjU5ZmQ0YzhhMiIKICAgIH0KICB9Cn0=", signature: "uSq8k+gkhoe4UIFkrpg7Y7GQnmR+QYdN7ebIFtQ5eKjTtBooSRrltuGaDmPJTKkOndMlehYz/RknkaWei+WGzFD4cl6wXnaKWUEJdASE1FleiE9txQ4v2gsGeY+bNs/QujxH6LhTFxdCw/gU/gXGlYakPvENcBiKB+CSNqU1YiojoWDGcABHYbPieHYPPJeFvF1qIS3e2HL+5IiiVXRe1+hTlxUsPSDaRXulsDQ7Hyn2fHjWgVAOyhRMYM/nlNqdY4QHX+tiudTjP/1PVKnlmCJ09JmbdhLrmBXqEE8tIGh18d4DT7Xpym8admmyyA7UK6mZqqmIuVg0+seXNBl9nmlJ6ouJruCoQgA7xFf2V+aQ19/PiG4sB99MGEZF5ZWtb/my12DwYFBVRvOdKZwegv8t2hjm0qv/cR/fae7/1ov9nWOqCIUJY/DBsdtTXHIjAdqw5qW8cd4mKYS3GV5ughnjO3VDGqbfsvEsxtUkvSMMGEcG3LdRi8jtHUrtrmNdj/Vno9VJVugdAVdgECtFAt7AIrkEprgJwf+qcpvQZyVnsM4Yb6IZvn9fBxitMwGsdcgXkpXjvyliIkkDmyMzE4yaBWiqWpe0tl2rO/4ykO6NGP6sMYZPZidawSGRUoB+Qts0pv7uYxxgv2NxSiUvfJPAZ8y+6wQh3xCR60AWn84="}
     - {name: "", value: "ewogICJ0aW1lc3RhbXAiIDogMTc2MzI3MTI3NDExNSwKICAicHJvZmlsZUlkIiA6ICIyZmI1ZGJhYTY2NTA0OGEyYjZhYzU5YWE2Nzk5MDYzNSIsCiAgInByb2ZpbGVOYW1lIiA6ICJkcmFnbG9uZXIiLAogICJzaWduYXR1cmVSZXF1aXJlZCIgOiB0cnVlLAogICJ0ZXh0dXJlcyIgOiB7CiAgICAiU0tJTiIgOiB7CiAgICAgICJ1cmwiIDogImh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYzkyNjM1OGVmMGJlZTk0Y2Q3MGUxNjAxOTU0Zjk5MTFlMzllMWNjMDdlY2MyZTE5NGFhMTJiOWNkODYzMzVlMyIKICAgIH0KICB9Cn0=", signature: "PolynDXxnHgwftnmtwODMcsvWsslxJYl6Ne5j1EGBZAS0cKoZX18qcKvRmhAtbuD0l+cJkRZBI7EI0amxgKQwYI+FpLwi2Xf486Lu/qxHIkcGIgfd/UpKo4hC9rlZNExrRNLE6CccVdGsPm6NAgE1+GkPVlvLX0fZ5L7IgT9m883+OwWusE5NikC0rKCjOOrJLwsjJ7vgGTmQpAriVwTVBGmgH3KfK47nUGa8EeuWt188L5eaUZFVWhSGBDOLNOxx3wHi3XA1dMb4WY5ZZyE37qHusgmBkBUG7wPovKirsyI/R8DMG+HwsSQwu7MOz9pYMk4+wlbzSKEXpJ4mKRrPhMGD54kIQadZzcNn072LIM6F5Bq+iieXP6D3x8l/oIejXNThmCmAi5kwFecV9ld6lS54Voyk75Wc/RlSFnrXYeEvIc9FWK6TYG0UrLhvL2qNxrmM1Gf0zHbmVnxEZ7AgHhRJg67Rvjh47yTJL3Pw6YUuLVoYBFG+wBVeOx9R8xs8v7hYSLdTeKA/YHEMPXukQ9h2+Eafj9iOP9xiAfewWOdk4YySS7ZI9mbWIaF87vttH7+tsVDIgp2Vzcndbi6acjcp3N/myJFCfMt5bN466HCreB4GpjNCg8gNEVcEbwdusu107RiMZPiPezzUAUfeOdFuV2FZV/oJ50/+gUA/5E="}
@@ -1866,6 +1872,21 @@ soldats:
 #  Vérifier un bâtiment : /city build inspect <nom>.
 # ============================================================
 batiments:
+  hauteur: 100     # zone de recherche : blocs au-dessus du sol de définition (coins cliqués) ; la hauteur construite se mesure seule
+  profondeur: 40   # zone de recherche : blocs sous le sol de définition (caves, mines)
+  # Terrain : blocs naturels, exclus de la variété et de la hauteur construite (ils comptent pour
+  # les exigences : l'eau du ponton de Martin…). Tags de Minecraft (#…) ou matériaux.
+  terrain: ["#overworld_carver_replaceables", "#sculk_replaceable", "#base_stone_overworld", "#base_stone_nether",
+            "#dirt", "#sand", "#terracotta", "#nylium", "#snow", "#ice", "#leaves", "#flowers", "#saplings",
+            "#cave_vines", "#coal_ores", "#iron_ores", "#copper_ores", "#gold_ores", "#redstone_ores",
+            "#lapis_ores", "#diamond_ores", "#emerald_ores", BEDROCK, WATER, LAVA, GRAVEL, CLAY, SHORT_GRASS,
+            TALL_GRASS, FERN, LARGE_FERN, DEAD_BUSH, VINE, GLOW_LICHEN, MOSS_BLOCK, MOSS_CARPET, SEAGRASS,
+            TALL_SEAGRASS, KELP, KELP_PLANT, SUGAR_CANE, LILY_PAD, BROWN_MUSHROOM, RED_MUSHROOM,
+            SWEET_BERRY_BUSH, PINK_PETALS, POINTED_DRIPSTONE, DRIPSTONE_BLOCK, CALCITE, SMOOTH_BASALT,
+            AMETHYST_BLOCK, BUDDING_AMETHYST, AMETHYST_CLUSTER, SMALL_AMETHYST_BUD, MEDIUM_AMETHYST_BUD,
+            LARGE_AMETHYST_BUD, MAGMA_BLOCK, COBWEB, SPORE_BLOSSOM, HANGING_ROOTS, BIG_DRIPLEAF,
+            BIG_DRIPLEAF_STEM, SMALL_DRIPLEAF, AZALEA, FLOWERING_AZALEA, SCULK, SCULK_VEIN, INFESTED_STONE,
+            INFESTED_DEEPSLATE]
   # Points de détail nécessaires pour chaque niveau (un bâtiment conforme est au moins niveau 1)
   niveaux: {2: 15, 3: 30, 4: 50, 5: 75}
   points:
@@ -2084,3 +2105,11 @@ batiments:
         - {bloc: BLUE_ICE, nom: "glace bleue"}
         - {bloc: OBSIDIAN, nom: "obsidienne"}
         - {bloc: DRAGON_HEAD, nom: "tête de dragon"}
+
+# ============================================================
+#  DIALOGUES DES PNJ (texte écrit lettre par lettre au-dessus de la barre d’objets)
+#  La barre d’action ne tient que sur une ligne : une réplique plus longue est coupée entre
+#  deux mots et affichée en morceaux successifs, le nom du personnage repris à chaque fois.
+# ============================================================
+dialogues:
+  largeur: 58   # caractères au plus par morceau (interface à l’échelle 4 en 1080p : environ 75)

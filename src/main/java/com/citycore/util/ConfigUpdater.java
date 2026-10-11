@@ -178,6 +178,10 @@ public final class ConfigUpdater {
         String withInhabitants = addMissingChildren(updated, lines, user, "habitants");
         if (!withInhabitants.equals(updated)) added.add("habitants (nouveaux réglages)");
         updated = withInhabitants;
+        // Nouveaux réglages des bâtiments (hauteur, profondeur, terrain…) : ajoutés sous batiments
+        String withBuildings = addMissingChildren(updated, lines, user, "batiments");
+        if (!withBuildings.equals(updated)) added.add("batiments (nouveaux réglages)");
+        updated = withBuildings;
         if (append.length() > 0) updated = updated.stripTrailing() + "\n" + append;
         return updated;
     }
@@ -206,19 +210,28 @@ public final class ConfigUpdater {
     }
 
     /**
-     * Ajoute, juste sous la ligne « section: » du fichier, les clés enfants (une ligne chacune)
-     * que le config.yml du jar possède et pas le fichier. Section absente : rien n'est fait.
+     * Ajoute, juste sous la ligne « section: » du fichier, les clés enfants que le config.yml du
+     * jar possède et pas le fichier : la ligne de la clé et ses lignes de suite plus indentées
+     * (liste sur plusieurs lignes). Section absente : rien n'est fait.
      */
     private static String addMissingChildren(String text, String[] jarLines, YamlConfiguration user, String section) {
         if (!user.isConfigurationSection(section)) return text;
         List<String> missing = new ArrayList<>();
-        boolean inside = false;
+        boolean inside = false, copying = false;
+        Pattern child = Pattern.compile("^  ([A-Za-z0-9_-]+):");
         for (String line : jarLines) {
             if (line.startsWith(section + ":")) { inside = true; continue; }
             if (!inside) continue;
             if (!line.startsWith("  ")) break;                       // fin de la section
-            Matcher m = Pattern.compile("^  ([A-Za-z0-9_-]+):").matcher(line);
-            if (m.find() && !user.contains(section + "." + m.group(1))) missing.add(line);
+            Matcher m = child.matcher(line);
+            if (m.find()) {
+                copying = !user.contains(section + "." + m.group(1));
+                if (copying) missing.add(line);
+            } else if (copying && line.startsWith("   ")) {
+                missing.add(line);                                    // suite de la clé ajoutée
+            } else if (!line.startsWith("   ")) {
+                copying = false;                                      // commentaire de la section
+            }
         }
         if (missing.isEmpty()) return text;
         Matcher header = Pattern.compile("(?m)^" + Pattern.quote(section) + ":[^\\n]*\\n").matcher(text);

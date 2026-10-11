@@ -56,7 +56,27 @@ public final class BuildingRequirements {
     private final Map<String, Spec> ateliers = new HashMap<>();
     private final NavigableMap<Integer, Integer> levels = new TreeMap<>(); // niveau → points requis
     private final Set<Material> decorations = new HashSet<>();
+    private final Set<Material> terrain = new HashSet<>();
     private Points points;
+
+    /**
+     * Terrain par défaut (si config.yml n'a pas batiments.terrain) : tags de Minecraft qui
+     * regroupent les blocs naturels (roche, terre, sable, gravier, minerais, glace, neige,
+     * végétation), plus quelques blocs des grottes. Même liste que celle livrée dans config.yml.
+     */
+    private static final List<String> DEFAULT_TERRAIN = List.of(
+            "#overworld_carver_replaceables", "#sculk_replaceable", "#base_stone_overworld", "#base_stone_nether",
+            "#dirt", "#sand", "#terracotta", "#nylium", "#snow", "#ice", "#leaves", "#flowers", "#saplings",
+            "#cave_vines", "#coal_ores", "#iron_ores", "#copper_ores", "#gold_ores", "#redstone_ores",
+            "#lapis_ores", "#diamond_ores", "#emerald_ores",
+            "BEDROCK", "WATER", "LAVA", "GRAVEL", "CLAY", "SHORT_GRASS", "TALL_GRASS", "FERN", "LARGE_FERN",
+            "DEAD_BUSH", "VINE", "GLOW_LICHEN", "MOSS_BLOCK", "MOSS_CARPET", "SEAGRASS", "TALL_SEAGRASS", "KELP",
+            "KELP_PLANT", "SUGAR_CANE", "LILY_PAD", "BROWN_MUSHROOM", "RED_MUSHROOM", "SWEET_BERRY_BUSH",
+            "PINK_PETALS", "POINTED_DRIPSTONE", "DRIPSTONE_BLOCK", "CALCITE", "SMOOTH_BASALT", "AMETHYST_BLOCK",
+            "BUDDING_AMETHYST", "AMETHYST_CLUSTER", "SMALL_AMETHYST_BUD", "MEDIUM_AMETHYST_BUD",
+            "LARGE_AMETHYST_BUD", "MAGMA_BLOCK", "COBWEB", "SPORE_BLOSSOM", "HANGING_ROOTS", "BIG_DRIPLEAF",
+            "BIG_DRIPLEAF_STEM", "SMALL_DRIPLEAF", "AZALEA", "FLOWERING_AZALEA", "SCULK", "SCULK_VEIN",
+            "INFESTED_STONE", "INFESTED_DEEPSLATE");
     private double storageBonus;
 
     public BuildingRequirements(JavaPlugin plugin) {
@@ -95,6 +115,18 @@ public final class BuildingRequirements {
             Set<Material> mats = resolve(token);
             if (mats.isEmpty()) warn("décoration inconnue : " + token);
             decorations.addAll(mats);
+        }
+
+        // Zone de recherche : profondeur sous le sol de définition, hauteur au-dessus
+        BuildingHeights.configure(root.getInt("hauteur", 100), root.getInt("profondeur", 40));
+
+        // Terrain : blocs naturels, exclus de la variété (ils comptent pour les exigences)
+        terrain.clear();
+        List<String> terrainTokens = root.isList("terrain") ? root.getStringList("terrain") : DEFAULT_TERRAIN;
+        for (String token : terrainTokens) {
+            Set<Material> mats = resolve(token);
+            if (mats.isEmpty()) warn("bloc de terrain inconnu : " + token);
+            terrain.addAll(mats);
         }
 
         ConfigurationSection common = root.getConfigurationSection("commun");
@@ -204,6 +236,8 @@ public final class BuildingRequirements {
     public NavigableMap<Integer, Integer> levels() { return levels; }
     public Points points()                         { return points; }
     public Set<Material> decorations()             { return decorations; }
+    /** Blocs naturels (terrain) : ne comptent ni dans la variété ni dans la hauteur construite. */
+    public Set<Material> terrain()                 { return terrain; }
 
     /** Capacité de l'entrepôt d'un artisan selon le niveau de son atelier : +bonus par niveau au-delà du 1er. */
     public double storageMultiplier(int level) {

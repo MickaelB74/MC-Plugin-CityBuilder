@@ -61,6 +61,7 @@ public class CityCore extends JavaPlugin {
     private com.citycore.ui.UiPack uiPack;
     private com.citycore.debug.NpcPrototype prototype;
     private BuildingInspector buildingInspector;
+    private com.citycore.inhabitant.InhabitantManager inhabitants;
 
     @Override
     public void onEnable() {
@@ -90,6 +91,8 @@ public class CityCore extends JavaPlugin {
         notificationManager = new NPCNotificationManager(databaseManager);
         playerDataManager   = new PlayerDataManager(databaseManager);
         TypewriterUtil.setCityNameSupplier(cityManager::getCityName);
+        // Répliques plus larges que l'écran : coupées en morceaux successifs (dialogues.largeur)
+        TypewriterUtil.setMaxWidth(getConfig().getInt("dialogues.largeur", 58));
 
         // ── Managers partagés ────────────────────────────────────
         NPCDataManager          npcDataManager       = new NPCDataManager(databaseManager);
@@ -116,6 +119,11 @@ public class CityCore extends JavaPlugin {
         buildingInspector = new BuildingInspector(this, buildingManager, new BuildingRequirements(this));
         buildingCreation.setInspector(buildingInspector);
         getServer().getPluginManager().registerEvents(buildingInspector, this);
+        // Habitants (phase 3) : un par lit d'habitation conforme ; démarrés une fois le serveur prêt
+        inhabitants = new com.citycore.inhabitant.InhabitantManager(this, databaseManager, buildingManager,
+                buildingInspector, cityManager);
+        getServer().getPluginManager().registerEvents(inhabitants, this);
+        Bukkit.getScheduler().runTask(this, inhabitants::start);
 
         getServer().getPluginManager().registerEvents(
                 new BuildingListener(buildingSession, buildingManager, cityManager, buildingCreation), this);
@@ -181,6 +189,7 @@ public class CityCore extends JavaPlugin {
 
         // ── HUD ──────────────────────────────────────────────────
         cityHUD = new CityCoreHUD(this, cityManager, economy, playerDataManager, cityQuestManager);
+        cityHUD.setPopulation(inhabitants::populationLine); // « Habitants 12/16 » dans le panneau Tab
         cityHUD.start();
 
         // ── Interfaces illustrées « Valmont » (pack de ressources) ──
@@ -221,6 +230,7 @@ public class CityCore extends JavaPlugin {
                 uiKit, mayorGUI, cityManager, cityQuestManager, npcManager, buildingManager);
         mayorScreens.setBuildingScreens(buildingScreens);
         mayorScreens.setInspector(buildingInspector);
+        mayorScreens.setOccupancy(inhabitants::occupancy); // habitants de chaque habitation
         mayorGUI.setThemed(mayorScreens);
 
         getServer().getPluginManager().registerEvents(
@@ -345,6 +355,7 @@ public class CityCore extends JavaPlugin {
         cityCommand.setQuestTracking(questJournal);
         cityCommand.setBuildingCreation(buildingCreation);
         cityCommand.setBuildingInspector(buildingInspector);
+        cityCommand.setInhabitants(inhabitants);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);
@@ -352,6 +363,7 @@ public class CityCore extends JavaPlugin {
         cityCmd.setExecutor(cityCommand);
         CityTabCompleter cityTabCompleter = new CityTabCompleter(cityManager, buildingManager, npcManager);
         cityTabCompleter.setBuildingCreation(buildingCreation);
+        cityTabCompleter.setInhabitants(inhabitants);
         cityCmd.setTabCompleter(cityTabCompleter);
 
         // ── Summit — instancié APRÈS QuestListener ────────────────
@@ -386,6 +398,7 @@ public class CityCore extends JavaPlugin {
     @Override
     public void onDisable() {
         if (prototype != null) prototype.clear(); // PNJ et zombies du prototype : rien ne doit rester
+        if (inhabitants != null) inhabitants.shutdown(); // recréés depuis la base au prochain démarrage
         if (cityHUD != null) cityHUD.stop();
         if (uiPack != null) uiPack.stop();
         databaseManager.closeDatabase();

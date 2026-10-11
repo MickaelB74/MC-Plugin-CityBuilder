@@ -111,12 +111,14 @@ public class NPCManager {
     }
 
     /**
-     * Capacités de déplacement communes aux PNJ de la cité : nage en surface.
+     * Capacités de déplacement communes aux PNJ de la cité : nage en surface, ouverture des portes.
      * Citizens ne l'active par défaut que pour les créatures aquatiques : un PNJ humain
      * coulait au fond de l'eau au lieu de nager derrière le joueur.
      */
     private void applyMovement(NPC npc) {
         npc.data().setPersistent(NPC.Metadata.SWIM, true);
+        // Les ateliers ont une porte (exigence des bâtiments) : sans cela, le PNJ restait dehors
+        npc.data().setPersistent(NPC.Metadata.PATHFINDER_OPEN_DOORS, true);
     }
 
     /** Applique le skin connu (plugin ou config.yml) s'il diffère de celui que porte le PNJ. */

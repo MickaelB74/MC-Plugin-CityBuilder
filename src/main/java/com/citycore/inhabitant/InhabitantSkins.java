@@ -71,6 +71,11 @@ public final class InhabitantSkins {
         return skins.isEmpty();
     }
 
+    /** Numéro du prochain skin à distribuer (à tour de rôle), ou -1 si la liste est vide. */
+    public int nextIndex() {
+        return skins.isEmpty() ? -1 : Math.floorMod(next++, skins.size());
+    }
+
     /** Nombre d'entrées vides ou incomplètes (value sans signature…). */
     public int ignored() {
         return ignored;

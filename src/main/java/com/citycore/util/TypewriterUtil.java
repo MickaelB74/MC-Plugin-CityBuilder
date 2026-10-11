@@ -14,7 +14,8 @@ import java.util.function.Supplier;
 
 /**
  * Dialogues des PNJ affichés lettre par lettre dans la barre d'action (au-dessus de la barre
- * d'objets), et uniquement là : rien n'est recopié dans le chat.
+ * d'objets), et uniquement là : rien n'est recopié dans le chat. Une réplique plus large que
+ * l'écran est coupée entre deux mots et affichée en plusieurs morceaux successifs (voir wrap).
  *
  * Un seul dialogue à la fois par joueur : un dialogue lancé pendant qu'un autre se joue attend
  * son tour. Pendant un dialogue, les autres messages de la barre d'action du plugin (entrée dans
@@ -59,12 +60,87 @@ public class TypewriterUtil {
         if (!isTalking(player)) player.sendActionBar(message);
     }
 
+    /**
+     * Largeur maximale d'une réplique dans la barre d'action, en caractères visibles. La barre
+     * d'action ne tient que sur une ligne : au-delà, la réplique sortirait de l'écran (interface à
+     * l'échelle 4 en 1080p : environ 75 caractères). Réglable : dialogues.largeur de config.yml.
+     */
+    private static int maxWidth = 58;
+
+    public static void setMaxWidth(int width) {
+        maxWidth = Math.max(20, width);
+    }
+
+    /**
+     * Coupe une réplique trop longue en morceaux affichés l'un après l'autre (le « retour à la
+     * ligne » de la barre d'action) : coupure entre deux mots, le nom du personnage (« Thorvald : »)
+     * et la mise en forme en cours (couleur, italique) repris en tête de chaque morceau, « … » à la
+     * fin des morceaux non terminés.
+     */
+    static List<String> wrap(String line) {
+        if (visibleLength(line) <= maxWidth) return List.of(line);
+        // Nom du personnage : tout ce qui précède « : » (« §4Thorvald §f: ») est répété
+        int colon = line.indexOf(": ");
+        String speaker = colon > 0 && colon < 40 ? line.substring(0, colon + 2) : "";
+        String body = line.substring(speaker.length());
+        int room = Math.max(20, maxWidth - visibleLength(speaker) - 2);
+
+        List<String> parts = new java.util.ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        String carried = "";      // codes de mise en forme actifs au début du morceau
+        String active = "";       // codes actifs au fil du texte
+        int visible = 0;
+        for (String word : body.split(" ", -1)) {
+            int len = visibleLength(word);
+            if (visible > 0 && visible + 1 + len > room) {
+                parts.add(speaker + carried + current + " §8…");
+                current.setLength(0);
+                carried = active;
+                visible = 0;
+            }
+            if (visible > 0) { current.append(' '); visible++; }
+            current.append(word);
+            visible += len;
+            active = activeCodes(active, word);
+        }
+        parts.add(speaker + carried + current);
+        return parts;
+    }
+
+    /** Nombre de caractères affichés (codes « §x » exclus). */
+    private static int visibleLength(String s) {
+        int n = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '§' && i + 1 < s.length()) { i++; continue; }
+            n++;
+        }
+        return n;
+    }
+
+    /** Codes de mise en forme actifs après un mot : une couleur remet à zéro, un style s'ajoute. */
+    private static String activeCodes(String active, String word) {
+        String codes = active;
+        for (int i = 0; i + 1 < word.length(); i++) {
+            if (word.charAt(i) != '§') continue;
+            char c = Character.toLowerCase(word.charAt(i + 1));
+            String code = "§" + c;
+            if ("0123456789abcdefr".indexOf(c) >= 0) codes = c == 'r' ? "" : code;   // couleur ou remise à zéro
+            else if ("klmno".indexOf(c) >= 0 && !codes.contains(code)) codes += code;  // gras, italique…
+            i++;
+        }
+        return codes;
+    }
+
     public static void play(JavaPlugin plugin, Player player,
                             List<String> lines, Runnable onFinish) {
         if (lines == null || lines.isEmpty()) {
             if (onFinish != null) onFinish.run();
             return;
         }
+        // Répliques trop longues pour la barre d'action : coupées en morceaux successifs
+        List<String> wrapped = new java.util.ArrayList<>();
+        for (String line : lines) wrapped.addAll(wrap(resolve(line, player)));
+        lines = wrapped;
         Deque<Dialogue> queue = queues.get(player.getUniqueId());
         if (queue != null) {
             queue.addLast(new Dialogue(lines, onFinish)); // un dialogue est en cours : il attend

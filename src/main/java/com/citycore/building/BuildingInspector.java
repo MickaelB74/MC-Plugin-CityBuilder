@@ -73,7 +73,6 @@ public class BuildingInspector implements Listener {
     private long knownAt;
 
     private static final Set<Material> LIGHTS  = lights();
-    private static final Set<Material> NATURAL = natural();
 
     public BuildingInspector(JavaPlugin plugin, BuildingManager buildings, BuildingRequirements requirements) {
         this.plugin       = plugin;
@@ -210,52 +209,68 @@ public class BuildingInspector implements Listener {
         World world = Bukkit.getWorld(b.world());
         if (world == null) {
             return new Inspection(b, target, List.of(new Inspection.Check("monde « " + b.world() + " » introuvable",
-                    false, "", Material.BARRIER)), List.of(), 0, 0, 0, 0, 0, 0, 0, -1);
+                    false, "", Material.BARRIER)), List.of(), 0, 0, 0, 0, 0, 0, 0, -1, List.of(), -1, -1);
         }
-        // Hauteur : estimée une fois si le bâtiment n'en a pas encore
-        int yMin, yMax;
+        // Zone de recherche : de batiments.profondeur sous le sol de définition à batiments.hauteur
+        // au-dessus (fixée à la création ; donnée une fois aux bâtiments qui n'en ont pas)
+        int ref, yMin, yMax;
         if (b.hasHeight()) {
             yMin = b.yMin();
             yMax = b.yMax();
+            ref  = b.refY() != null ? b.refY() : yMin;
         } else {
-            int[] h = BuildingHeights.estimate(world, b.x1(), b.z1(), b.x2(), b.z2(), null, null);
+            ref = b.refY() != null ? b.refY() : BuildingHeights.groundLevel(world, b.x1(), b.z1(), b.x2(), b.z2());
+            int[] h = BuildingHeights.range(world, ref, ref);
+            buildings.setReference(b.id(), ref);
             buildings.setHeight(b.id(), h[0], h[1]);
             yMin = h[0];
             yMax = h[1];
         }
         yMin = Math.max(world.getMinHeight(), yMin);
         yMax = Math.min(world.getMaxHeight() - 1, Math.max(yMin, yMax));
+        Set<Material> terrain = requirements.terrain();
 
-        // Copie des chunks couverts par la zone (lecture rapide)
+        // Copie des chunks couverts par la zone (lecture rapide, avec la hauteur max de chaque colonne)
         Map<Long, ChunkSnapshot> snapshots = new HashMap<>();
         for (int cx = b.x1() >> 4; cx <= b.x2() >> 4; cx++) {
             for (int cz = b.z1() >> 4; cz <= b.z2() >> 4; cz++) {
-                snapshots.put(key(cx, cz), world.getChunkAt(cx, cz).getChunkSnapshot(false, false, false));
+                snapshots.put(key(cx, cz), world.getChunkAt(cx, cz).getChunkSnapshot(true, false, false));
             }
         }
 
         Map<Material, Integer> counts = new HashMap<>();
+        List<org.bukkit.util.BlockVector> beds = new ArrayList<>(); // tête de chaque lit (places des habitants)
         int covered = 0, open = 0;
+        int builtLow = Integer.MAX_VALUE, builtHigh = Integer.MIN_VALUE; // hauteur réellement construite
         for (int x = b.x1(); x <= b.x2(); x++) {
             for (int z = b.z1(); z <= b.z2(); z++) {
                 ChunkSnapshot snap = snapshots.get(key(x >> 4, z >> 4));
                 int lx = x & 15, lz = z & 15;
-                Material[] column = new Material[yMax - yMin + 1];
-                for (int y = yMin; y <= yMax; y++) {
+                // Au-dessus du plus haut bloc de la colonne, il n'y a que de l'air : on s'arrête là
+                // (deux blocs d'air gardés pour repérer un sol à ciel ouvert)
+                int top = Math.min(yMax, Math.max(yMin, snap.getHighestBlockYAt(lx, lz) + 2));
+                Material[] column = new Material[top - yMin + 1];
+                for (int y = yMin; y <= top; y++) {
                     Material m = snap.getBlockType(lx, y, lz);
                     column[y - yMin] = m;
                     if (m.isAir()) continue;
+                    if (!terrain.contains(m)) {
+                        builtLow  = Math.min(builtLow, y);
+                        builtHigh = Math.max(builtHigh, y);
+                    }
                     // Lits et portes occupent deux blocs : on compte la tête du lit et le bas de la porte
                     if (Tag.BEDS.isTagged(m) || Tag.DOORS.isTagged(m)) {
                         BlockData data = snap.getBlockData(lx, y, lz);
                         if (data instanceof Bed bed && bed.getPart() != Bed.Part.HEAD) continue;
                         if (data instanceof Bisected half && half.getHalf() != Bisected.Half.BOTTOM) continue;
+                        if (data instanceof Bed) beds.add(new org.bukkit.util.BlockVector(x, y, z));
                     }
                     counts.merge(m, 1, Integer::sum);
                 }
-                // Toit : au point le plus bas où l'on peut se tenir, y a-t-il un bloc solide au-dessus ?
+                // Toit : au point le plus bas où l'on peut se tenir, à partir du sol de définition
+                // (une grotte sous la maison ne compte pas), y a-t-il un bloc solide au-dessus ?
                 int spot = -1;
-                for (int i = 1; i + 1 < column.length; i++) {
+                for (int i = Math.max(1, ref - 1 - yMin); i + 1 < column.length; i++) {
                     if (solid(column[i - 1]) && !column[i].isSolid() && !column[i + 1].isSolid()) { spot = i; break; }
                 }
                 if (spot < 0) continue; // mur, pilier, sol plein : ni dedans ni dehors
@@ -295,7 +310,7 @@ public class BuildingInspector implements Listener {
 
         // Points de détail
         BuildingRequirements.Points p = requirements.points();
-        long distinct = counts.keySet().stream().filter(m -> !NATURAL.contains(m)).count();
+        long distinct = counts.keySet().stream().filter(m -> !terrain.contains(m)).count();
         int variety = (int) Math.min(p.varietyMax(), distinct * p.variety());
         int decor = hanging;
         for (Material m : requirements.decorations()) decor += Math.min(p.decorationPerType(), counts.getOrDefault(m, 0));
@@ -323,7 +338,8 @@ public class BuildingInspector implements Listener {
             next = nextStep == null || level >= 5 ? -1 : nextStep.getValue();
         }
         return new Inspection(b, target, List.copyOf(checks), List.copyOf(bonusChecks), level, points,
-                variety, decor, bonus, surface, floor, next);
+                variety, decor, bonus, surface, floor, next, List.copyOf(beds),
+                builtHigh < builtLow ? ref : builtLow, builtHigh < builtLow ? ref : builtHigh);
     }
 
     /**
@@ -496,23 +512,6 @@ public class BuildingInspector implements Listener {
         return set;
     }
 
-    /** Blocs naturels : ne comptent pas dans la variété (terre, pierre, sable, eau, feuillage…). */
-    private static Set<Material> natural() {
-        Set<Material> set = new HashSet<>();
-        for (String name : List.of("AIR", "CAVE_AIR", "VOID_AIR", "WATER", "LAVA", "BEDROCK", "GRAVEL", "CLAY",
-                "SNOW", "SNOW_BLOCK", "ICE", "SHORT_GRASS", "GRASS", "TALL_GRASS", "FERN", "LARGE_FERN", "DEAD_BUSH",
-                "VINE", "SEAGRASS", "TALL_SEAGRASS", "KELP", "KELP_PLANT", "SUGAR_CANE", "MOSS_BLOCK", "MOSS_CARPET",
-                "SWEET_BERRY_BUSH", "PINK_PETALS", "LILY_PAD", "BROWN_MUSHROOM", "RED_MUSHROOM")) {
-            Material m = Material.matchMaterial(name);
-            if (m != null) set.add(m);
-        }
-        for (String tag : List.of("dirt", "base_stone_overworld", "base_stone_nether", "sand", "leaves", "flowers",
-                "saplings", "coal_ores", "iron_ores", "copper_ores", "gold_ores", "redstone_ores", "lapis_ores",
-                "diamond_ores", "emerald_ores")) {
-            set.addAll(tag(tag));
-        }
-        return set;
-    }
 
     private static Set<Material> tag(String name) {
         Tag<Material> tag = Bukkit.getTag(Tag.REGISTRY_BLOCKS, NamespacedKey.minecraft(name.toLowerCase(Locale.ROOT)), Material.class);

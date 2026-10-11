@@ -63,6 +63,13 @@ public final class MayorScreens {
         this.inspector = inspector;
     }
 
+    /** Habitants d'une habitation (« Habitants : 2 / 3 lits »), phase 3 ; null = rien à afficher. */
+    private java.util.function.Function<Building, String> occupancy = b -> null;
+
+    public void setOccupancy(java.util.function.Function<Building, String> occupancy) {
+        this.occupancy = occupancy;
+    }
+
     /* =========================
        POINTS D'ENTRÉE (false = menu classique)
        ========================= */
@@ -330,7 +337,10 @@ public final class MayorScreens {
                         b.typeLine(),
                         "§7Zone  : §f" + b.x1() + "," + b.z1() + " §7→ §f" + b.x2() + "," + b.z2(),
                         b.heightLine(),
-                        "§7NPC   : " + buildingGUI().occupant(b), ""));
+                        "§7NPC   : " + buildingGUI().occupant(b)));
+                String residents = occupancy.apply(b);
+                if (residents != null) lore.add(residents);
+                lore.add("");
                 if (insp != null) {
                     lore.addAll(insp.lore());
                     lore.add("");

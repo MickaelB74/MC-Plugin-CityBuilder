@@ -32,7 +32,7 @@ Ces deux affichages utilisent le même panneau compact : bandeau doré titré, l
 en petites capitales, barre de progression fine sous les objectifs.
 
 - **Liste des joueurs (touche Tab)** : par-dessus la liste de Minecraft, une plaque « MyCivilisation »
-  au centre, le panneau de la **cité** à gauche (nom, palier et niveau, habitants, trésor,
+  au centre, le panneau de la **cité** à gauche (nom, palier et niveau, habitants « vivants / places », trésor,
   parcelles avec barre) et celui du **joueur** à droite (pseudo, niveau, barre d'expérience,
   bourse, métier). Les joueurs connectés restent listés au milieu, entre les deux panneaux.
   Aperçus : `docs/ui-previews/tab.png` et `docs/ui-previews/ecran_tab_1080p.png` (écran entier).

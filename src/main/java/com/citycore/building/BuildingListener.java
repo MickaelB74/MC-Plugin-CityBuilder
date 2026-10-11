@@ -65,8 +65,14 @@ public class BuildingListener implements Listener {
                 return;
             }
 
-            double npcY = loc.getWorld().getHighestBlockYAt(
-                    loc.getBlockX(), loc.getBlockZ()) + 1;
+            // Le PNJ se tient sur le bloc cliqué (le sol de l'atelier) — et non sur le bloc le plus
+            // haut de la colonne, qui est le toit d'un bâtiment couvert, inaccessible
+            int feet = loc.getBlockY() + 1;
+            for (int up = 0; up < 4; up++) {
+                org.bukkit.block.Block f = loc.getWorld().getBlockAt(loc.getBlockX(), loc.getBlockY() + 1 + up, loc.getBlockZ());
+                if (!f.getType().isSolid() && !f.getRelative(0, 1, 0).getType().isSolid()) { feet = f.getY(); break; }
+            }
+            double npcY = feet;
             Location npcPt = new Location(loc.getWorld(),
                     loc.getBlockX() + 0.5, npcY, loc.getBlockZ() + 0.5);
             float npcYaw = player.getLocation().getYaw();
@@ -77,7 +83,7 @@ public class BuildingListener implements Listener {
             player.sendMessage("§d📍 Point NPC : §fX" + loc.getBlockX()
                     + " §7Z" + loc.getBlockZ());
 
-            showNpcPointParticle(player, loc);
+            showNpcPointParticle(player, npcPt);
             session.clear(uuid);
             player.getInventory().setItemInMainHand(null);
             return;
@@ -137,10 +143,10 @@ public class BuildingListener implements Listener {
 
             BuildingSession.Pending choice = session.getPending(uuid);
             String name = choice.name();
-            // Hauteur : bas = sol autour de la zone ou coins cliqués, haut = bloc le plus haut de la zone
-            int[] height = BuildingHeights.estimate(player.getWorld(),
-                    p1.getBlockX(), p1.getBlockZ(), p2.getBlockX(), p2.getBlockZ(),
-                    Math.min(p1.getBlockY(), p2.getBlockY()), Math.max(p1.getBlockY(), p2.getBlockY()));
+            // Hauteur : zone de recherche autour des coins cliqués (au sol) — profondeur dessous,
+            // hauteur au-dessus ; la hauteur réellement construite est mesurée à chaque inspection
+            int refY = Math.min(p1.getBlockY(), p2.getBlockY());
+            int[] height = BuildingHeights.range(player.getWorld(), refY, Math.max(p1.getBlockY(), p2.getBlockY()));
             player.sendMessage("§a✅ Zone définie pour §e" + name + "§a !");
             player.sendMessage("§7Zone : §fX(" + p1.getBlockX() + "§7→§f"
                     + p2.getBlockX() + "§7) Z(§f" + p1.getBlockZ()
@@ -151,7 +157,7 @@ public class BuildingListener implements Listener {
                     name, player.getWorld().getName(),
                     p1.getBlockX(), p1.getBlockZ(),
                     p2.getBlockX(), p2.getBlockZ(),
-                    choice.type(), choice.reservedFor(), height[0], height[1]));
+                    choice.type(), choice.reservedFor(), height[0], height[1], refY));
 
             // ✅ Remplace le bâton par l'outil de point NPC
             player.getInventory().setItemInMainHand(null);
@@ -178,11 +184,10 @@ public class BuildingListener implements Listener {
         return item;
     }
 
-    private void showNpcPointParticle(Player player, Location loc) {
-        loc.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER,
-                loc.getBlockX() + 0.5,
-                loc.getWorld().getHighestBlockYAt(loc.getBlockX(), loc.getBlockZ()) + 1,
-                loc.getBlockZ() + 0.5,
+    /** Étincelles vertes à l'endroit exact où se tiendra le PNJ. */
+    private void showNpcPointParticle(Player player, Location point) {
+        point.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER,
+                point.getX(), point.getY() + 0.5, point.getZ(),
                 10, 0.3, 0.3, 0.3, 0);
     }
 

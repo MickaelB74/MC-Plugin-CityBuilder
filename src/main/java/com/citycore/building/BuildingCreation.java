@@ -173,14 +173,12 @@ public class BuildingCreation {
             reserved = null;
         }
         buildings.createBuilding(p.name(), p.world(), p.x1(), p.z1(), p.x2(), p.z2(),
-                npcX, npcY, npcZ, npcYaw, type, reserved, p.yMin(), p.yMax());
+                npcX, npcY, npcZ, npcYaw, type, reserved, p.yMin(), p.yMax(), p.refY());
         CityNPC owner = reserved != null ? CityNPC.fromTag(reserved) : null;
         player.sendMessage("§a✅ Bâtiment §e" + p.name() + " §acréé §7(" + label(type, owner)
-                + "§7, hauteur Y " + p.yMin() + " → " + p.yMax() + ")§a !");
-        if (p.yMax() - p.yMin() >= BuildingHeights.MAX_HEIGHT) {
-            player.sendMessage("§8Hauteur plafonnée à " + BuildingHeights.MAX_HEIGHT
-                    + " blocs. Corrigez-la avec /city build hauteur " + p.name() + " <bas> <haut>.");
-        }
+                + "§7, sol Y " + p.refY() + ")§a !");
+        player.sendMessage("§8Tout ce qui est construit de " + BuildingHeights.depth() + " blocs sous le sol à "
+                + BuildingHeights.height() + " blocs au-dessus compte (terrain naturel exclu de la variété).");
         reportInspection(player, p.name());
     }
 

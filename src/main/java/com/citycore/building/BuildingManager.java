@@ -45,13 +45,13 @@ public class BuildingManager {
                                Double npcX, Double npcY, Double npcZ,
                                Float npcYaw,
                                BuildingType type, String reservedFor,
-                               Integer yMin, Integer yMax) {
+                               Integer yMin, Integer yMax, Integer refY) {
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
             INSERT INTO buildings (name, world, x1, z1, x2, z2,
                                    npc_x, npc_y, npc_z, npc_yaw,
-                                   type, reserved_for, y_min, y_max)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   type, reserved_for, y_min, y_max, ref_y)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """);
             ps.setString(1, name);
             ps.setString(2, world);
@@ -75,6 +75,7 @@ public class BuildingManager {
             ps.setString(12, t == BuildingType.ATELIER ? reservedFor : null);
             setNullableInt(ps, 13, yMin);
             setNullableInt(ps, 14, yMax);
+            setNullableInt(ps, 15, refY);
             ps.executeUpdate();
             ps.close();
         } catch (SQLException e) {
@@ -98,6 +99,8 @@ public class BuildingManager {
         boolean hasMin = !rs.wasNull();
         int yMax = rs.getInt("y_max");
         boolean hasMax = !rs.wasNull();
+        int refY = rs.getInt("ref_y");
+        boolean hasRef = !rs.wasNull();
         return new Building(
                 rs.getInt("id"),
                 rs.getString("name"),
@@ -113,7 +116,8 @@ public class BuildingManager {
                 rs.getString("reserved_for"),
                 hasMin ? yMin : null,
                 hasMax ? yMax : null,
-                rs.getInt("level")
+                rs.getInt("level"),
+                hasRef ? refY : null
         );
     }
 
@@ -457,8 +461,20 @@ public class BuildingManager {
                 .collect(Collectors.toList());
     }
 
+    /** Point de définition (sol) d'un bâtiment. */
+    public void setReference(int buildingId, int refY) {
+        try (PreparedStatement ps = db.getConnection().prepareStatement("UPDATE buildings SET ref_y = ? WHERE id = ?")) {
+            ps.setInt(1, refY);
+            ps.setInt(2, buildingId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     /**
-     * Estime la hauteur des bâtiments qui n'en ont pas (créés avant la phase 1).
+     * Donne une hauteur aux bâtiments qui n'en ont pas (créés avant la phase 1) : le sol autour
+     * de la zone sert de point de définition, puis la règle profondeur / hauteur s'applique.
      * Charge les chunks concernés : à appeler une fois, sur le fil principal.
      * @return nombre de bâtiments complétés
      */
@@ -468,7 +484,9 @@ public class BuildingManager {
             if (b.hasHeight()) continue;
             org.bukkit.World world = server.getWorld(b.world());
             if (world == null) continue;
-            int[] h = BuildingHeights.estimate(world, b.x1(), b.z1(), b.x2(), b.z2(), null, null);
+            int ref = b.refY() != null ? b.refY() : BuildingHeights.groundLevel(world, b.x1(), b.z1(), b.x2(), b.z2());
+            int[] h = BuildingHeights.range(world, ref, ref);
+            setReference(b.id(), ref);
             if (setHeight(b.id(), h[0], h[1])) done++;
         }
         return done;
