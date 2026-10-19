@@ -48,6 +48,7 @@ public final class ConfigUpdater {
      * Chaque entrée : {expression de l'ancienne ligne, nouvelle valeur}.
      * 15 : la garde monte jusqu'à 50 (au lieu de 12), formations simultanées en conséquence.
      * 17 : trois emplacements à remplir pour les uniformes de l'armée ennemie (liste vide en 16).
+     * 23 : section carte retirée (export pour JourneyMap abandonné), avec son bloc de commentaires.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -68,6 +69,10 @@ public final class ConfigUpdater {
                             "#  compte dès qu'il y a des habitants). La satisfaction est leur moyenne pondérée ; c'est un\n#  bonus : elle accélère les arrivées et augmente l'impôt, sans jamais faire partir personne.\n", "commentaire de la section besoins"},
                     new String[]{java.util.regex.Pattern.quote("#  Test (op) : /city habitants aube (repas, soins, impôt, départs tout de suite).\n"),
                             "#  Test (op) : /city habitants aube (repas, soins et impôt tout de suite).\n", "commentaire de la section besoins"}),
+            // 23 : plus d'export pour JourneyMap — la section carte (ajoutée en 22) disparaît, réglages compris
+            23, List.<String[]>of(
+                    new String[]{"(?m)^# =+\\r?\\n#  CARTE [^\\r\\n]*\\r?\\n(?:#[^\\r\\n]*\\r?\\n)*carte:[^\\r\\n]*(?:\\r?\\n|$)(?:  [^\\r\\n]*(?:\\r?\\n|$))*",
+                            "", "carte (retirée)"}),
             17, List.<String[]>of(
                     new String[]{"(?m)^    skins: \\[\\]$",
                             "    skins:\n"

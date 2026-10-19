@@ -17,7 +17,7 @@ sièges par vagues, fêtes, soldats de la garde. Pas de monuments ni d'autre ges
 | 6 | Besoins et satisfaction | 3, 5 | moyenne | **codée, à tester en jeu** |
 | 7 | Fêtes | calendrier de la phase 4 | petite à moyenne | à faire |
 | — | Emplois : les habitants travaillent pour les artisans (hors phase) | 3, 6 | moyenne à grosse | **codée, à tester en jeu** |
-| — | Bordures de la ville sur les cartes JourneyMap (hors phase) | — | petite | **codée, à tester en jeu** |
+| — | Animations Epic Fight des PNJ (mod serveur compagnon, hors phase) | — | petite à moyenne | **codée, à tester en jeu** |
 
 L'ordre suit les dépendances : en ville, les joueurs et les artisans ne peuvent pas être blessés,
 donc un siège n'a d'enjeu que s'il y a des habitants à protéger. Les soldats sont formés à partir
@@ -1014,63 +1014,64 @@ pour parler, puis s'y remet ; créer une annexe : outil « Point de travail », 
 cercle autour, tournés vers le point ; partir à 300 blocs de la ville : les employés continuent de
 produire, les artisans rejoignent leur poste (`/city emplois` ; retour en ville).
 
-## Hors phase — Bordures de la ville sur les cartes (JourneyMap)
+## Hors phase — Animations Epic Fight des PNJ
 
-Les parcelles de la ville s'affichent sur la **carte plein écran et la minicarte de JourneyMap** :
-zone teintée de l'or de Valmont, contour, nom de la ville au centre et bulle au survol
-(« Valmont — 42 parcelles · 15 habitants »). Rien à installer de plus chez les joueurs que
-JourneyMap lui-même : c'est le serveur qui envoie la zone.
+Avec Epic Fight sur le serveur, les PNJ du plugin (artisans, habitants, gardes, armées ennemies)
+glissaient dans la pose d'attente d'Epic Fight, sans animation de marche. Cause : Citizens fait
+des PNJ à skin des entités « joueur », et Epic Fight anime un joueur à partir des touches de son
+clavier (envoyées par son jeu), qu'un PNJ n'a pas. Les monstres, eux, sont animés d'après leur
+déplacement réel. Choix retenu : donner aux PNJ les vraies animations d'Epic Fight, comme les
+monstres (plutôt que de les rendre avec le modèle de Minecraft).
 
-### Comment c'est fait
+### Ce qui est codé
 
-- **Plugin** (`city.CityMapExport`) : écrit `plugins/CityCore/carte.json` (nom, couleur,
-  opacités, chunks revendiqués de chaque dimension), revu toutes les 30 s et réécrit seulement
-  s'il a changé ; écriture atomique (jamais de fichier à moitié écrit). Le plugin ne dépend
-  d'aucun mod.
-- **Mod serveur NeoForge « CityCore — JourneyMap »** (`companions/citycore-journeymap`, mod
-  `citycore_journeymap`) : utilise l'**API serveur de JourneyMap** (superpositions envoyées par le
-  serveur, JourneyMap 6.0.5 et plus). Il relit `carte.json` dès qu'il change (contrôle toutes les
-  5 s), calcule les contours et les envoie à chaque joueur : 5 s puis 30 s après la connexion, 2 s
-  après un changement de dimension, à chaque modification des parcelles, et toutes les 2 min par
-  sécurité (la zone est remplacée, jamais dupliquée). Sans JourneyMap sur le serveur, le mod ne
-  fait rien et le serveur démarre normalement.
-- **Contours** (`ChunkOutline`) : les côtés partagés entre parcelles disparaissent ; une zone
-  d'un seul tenant devient un polygone, avec ses **trous** (parcelle non revendiquée entourée par
-  la ville) ; deux parcelles qui ne se touchent que par un coin restent deux zones ; les points
-  alignés sont retirés (un rectangle de parcelles = 4 coins). Vérifié hors jeu : formes simples,
-  anneaux, îlot dans un trou, coins, villes aléatoires jusqu'à 680 parcelles (surface exacte).
-
-### Réglages (section `carte` de config.yml, version 22)
-
-| Réglage | Défaut | Effet |
-|---|---|---|
-| `activee` | true | false : la zone disparaît des cartes |
-| `nom` | "" | texte affiché sur la zone ; vide = nom de la ville |
-| `couleur` | "F1CF5E" | couleur RRGGBB (or de Valmont) |
-| `remplissage` | 0.15 | opacité de l'intérieur |
-| `bordure` | 0.9 | opacité du contour |
-| `epaisseur` | 2.0 | épaisseur du contour, en pixels |
+- **Mod serveur NeoForge « CityCore — Epic Fight »** (`companions/citycore-epicfight`, mod
+  `citycore_epicfight`) ; rien à installer chez les joueurs :
+  - à chaque tick, le déplacement réel de chaque PNJ est traduit en « touches » (avancer, reculer,
+    pas de côté, par rapport à son regard) et envoyé aux joueurs qui le voient, seulement quand il
+    change (pas d'à-coup : arrêt confirmé après 4 ticks immobiles) → marche, marche arrière,
+    arrêt ; au-delà de 0,24 bloc/tick (≈ 5 blocs/s), le PNJ passe « en course » (animation de
+    course ; sa faim n'en souffre pas) ;
+  - un joueur qui voit apparaître un PNJ reçoit aussitôt le mode combat d'Epic Fight et l'état
+    actuel (marche ou arrêt) ;
+  - **gestes** : coups des gardes et des soldats ennemis → enchaînement de l'arme tenue, celui
+    qu'Epic Fight donne à l'arme (armes de mods comprises ; à défaut : épée, hache, lance, outil,
+    poings), repris au premier coup après 2 s de pause ; tirs des archers et arbalétriers →
+    animation de tir de l'arme. **Affichage seulement** : les dégâts restent ceux du plugin.
+    Entraînement chez Roland : coup ou tir selon le rôle.
+  - Les gestes de travail des employés (bras) sont déjà animés par Epic Fight (mouvement de
+    creuser).
+- **Plugin** (`inhabitant.NpcGestures`) : à chaque coup ou tir, en plus du mouvement de bras de
+  Minecraft, une étiquette d'entité (`citycore.geste.attaque` / `citycore.geste.tir`) signale le
+  geste au mod, qui la retire au tick suivant. Sans le mod, l'étiquette reste sans effet. Le
+  plugin ne dépend d'aucun mod.
+- Réglages du mod : `config/citycore_epicfight.toml` du serveur (vitesses de marche et de course,
+  gestes, mode combat, journal détaillé pour les tests).
+- Le mod utilise des classes internes d'Epic Fight (pas d'API officielle) : calé sur Epic Fight
+  21.17.3.1. Une incompatibilité est écrite une fois dans le journal, sans gêner le serveur.
 
 ### Installation
 
-1. Construire le mod : dans `companions/citycore-journeymap`, `./gradlew build` → 
-   `build/libs/citycore-journeymap-1.0.0.jar`.
-2. Dans le dossier `mods` du **serveur** : **JourneyMap NeoForge 1.21.1 (6.0.9)** et
-   `citycore-journeymap-1.0.0.jar` ; redémarrer. Journal attendu : « API serveur de JourneyMap
-   reçue », puis « Bordures de la ville : 1 zone(s) envoyée(s) ».
-3. Côté joueurs : **JourneyMap seulement** (version 6.0.5 ou plus, la même que le serveur de
-   préférence).
+1. Construire le mod : dans `companions/citycore-epicfight`, `./gradlew build` →
+   `build/libs/citycore-epicfight-1.0.0.jar` (compilé avec le jar d'Epic Fight du serveur).
+2. Le copier dans le dossier `mods` du serveur, à côté d'Epic Fight ; redémarrer. Journal
+   attendu : « Epic Fight présent : les PNJ de CityCore seront animés ».
 
 ### À tester en jeu
 
-- Ouvrir la carte JourneyMap (J) : zone dorée sur les parcelles, nom au centre, bulle au survol ;
-  minicarte aussi.
-- Revendiquer une parcelle puis la rendre : la carte suit en 30 à 35 s, sans se déconnecter.
-- `/city carte` : état (parcelles publiées, dernière écriture). `carte.activee: false` puis
-  `/city carte recharger` (op) : la zone disparaît en 5 s ; `true` : elle revient.
-- Se déconnecter puis revenir : la zone revient en 5 s.
-- Points incertains (non vérifiables hors jeu) : fonctionnement de JourneyMap côté serveur sous
-  Youer ; affichage du nom pour une ville en plusieurs morceaux (un nom par morceau).
+- Un artisan ou un habitant qui se promène : animation de marche d'Epic Fight, arrêt net quand il
+  s'arrête, plus de glissade.
+- Un garde qui patrouille, puis `/city siege start` : les gardes rejoignent le front (en courant si
+  leur vitesse dépasse `deplacements.course`), frappent avec les enchaînements de l'épée, les archers jouent l'animation de tir ;
+  même chose pour les soldats ennemis (siège « bannière »).
+- Un garde qui recule en combat : marche arrière.
+- Entraînement chez Roland (`/city garde former`) : coups ou tirs animés.
+- Se déconnecter et revenir près des PNJ : ils sont animés tout de suite.
+- Si besoin : `journal = true` dans `config/citycore_epicfight.toml` (PNJ trouvés, marche/arrêt,
+  gestes), et ajuster `deplacements.course` si les PNJ courent trop ou pas assez.
+- Points incertains (non vérifiables hors jeu) : façon dont Youer présente les PNJ Citizens au
+  mod ; Epic Fight qui renverrait lui-même un autre mode pour les PNJ ; rendu exact des
+  animations de tir sans visée préalable.
 
 ## Phase 7 — Fêtes
 

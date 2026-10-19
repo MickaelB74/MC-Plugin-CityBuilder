@@ -92,12 +92,6 @@ public class CityCommand implements CommandExecutor {
     private com.citycore.jobs.JobsManager    jobs;
 
     /** Emplois des habitants chez les artisans. */
-    private com.citycore.city.CityMapExport mapExport;
-
-    public void setMapExport(com.citycore.city.CityMapExport mapExport) {
-        this.mapExport = mapExport;
-    }
-
     public void setJobs(com.citycore.jobs.JobsManager jobs) {
         this.jobs = jobs;
     }
@@ -549,24 +543,6 @@ public class CityCommand implements CommandExecutor {
                         }
                         default -> player.sendMessage("§cUsage : /city emplois [list|produire|recharger]");
                     }
-                }
-
-                // ── /city carte : bordures sur les cartes JourneyMap ──
-                case CARTE -> {
-                    if (mapExport == null) return true;
-                    String action = args.length >= 2 ? args[1].toLowerCase() : "";
-                    if (action.equals("recharger") || action.equals("reload")) {
-                        if (!player.isOp()) {
-                            player.sendMessage("§c❌ Réservé aux admins.");
-                            return true;
-                        }
-                        mapExport.reload();
-                        mapExport.export();
-                        player.sendMessage("§a✅ Réglages de la carte relus (section carte de config.yml) ; "
-                                + "les cartes suivent dans les 5 s.");
-                        return true;
-                    }
-                    mapExport.report().forEach(player::sendMessage);
                 }
 
                 // ── /city garde (phase 5) ────────────────────────

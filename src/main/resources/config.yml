@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 22
+config-version: 23
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -2005,21 +2005,6 @@ emplois:
   valeur-max: 20        # objet valant plus de 20 coins l'unité : jamais produit (têtes, étoile du Nether…)
   plafond: 50           # % de la capacité de l'entrepôt au-delà duquel les employés ne produisent plus cet objet
   vitesse: 1.0          # multiplicateur global (2 = cycles deux fois plus courts)
-
-# ============================================================
-#  CARTE — bordures de la ville sur les cartes des mods (JourneyMap)
-#  Le plugin écrit plugins/CityCore/carte.json (chunks revendiqués, revu toutes les 30 s) ;
-#  le mod serveur « CityCore — JourneyMap » (companions/citycore-journeymap) le lit et dessine
-#  la zone sur la carte plein écran et la minicarte de chaque joueur. À installer sur le
-#  serveur : JourneyMap + ce mod ; côté joueurs, JourneyMap suffit.
-# ============================================================
-carte:
-  activee: true        # false : la zone disparaît des cartes
-  nom: ""              # nom affiché sur la carte ; vide = nom de la ville
-  couleur: "F1CF5E"    # couleur RRGGBB (or de Valmont)
-  remplissage: 0.15    # opacité de l'intérieur (0 = transparent, 1 = opaque)
-  bordure: 0.9         # opacité du contour
-  epaisseur: 2.0       # épaisseur du contour, en pixels
 
 # ============================================================
 #  BÂTIMENTS — inspection des constructions (plan « Valmont vivante », phase 2)

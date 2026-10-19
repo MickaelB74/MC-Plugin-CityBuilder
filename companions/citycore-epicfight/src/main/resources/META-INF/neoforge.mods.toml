@@ -3,33 +3,33 @@ loaderVersion = "[4,)"
 license = "All rights reserved"
 
 [[mods]]
-modId = "citycore_journeymap"
+modId = "citycore_epicfight"
 version = "${version}"
-displayName = "CityCore — JourneyMap"
+displayName = "CityCore — Epic Fight"
 description = '''
-Dessine les bordures de la ville CityCore (plugin du serveur) sur la carte JourneyMap des joueurs.
-Mod côté serveur : les joueurs n'ont besoin que de JourneyMap.
+Donne aux PNJ du plugin CityCore (artisans, habitants, gardes, armées ennemies) les animations
+d'Epic Fight : marche, course, coups et tirs. Mod côté serveur : rien à installer chez les joueurs.
 '''
 # Mod du serveur seulement : un client qui ne l'a pas peut se connecter
 displayTest = "IGNORE_SERVER_VERSION"
 
-[[dependencies.citycore_journeymap]]
+[[dependencies.citycore_epicfight]]
 modId = "neoforge"
 type = "required"
 versionRange = "[21.1,)"
 ordering = "NONE"
 side = "BOTH"
 
-[[dependencies.citycore_journeymap]]
+[[dependencies.citycore_epicfight]]
 modId = "minecraft"
 type = "required"
 versionRange = "[1.21.1,1.21.2)"
 ordering = "NONE"
 side = "BOTH"
 
-# JourneyMap facultatif : sans lui, le mod ne fait rien (et le serveur démarre quand même)
-[[dependencies.citycore_journeymap]]
-modId = "journeymap"
+# Epic Fight facultatif : sans lui, le mod ne fait rien (et le serveur démarre quand même)
+[[dependencies.citycore_epicfight]]
+modId = "epicfight"
 type = "optional"
 versionRange = "*"
 ordering = "AFTER"

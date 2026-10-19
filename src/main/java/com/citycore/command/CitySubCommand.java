@@ -32,8 +32,6 @@ public enum CitySubCommand {
     EMPLOIS("emplois", "emplois [list|produire|recharger]",
             "Emplois des habitants chez les artisans : employés, annexes, cycles (produire, recharger : op)",
             "jobs", "travail"),
-    CARTE("carte", "carte [recharger]",
-            "Bordures de la ville sur les cartes JourneyMap : état ; relire les réglages (op)", "journeymap"),
     GARDE("garde", "garde [list|former <habitant> <rôle>|renvoyer <nom>|fin|kill <nom>|test [n] [rôle]|test retirer]",
             "Garde de la ville : formations chez Roland, gardes en patrouille (fin, kill, test : op)", "guard"),
     PROTO("proto", "proto <habitant|soldat|former|zombie|foule|tps|skins|clear>",

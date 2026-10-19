@@ -5,31 +5,27 @@ plugins {
 
 version = mod_version
 group = 'com.citycore'
-base { archivesName = 'citycore-journeymap' }
+base { archivesName = 'citycore-epicfight' }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-repositories {
-    // API JourneyMap (servie par le dépôt de BlameJared)
-    maven {
-        url = 'https://maven.blamejared.com'
-        content { includeGroup 'info.journeymap' }
-    }
-}
 
 neoForge {
     version = neo_version
     mods {
-        citycore_journeymap {
+        citycore_epicfight {
             sourceSet sourceSets.main
         }
     }
 }
 
 dependencies {
-    // Compilation seulement : à l'exécution, l'API est fournie par le mod JourneyMap
-    // (sa licence interdit de redistribuer ses classes)
-    compileOnly "info.journeymap:journeymap-api-neoforge:${journeymap_api_version}"
+    // Compilation seulement : à l'exécution, les classes viennent du mod Epic Fight installé
+    // (rien n'est recopié dans notre jar)
+    def epicFight = file(project.property('epicfight_jar'))
+    if (!epicFight.exists()) {
+        throw new GradleException("Jar d'Epic Fight introuvable : ${epicFight} (réglage epicfight_jar de gradle.properties)")
+    }
+    compileOnly files(epicFight)
 }
 
 tasks.withType(JavaCompile).configureEach {

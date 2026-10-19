@@ -66,7 +66,6 @@ public class CityCore extends JavaPlugin {
     private com.citycore.needs.NeedsManager needs;
     private com.citycore.jobs.JobsManager jobs;
     private com.citycore.city.CityChunkLoader chunkLoader;
-    private com.citycore.city.CityMapExport   mapExport;
 
     @Override
     public void onEnable() {
@@ -208,10 +207,6 @@ public class CityCore extends JavaPlugin {
         chunkLoader = new com.citycore.city.CityChunkLoader(this, cityManager);
         getServer().getPluginManager().registerEvents(chunkLoader, this);
         chunkLoader.start();
-
-        // ── Bordures de la ville pour les cartes des mods (JourneyMap, via le mod compagnon) ──
-        mapExport = new com.citycore.city.CityMapExport(this, cityManager);
-        mapExport.start();
 
         // ── Emplois : les habitants travaillent pour les artisans (annexes de travail) ──
         jobs = new com.citycore.jobs.JobsManager(this, buildingManager, buildingInspector, npcDataManager, market, inhabitants);
@@ -402,7 +397,6 @@ public class CityCore extends JavaPlugin {
         cityCommand.setSiege(siege, calendar);
         cityCommand.setNeeds(needs);
         cityCommand.setJobs(jobs);
-        cityCommand.setMapExport(mapExport);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);

@@ -72,7 +72,6 @@ public class CityTabCompleter implements TabCompleter {
                 case "emplois", "jobs", "travail" -> player.isOp()
                         ? List.of("list", "produire", "recharger")
                         : List.of("list");
-                case "carte", "journeymap" -> player.isOp() ? List.of("recharger") : new ArrayList<>();
                 case "garde", "guard" -> player.isOp()
                         ? List.of("list", "former", "renvoyer", "fin", "kill", "test")
                         : List.of("list", "former", "renvoyer");

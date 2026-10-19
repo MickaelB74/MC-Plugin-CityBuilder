@@ -260,7 +260,7 @@ public final class EnemyArmy implements Listener {
                         && now - s.lastSwing >= (s.champion ? 800 : 1000)) {
                     s.lastSwing = now;
                     s.npc.faceLocation(s.target.getEyeLocation());
-                    body.swingMainHand();
+                    com.citycore.inhabitant.NpcGestures.attack(body);
                     NpcCombat.strike(body, s.target, NpcCombat.meleeDamage(body));
                 }
             }
@@ -324,7 +324,7 @@ public final class EnemyArmy implements Listener {
         dir.normalize().multiply(1.9).add(new Vector(0, dist * 0.012, 0));
         Arrow arrow = body.launchProjectile(Arrow.class, dir);
         arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
-        body.swingMainHand();
+        com.citycore.inhabitant.NpcGestures.shot(body);
         body.getWorld().playSound(body.getLocation(), s.unit.weapon() == Material.CROSSBOW
                 ? Sound.ITEM_CROSSBOW_SHOOT : Sound.ENTITY_ARROW_SHOOT, 0.8f, 0.9f);
         Bukkit.getScheduler().runTaskLater(plugin, () -> { if (arrow.isValid()) arrow.remove(); }, 60L);

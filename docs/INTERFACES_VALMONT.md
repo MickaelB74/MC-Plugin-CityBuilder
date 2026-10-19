@@ -67,12 +67,6 @@ en petites capitales, barre de progression fine sous les objectifs.
     reste affiché) ; les barres des boss du jeu (dragon, Wither, raids) ne sont pas concernées, mais
     elles s'affichent sous la barre invisible du panneau (19 pixels plus bas qu'à l'habitude).
 
-Hors du pack de ressources : les **bordures de la ville sur la carte JourneyMap** (plein écran
-et minicarte) — zone teintée d'or (#F1CF5E), contour, nom de la ville, bulle au survol avec les
-parcelles et les habitants. Envoyées par le serveur (plugin + mod `citycore_journeymap`) ;
-réglages dans la section `carte`, état avec `/city carte`. Détails et installation :
-`docs/PLAN_VILLE_VIVANTE.md`, « Bordures de la ville sur les cartes ».
-
 ## Fonctionnement
 
 - Au démarrage, le plugin construit `plugins/CityCore/ui-pack/CityCore-UI.zip` à partir des images

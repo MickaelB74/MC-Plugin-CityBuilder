@@ -1128,7 +1128,7 @@ public class InhabitantManager implements Listener {
         if (beat == 3) return; // une pause dans le rythme
         GuardConfig.Role role = guard.role(inh.role);
         boolean ranged = role != null && role.ranged();
-        body.swingMainHand();
+        if (ranged) NpcGestures.shot(body); else NpcGestures.attack(body); // geste animé par Epic Fight si présent
         World w = body.getWorld();
         Location front = body.getEyeLocation().add(body.getEyeLocation().getDirection().multiply(1.2)).subtract(0, 0.4, 0);
         if (ranged) {
@@ -1239,7 +1239,7 @@ public class InhabitantManager implements Listener {
                         && now - lastSwing.getOrDefault(inh.id, 0L) >= SWING_COOLDOWN_MS) {
                     lastSwing.put(inh.id, now);
                     npc.faceLocation(enemy.getEyeLocation());
-                    body.swingMainHand();
+                    NpcGestures.attack(body);
                     NpcCombat.strike(body, enemy, NpcCombat.meleeDamage(body));
                 }
             }
@@ -1443,7 +1443,7 @@ public class InhabitantManager implements Listener {
         dir.normalize().multiply(1.9).add(new Vector(0, dist * 0.012, 0));
         Arrow arrow = body.launchProjectile(Arrow.class, dir);
         arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
-        body.swingMainHand();
+        NpcGestures.shot(body);
         body.getWorld().playSound(body.getLocation(), Sound.ENTITY_ARROW_SHOOT, 0.8f, 1.0f);
         Bukkit.getScheduler().runTaskLater(plugin, () -> { if (arrow.isValid()) arrow.remove(); }, 60L);
     }

@@ -1,4 +1,4 @@
-// Mod serveur NeoForge « CityCore — JourneyMap » : projet indépendant du plugin
+// Mod serveur NeoForge « CityCore — Epic Fight » : projet indépendant du plugin
 // (construit à part : ./gradlew build dans ce dossier).
 pluginManagement {
     repositories {
@@ -7,4 +7,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'citycore-journeymap'
+rootProject.name = 'citycore-epicfight'
