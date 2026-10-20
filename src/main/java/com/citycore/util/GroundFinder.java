@@ -40,6 +40,23 @@ public final class GroundFinder {
         return null;
     }
 
+    /**
+     * Point où se tenir en (x, z) à peu près à la hauteur y (de y + 2 à y - 3), au centre du bloc ;
+     * null s'il n'y en a pas. En ville, le bloc « le plus haut » est souvent un toit : on cherche
+     * ici près de la hauteur d'un combattant (places d'une formation, abords d'une mêlée). La
+     * colonne doit être dans un chunk chargé.
+     */
+    public static Location standAt(World world, int x, int y, int z) {
+        for (int dy = 2; dy >= -3; dy--) {
+            Block feet = world.getBlockAt(x, y + dy, z);
+            Block below = feet.getRelative(BlockFace.DOWN);
+            if (!standable(feet) || !standable(feet.getRelative(BlockFace.UP))) continue;
+            if (below.isLiquid() || !below.getType().isSolid() || isTree(below.getType())) continue;
+            return new Location(world, x + 0.5, y + dy, z + 0.5);
+        }
+        return null;
+    }
+
     /** Bloc traversable à hauteur de corps (air, herbes hautes, fleurs, neige fine). */
     private static boolean standable(Block block) {
         return block.isPassable() && !block.isLiquid() && !isTree(block.getType());

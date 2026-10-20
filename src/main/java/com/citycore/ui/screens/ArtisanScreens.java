@@ -248,8 +248,8 @@ public final class ArtisanScreens {
                     List.of("§7Vendez vos ressources.", "§7Le prix baisse quand son", "§7entrepôt se remplit."),
                     t -> gui.openSell(player));
             bigButton(c, 2, "btn_entrepot", "§6📦 Entrepôt",
-                    List.of("§7Réserves de " + npc.displayName + "§7.", "§7Rachetez-lui ses matières",
-                            "§7premières (non revendables)."),
+                    List.of("§7Réserves de " + npc.displayName + "§7.", "§7Servez-vous gratuitement",
+                            "§7(objets non revendables)."),
                     t -> gui.openInventory(player));
             bigButton(c, 3, "btn_boutique", "§b🛒 Boutique",
                     List.of("§7Ses fabrications et raretés.", "§7Produites à partir des stocks",
@@ -434,14 +434,26 @@ public final class ArtisanScreens {
                     "", "§eCliquez : ce qu'il faut pour monter de niveau"));
             bigButton(c, 1, "btn_logis", "§e🏠 Logis", logisLore, t -> kit.show(new AtelierView(player)));
 
+            // Mêmes actions que l'écran Actions : employés et annexe (tous les artisans), garde (Roland)
             List<String> actionLore = new ArrayList<>();
+            if (jobs != null && inhabitants != null) {
+                Building annex = jobs.annex(npc);
+                actionLore.addAll(List.of("§3⚒ Employés §7: des habitants travaillent", "§7pour lui et remplissent son entrepôt.",
+                        "§7Employés : §f" + inhabitants.employees(npc).size() + " §7/ §f" + jobs.maxEmployees(npc),
+                        annex == null ? "§7Annexe de travail : §eà créer"
+                                : "§7Annexe de travail : §f" + annex.name()));
+            }
             if (npc == CityNPC.GUARD && inhabitants != null) {
                 int rank = inhabitants.guardRank();
-                actionLore.addAll(List.of("§7Former des habitants de la ville", "§7à la garde (soldat, archer…).", "",
+                if (!actionLore.isEmpty()) actionLore.add("");
+                actionLore.addAll(List.of("§9🛡 La garde §7: former des habitants", "§7de la ville (soldat, archer…).",
                         "§7Garde : §f" + inhabitants.guardSize() + " §7/ §f" + inhabitants.guard().maxGuards(rank),
                         "§7Formations : §f" + inhabitants.trainees().size() + " §7/ §f" + inhabitants.guard().maxTraining(rank)));
-            } else {
+            }
+            if (actionLore.isEmpty()) {
                 actionLore.add("§7Aucune action pour l'instant.");
+            } else {
+                actionLore.addAll(List.of("", "§eCliquez pour ouvrir"));
             }
             bigButton(c, 2, "btn_actions", "§c🛡 Actions", actionLore, t -> kit.show(new ActionsView(player)));
             bigButton(c, 3, "btn_histoire", "§6📖 Son histoire", storyLore(), t -> tellStory(player));
@@ -754,7 +766,8 @@ public final class ArtisanScreens {
             boolean room = staff.size() < max;
             info(c, 7, "§3⚒ Employés de " + plain(npc.displayName), List.of(
                     "§7Cliquez sur un habitant pour l'embaucher.", "§7Le jour, il se rend à l'annexe de travail",
-                    "§7et remplit l'entrepôt à chaque cycle :", "§7un exemplaire de chaque objet racheté",
+                    "§7et remplit l'entrepôt à chaque cycle :",
+                    "§f" + fmtPerCycle(cfg.perCycle()) + " §7de chaque objet racheté",
                     "§7(les objets de valeur plus rarement).", "",
                     "§7Rang " + data.getLevel(npc) + " : §f" + max + " §7employé(s) au plus.",
                     "§7Il s'arrête à §f" + cfg.ceiling() + " %§7 de la capacité de l'entrepôt.",
@@ -942,7 +955,7 @@ public final class ArtisanScreens {
             if (inspector != null) help.addAll(com.citycore.building.BuildingRequirements.lore(
                     inspector.requirements().specFor(npc)));
             help.addAll(List.of("", "§7Ateliers sans habitant, libres ou", "§7réservés à " + plain(npc.displayName)
-                            + ". Créez-en un chez Alderic", "§7ou : §f/city build new atelier " + npc.skinId, "",
+                            + ". Créez-en un chez Alderic :", "§7« Bâtiments » → « Ajouter un bâtiment »", "",
                     "§a■ §7conforme  §6■ §7réservé à lui  §c■ §7incomplet"));
             info(c, 7, "§e🏠 Atelier de " + plain(npc.displayName), help);
             close(c);
@@ -1047,9 +1060,11 @@ public final class ArtisanScreens {
             back(c, 0, "Retour", () -> gui.open(player));
             c.sprite("rib_entrepot", sx(1), sy(0));
             info(c, 7, "§6📦 Entrepôt de " + npc.displayName, List.of(
-                    "§7Matières premières stockées,", "§7revendues au prix de revente.", "",
+                    "§7Réserve de la ville : y déposer", "§7(Vendre) est payé, s'y servir est",
+                    "§7gratuit. Ses employés la remplissent.", "",
                     "§a■ §7lot disponible   §6■ §7stock entamé   §c■ §7vide", "",
-                    "§8Objets achetés ici : non revendables."));
+                    "§eClic §7: un lot   §eMaj + clic §7: une pile",
+                    "§8Objets pris ici, et ce qu'on en fait :", "§8non revendables."));
             close(c);
 
             List<Map.Entry<Material, SellPrice>> entries = new ArrayList<>(config.getSellPrices().entrySet());
@@ -1061,7 +1076,7 @@ public final class ArtisanScreens {
                 c.sprite(stock >= sp.quantity() ? "ring_green" : stock > 0 ? "ring_amber" : "ring_red",
                         sx(col(i)), sy(row(i)));
                 item(col(i), row(i), UiItems.shown(mat, (stock > 0 ? "§f" : "§8") + VillagerGUI.formatName(mat),
-                        gui.stockLore(player, mat, sp), false), t -> actions.buyStock(player, mat));
+                        gui.stockLore(player, mat, sp), false), t -> actions.takeStock(player, mat, t.isShiftClick()));
             }
             pager(c, pg, pages(entries.size()), p -> kit.show(new Stock(player, p)));
             footer(c, true, "BOURSE : " + fmt(balance()));
@@ -1126,5 +1141,9 @@ public final class ArtisanScreens {
             pager(c, pg, pages(entries.size()), p -> kit.show(new Shop(player, p)));
             footer(c, true, "BOURSE : " + fmt(balance()));
         }
+    }
+    /** Exemplaires par cycle : « 8 », ou « 2,5 ». */
+    private static String fmtPerCycle(double n) {
+        return n == Math.rint(n) ? String.valueOf((long) n) : String.format(java.util.Locale.FRANCE, "%.1f", n);
     }
 }

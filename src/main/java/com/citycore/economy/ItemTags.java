@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Marquage des items vendus par les PNJ.
+ * Marquage des items vendus par les PNJ ou pris (gratuitement) dans leur entrepôt, et de ce qu'on
+ * fabrique avec (voir {@link TagPropagation}).
  *
  * Un item marqué :
  *   - ne peut pas être revendu à un PNJ (anti achat-revente) ;
@@ -40,11 +41,26 @@ public final class ItemTags {
 
     /** Marque l'item comme acheté chez un PNJ (+ ligne de lore explicative). */
     public static void tag(ItemStack item, String sellerName) {
+        mark(item, "§8Acheté chez " + sellerName + " §8— non revendable");
+    }
+
+    /** Marque l'item comme pris dans l'entrepôt d'un PNJ (gratuit, donc non revendable). */
+    public static void tagStock(ItemStack item, String npcName) {
+        mark(item, "§8Réserve de " + npcName + " §8— non revendable");
+    }
+
+    /** Marque un objet fabriqué ou cuit avec des objets marqués (sinon : entrepôt gratuit → pain → vente). */
+    public static void tagDerived(ItemStack item) {
+        if (isTagged(item)) return;
+        mark(item, "§8Fait avec des réserves de la ville §8— non revendable");
+    }
+
+    private static void mark(ItemStack item, String line) {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return;
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
-        lore.add("§8Acheté chez " + sellerName + " §8— non revendable");
+        lore.add(line);
         meta.setLore(lore);
         item.setItemMeta(meta);
     }
@@ -61,6 +77,34 @@ public final class ItemTags {
             count += item.getAmount();
         }
         return count;
+    }
+
+    /** Items non marqués d'une famille de matériaux (toutes laines, toutes chaises…). */
+    public static int countUntagged(Player player, Set<Material> mats) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item == null || !mats.contains(item.getType()) || isTagged(item)) continue;
+            count += item.getAmount();
+        }
+        return count;
+    }
+
+    /**
+     * Retire jusqu'à {@code amount} items non marqués d'une famille de matériaux.
+     * @return quantités réellement retirées, par matériau
+     */
+    public static java.util.Map<Material, Integer> removeUntagged(Player player, Set<Material> mats, int amount) {
+        java.util.Map<Material, Integer> removed = new java.util.LinkedHashMap<>();
+        int toRemove = amount;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (toRemove <= 0) break;
+            if (item == null || !mats.contains(item.getType()) || isTagged(item)) continue;
+            int take = Math.min(item.getAmount(), toRemove);
+            removed.merge(item.getType(), take, Integer::sum);
+            item.setAmount(item.getAmount() - take);
+            toRemove -= take;
+        }
+        return removed;
     }
 
     public static int countTagged(Player player, Material mat) {

@@ -57,6 +57,53 @@ public class CityQuestManager {
     /** Découpage actuel de la trame (nombre de chapitres). */
     public static final int TIER_SCHEME = 10;
 
+    /** Barème des parcelles : 1 = premier barème, 2 = grande ville (21/10/2026). */
+    public static final int CHUNK_SCHEME = 2;
+    /** Emplacements offerts par charte dans le premier barème (chapitres I à X). */
+    private static final int[] OLD_REWARD_CHUNKS = {6, 6, 8, 8, 10, 12, 14, 16, 20, 0};
+    /** Emplacements offerts par Alderic à la fondation dans le premier barème. */
+    private static final int OLD_FREE_CHUNKS = 6;
+
+    /**
+     * Passage au barème « grande ville » : une ville déjà fondée reçoit les emplacements que le
+     * nouveau barème lui aurait offerts en plus (cadeau d'Alderic et chartes déjà signées), pour
+     * ne pas racheter ce qu'une ville neuve reçoit gratuitement. Une seule fois ; sans ville, le
+     * barème est simplement noté. Les récompenses surchargées dans config.yml (city-tiers) ne
+     * donnent rien de plus.
+     */
+    public void migrateChunkScheme() {
+        try {
+            db.execute("ALTER TABLE city_level ADD COLUMN chunk_scheme INTEGER NOT NULL DEFAULT 1");
+        } catch (SQLException ignored) {
+            // colonne déjà présente
+        }
+        int scheme = db.queryInt("SELECT chunk_scheme FROM city_level WHERE id = 1", "chunk_scheme", CHUNK_SCHEME);
+        if (scheme >= CHUNK_SCHEME) return;
+        int granted = 0;
+        if (cityManager.isCityInitialized()) {
+            if (cityManager.isMayorGiftGiven()) granted += Math.max(0, cityManager.getFreeChunks() - OLD_FREE_CHUNKS);
+            int level = getCityLevel();
+            for (CityTier tier : CityTier.values()) {
+                if (tier.level >= level) break; // chartes déjà signées seulement
+                int before = plugin.getConfig().getInt("city-tiers." + tier.level + ".reward-chunks",
+                        OLD_REWARD_CHUNKS[tier.level - 1]);
+                granted += Math.max(0, rewardChunks(tier) - before);
+            }
+            if (granted > 0) cityManager.addBonusChunks(granted);
+        }
+        try (PreparedStatement ps = db.getConnection().prepareStatement(
+                "UPDATE city_level SET chunk_scheme = ? WHERE id = 1")) {
+            ps.setInt(1, CHUNK_SCHEME);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        if (granted > 0) {
+            plugin.getLogger().info("Parcelles : nouveau barème (grande ville), +" + granted
+                    + " emplacements offerts à la ville pour les chartes déjà signées.");
+        }
+    }
+
     /**
      * Passage de l'ancienne trame (7 chapitres) à la nouvelle (10) : le niveau enregistré est
      * converti vers le chapitre équivalent. Les quêtes gardent leurs identifiants, donc leur
@@ -320,60 +367,47 @@ public class CityQuestManager {
     }
 
     /**
-     * Réquisition : la caisse de la ville rachète aux artisans ce qu'ils ont en stock,
-     * au prix de revente, pour le chantier. Les items sont consommés par le chantier.
+     * Réquisition : le chantier puise dans les entrepôts des artisans (la réserve de la ville),
+     * gratuitement, comme un joueur qui s'y sert ; les plus gros stocks d'abord.
      *
      * @param execute false = simple estimation
      */
     public Requisition requisition(CityQuest quest, boolean execute) {
         int remaining = target(quest) - getProgress(quest.id());
-        if (remaining <= 0 || isCompleted(quest.id())) return new Requisition(0, 0, 0);
+        if (remaining <= 0 || isCompleted(quest.id())) return new Requisition(0, 0);
 
-        // Offres disponibles, de la moins chère à la plus chère
-        record Offer(CityNPC npc, Material mat, double unitPrice, int stock) {}
+        record Offer(CityNPC npc, Material mat, int stock) {}
         List<Offer> offers = new ArrayList<>();
         for (Map.Entry<CityNPC, VillagerConfig> e : market.configs().entrySet()) {
             for (Material mat : quest.materials()) {
-                SellPrice sp = e.getValue().getSellPrice(mat);
-                if (sp == null) continue;
+                if (e.getValue().getSellPrice(mat) == null) continue;
                 int stock = npcDataManager.getInventoryAmount(e.getKey(), mat);
-                if (stock <= 0) continue;
-                offers.add(new Offer(e.getKey(), mat,
-                        (double) market.resaleLotPrice(sp, false) / sp.quantity(), stock));
+                if (stock > 0) offers.add(new Offer(e.getKey(), mat, stock));
             }
         }
-        offers.sort(Comparator.comparingDouble(Offer::unitPrice));
+        offers.sort(Comparator.comparingInt(Offer::stock).reversed());
 
         int available = offers.stream().mapToInt(Offer::stock).sum();
-        int treasury  = cityManager.getCityCoins();
         int taken = 0;
-        double cost = 0;
         for (Offer o : offers) {
             if (taken >= remaining) break;
             int take = Math.min(o.stock(), remaining - taken);
-            // Limité par la caisse
-            while (take > 0 && Math.ceil(cost + take * o.unitPrice()) > treasury) take--;
-            if (take <= 0) break;
             if (execute) npcDataManager.removeFromInventory(o.npc(), o.mat(), take);
-            cost  += take * o.unitPrice();
             taken += take;
         }
-        int costInt = (int) Math.ceil(cost);
 
         if (execute && taken > 0) {
-            cityManager.removeCityCoins(costInt);
             int newVal = getProgress(quest.id()) + taken;
             setProgress(quest.id(), newVal, newVal >= target(quest));
         }
-        return new Requisition(taken, costInt, Math.min(available, remaining));
+        return new Requisition(taken, Math.min(available, remaining));
     }
 
     /**
      * @param taken     quantité réquisitionnée (ou réquisitionnable si estimation)
-     * @param cost      coût pour la caisse
      * @param available quantité disponible dans les stocks (plafonnée au reste à livrer)
      */
-    public record Requisition(int taken, int cost, int available) {}
+    public record Requisition(int taken, int available) {}
 
     /* =========================
        AMÉLIORATION DE LA VILLE

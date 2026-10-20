@@ -17,11 +17,15 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Joue le son "citycore:dragon" quand un joueur dépasse 400 blocs
- * d'altitude en chevauchant une entité (dragon custom ou autre).
+ * Joue le son "citycore:dragon" quand un joueur dépasse l'altitude dragon.min-height
+ * (500 par défaut) en chevauchant une entité (dragon custom ou autre).
  * Paramètres lus depuis config.yml (section "dragon").
+ * La quête d'Harold « Au-dessus des nuages » lit la même altitude : musique et quête vont ensemble.
  */
 public class DragonListener implements Listener {
+
+    /** Altitude par défaut du vol « au-dessus des nuages » (réglage dragon.min-height). */
+    public static final int DEFAULT_MIN_HEIGHT = 500;
 
     private final JavaPlugin plugin;
 
@@ -39,7 +43,7 @@ public class DragonListener implements Listener {
     private final Set<UUID>          mountedPlayers = new HashSet<>();
     /** Cooldown par joueur */
     private final Map<UUID, Long>    lastTriggered  = new HashMap<>();
-    /** Pour ne déclencher qu'à la montée (pas à chaque tick au-dessus de 400) */
+    /** Pour ne déclencher qu'à la montée (pas à chaque tick au-dessus de l'altitude) */
     private final Map<UUID, Boolean> wasAbove       = new HashMap<>();
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -53,7 +57,7 @@ public class DragonListener implements Listener {
     public void reload() {
         var cfg = plugin.getConfig();
         enabled     = cfg.getBoolean("dragon.enabled",           true);
-        minHeight   = cfg.getInt    ("dragon.min-height",        400);
+        minHeight   = cfg.getInt    ("dragon.min-height",        DEFAULT_MIN_HEIGHT);
         soundKey    = cfg.getString ("dragon.sound-key",         "citycore:dragon");
         soundVolume = (float) cfg.getDouble("dragon.sound-volume", 1.0);
         soundPitch  = (float) cfg.getDouble("dragon.sound-pitch",  1.0);

@@ -1,6 +1,7 @@
 package com.citycore.quest;
 
 import com.citycore.economy.MarketService;
+import com.citycore.npc.CityNPC;
 import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -25,7 +26,14 @@ import java.util.*;
  *     item-pool: [...]
  *     entity-pool:
  *       - {entity: ZOMBIE, base-amount: 8, value: 2}
+ *       - {entity: "mowziesmobs:umvuthana,mowziesmobs:umvuthana_raptor", nom: "Guerriers Umvuthana", base-amount: 4, value: 12}
  * </pre>
+ *
+ * Objets et créatures : vanilla ou « mod:id ». Un objectif peut accepter toute une famille :
+ * tag (« #minecraft:wool »), motif (« handcrafted:*_chair »), liste séparée par des virgules ;
+ * « nom » donne alors son libellé (« Laine (toutes couleurs) »). Une entrée dont rien n'existe
+ * sur le serveur (mod absent) est écartée ; « avec-mod » / « sans-mod » la réservent à un mod
+ * présent ou absent (contenu facultatif).
  *
  * Récompense = Σ (quantité × valeur unitaire) × prime (npc-quests.*-reward-premium).
  * La valeur unitaire vient du prix de rachat du PNJ acheteur, ou du champ "value".
@@ -49,6 +57,9 @@ public class QuestConfig {
     public int getMainXpRewardPerLevel()    { return mainXpRewardPerLevel; }
     public int getSpecialXpRewardPerLevel() { return specialXpRewardPerLevel; }
 
+    /** Entrées de toutes les quêtes, par habitant puis par objet / créature représentant (libellés, familles). */
+    private static final Map<String, QuestPoolEntry> ENTRIES = new java.util.concurrent.ConcurrentHashMap<>();
+
     public QuestConfig(JavaPlugin plugin, String configKey, MarketService market) {
         this.plugin    = plugin;
         this.configKey = configKey;
@@ -61,6 +72,7 @@ public class QuestConfig {
         specialItemPool.clear();
         specialEntityPool.clear();
         multipliers.clear();
+        ENTRIES.keySet().removeIf(k -> k.startsWith(configKey + "|"));
 
         plugin.saveDefaultConfig();
         var config = plugin.getConfig();
@@ -85,6 +97,45 @@ public class QuestConfig {
         specialXpRewardPerLevel = config.getInt(base + ".special.xp-reward-per-level", 60);
         loadPool(config.getMapList(base + ".special.item-pool"), specialItemPool, false);
         loadPool(config.getMapList(base + ".special.entity-pool"), specialEntityPool, true);
+        for (QuestPoolEntry e : allEntries()) ENTRIES.putIfAbsent(entryKey(configKey, e), e);
+    }
+
+    /* =========================
+       FAMILLES ET LIBELLÉS (lus par le suivi, les menus et la validation)
+       ========================= */
+
+    private static String entryKey(String configKey, QuestPoolEntry e) {
+        return configKey + "|" + (e.isEntity() ? "E:" + e.entity().name() : "M:" + e.material().name());
+    }
+
+    private static QuestPoolEntry entryOf(CityNPC npc, QuestObjective obj) {
+        if (npc == null || obj == null) return null;
+        String key = npc.skinId + "|" + (obj.isEntityObjective() ? "E:" + obj.entity().name()
+                : obj.isMaterialObjective() ? "M:" + obj.material().name() : "?");
+        return ENTRIES.get(key);
+    }
+
+    /** Objets acceptés pour un objectif (toute la famille si l'entrée en est une). */
+    public static Set<Material> acceptedMaterials(CityNPC npc, QuestObjective obj) {
+        QuestPoolEntry e = entryOf(npc, obj);
+        if (e != null && e.materials() != null && !e.materials().isEmpty()) return e.materials();
+        return obj.material() == null ? Set.of() : Set.of(obj.material());
+    }
+
+    /** Créatures acceptées pour un objectif de chasse. */
+    public static Set<EntityType> acceptedEntities(CityNPC npc, QuestObjective obj) {
+        QuestPoolEntry e = entryOf(npc, obj);
+        if (e != null && e.entities() != null && !e.entities().isEmpty()) return e.entities();
+        return obj.entity() == null ? Set.of() : Set.of(obj.entity());
+    }
+
+    /** Libellé d'un objectif (« Laine (toutes couleurs) », « Cultiste », « Oak Log »). */
+    public static String label(CityNPC npc, QuestObjective obj) {
+        QuestPoolEntry e = entryOf(npc, obj);
+        if (e != null && e.label() != null) return e.label();
+        if (obj.isMaterialObjective()) return com.citycore.integration.ItemIds.label(obj.material());
+        if (obj.isEntityObjective()) return com.citycore.integration.ItemIds.entityLabel(obj.entity());
+        return "?";
     }
 
     /** Le PNJ propose-t-il des quêtes ? */
@@ -153,12 +204,12 @@ public class QuestConfig {
      * Récompense maximale par unité livrée, par matériau (contrôle anti-arbitrage).
      */
     public Map<Material, Double> unitRewards() {
-        Map<Material, Double> map = new EnumMap<>(Material.class);
+        Map<Material, Double> map = new HashMap<>(); // matériaux de mods : pas d'EnumMap
         for (QuestPoolEntry e : mainItemPool) {
-            map.merge(e.material(), valueOf(e) * market.cfg().mainRewardPremium(), Math::max);
+            for (Material m : e.members()) map.merge(m, valueOf(e) * market.cfg().mainRewardPremium(), Math::max);
         }
         for (QuestPoolEntry e : specialItemPool) {
-            map.merge(e.material(), valueOf(e) * market.cfg().specialRewardPremium(), Math::max);
+            for (Material m : e.members()) map.merge(m, valueOf(e) * market.cfg().specialRewardPremium(), Math::max);
         }
         return map;
     }
@@ -209,10 +260,14 @@ public class QuestConfig {
         StringBuilder sb = new StringBuilder();
         for (QuestObjective obj : objectives) {
             if (sb.length() > 0) sb.append(", ");
+            QuestPoolEntry e = find(obj);
+            String label = e != null && e.label() != null ? e.label()
+                    : obj.isMaterialObjective() ? com.citycore.integration.ItemIds.label(obj.material())
+                    : com.citycore.integration.ItemIds.entityLabel(obj.entity());
             if (obj.isMaterialObjective()) {
-                sb.append(obj.amount()).append("x ").append(com.citycore.integration.ItemIds.label(obj.material()));
+                sb.append(obj.amount()).append("x ").append(label);
             } else {
-                sb.append("Tuer ").append(obj.amount()).append(" ").append(formatName(obj.entity().name()));
+                sb.append("Tuer ").append(obj.amount()).append(" ").append(label);
             }
         }
         return sb.toString();
@@ -221,24 +276,66 @@ public class QuestConfig {
     private void loadPool(List<Map<?, ?>> raw, List<QuestPoolEntry> target, boolean entities) {
         for (Map<?, ?> map : raw) {
             try {
+                // Contenu facultatif : objectif proposé seulement avec (ou sans) un mod
+                if (!com.citycore.integration.ModIntegrations.allows(text(map.get("avec-mod")), text(map.get("sans-mod")))) continue;
                 int baseAmt  = Integer.parseInt(String.valueOf(map.get("base-amount")));
                 double value = map.containsKey("value") ? Double.parseDouble(String.valueOf(map.get("value"))) : 0;
                 int minLevel = map.containsKey("min-level") ? Integer.parseInt(String.valueOf(map.get("min-level"))) : 1;
+                String label = text(map.get("nom"));
                 if (entities) {
-                    EntityType entity = EntityType.valueOf(String.valueOf(map.get("entity")).toUpperCase(Locale.ROOT));
-                    target.add(new QuestPoolEntry(null, entity, baseAmt, value, minLevel));
+                    String ids = String.valueOf(map.get("entity"));
+                    Set<EntityType> types = new LinkedHashSet<>();
+                    for (String id : ids.split(",")) {
+                        EntityType type = com.citycore.integration.ItemIds.resolveEntity(id);
+                        if (type != null) types.add(type);
+                        else if (!skippable(id)) warnEntry("créature inconnue " + id.trim());
+                    }
+                    if (types.isEmpty()) continue; // créature d'un mod absent : entrée écartée
+                    target.add(new QuestPoolEntry(null, types.iterator().next(), baseAmt, value, minLevel,
+                            null, Set.copyOf(types), label));
                 } else {
                     String id = String.valueOf(map.get("material"));
-                    Material mat = com.citycore.integration.ItemIds.resolve(id);
+                    Set<Material> mats = new LinkedHashSet<>();
+                    for (Material m : com.citycore.economy.MaterialGroups.resolveAny(id)) if (m.isItem()) mats.add(m);
                     // Objet d'un mod absent : l'entrée est simplement écartée (habitant inactif)
-                    if (mat == null && com.citycore.integration.ItemIds.isModId(id)) continue;
-                    if (mat == null) throw new IllegalArgumentException("matériau inconnu " + id);
-                    target.add(new QuestPoolEntry(mat, null, baseAmt, value, minLevel));
+                    if (mats.isEmpty()) {
+                        if (!skippable(id)) warnEntry("objet inconnu " + id);
+                        continue;
+                    }
+                    boolean family = id.startsWith("#") || id.contains("*") || id.contains(",");
+                    target.add(new QuestPoolEntry(mats.iterator().next(), null, baseAmt, value, minLevel,
+                            family ? Collections.unmodifiableSet(mats) : null, null, label));
                 }
             } catch (Exception e) {
-                plugin.getLogger().warning("[" + configKey + "] entrée de quête invalide : " + e.getMessage());
+                warnEntry(e.getMessage());
             }
         }
+    }
+
+    /**
+     * Identifiant d'un mod absent : l'entrée s'écarte sans alerte. Mod présent ou jeu de base :
+     * l'identifiant est faux (ou le mod a changé) et mérite un avertissement.
+     */
+    private static boolean skippable(String id) {
+        String ns = com.citycore.integration.ItemIds.namespace(id.trim().replace("#", "").replace("-", ""));
+        return !ns.equals("minecraft") && !com.citycore.integration.ModIntegrations.present(ns);
+    }
+
+    private void warnEntry(String message) {
+        plugin.getLogger().warning("[" + configKey + "] entrée de quête invalide : " + message + " (ignorée)");
+    }
+
+    private static String text(Object o) {
+        return o == null ? null : String.valueOf(o);
+    }
+
+    /** Entrée d'origine d'un objectif généré par ce PNJ. */
+    private QuestPoolEntry find(QuestObjective obj) {
+        for (QuestPoolEntry e : allEntries()) {
+            if (obj.isMaterialObjective() && !e.isEntity() && e.material() == obj.material()) return e;
+            if (obj.isEntityObjective() && e.isEntity() && e.entity() == obj.entity()) return e;
+        }
+        return null;
     }
 
     private String formatName(String name) {
@@ -250,8 +347,22 @@ public class QuestConfig {
         return sb.toString().trim();
     }
 
+    /**
+     * @param material  objet représentant (icône, identifiant de l'objectif), null pour une créature
+     * @param entity    créature représentante, null pour un objet
+     * @param materials famille d'objets acceptés (null = le seul représentant)
+     * @param entities  créatures acceptées (null = la seule représentante)
+     * @param label     libellé choisi dans config.yml (« nom »), null = nom de l'objet ou de la créature
+     */
     public record QuestPoolEntry(Material material, EntityType entity, int baseAmount,
-                                 double value, int minLevel) {
+                                 double value, int minLevel, Set<Material> materials,
+                                 Set<EntityType> entities, String label) {
         public boolean isEntity() { return entity != null; }
+
+        /** Objets acceptés (le représentant seul hors famille). */
+        public Set<Material> members() {
+            if (materials != null) return materials;
+            return material == null ? Set.of() : Set.of(material);
+        }
     }
 }

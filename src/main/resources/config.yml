@@ -6,20 +6,20 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 23
+config-version: 28
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
 # ============================================================
 city-expand:
   # Prix du premier emplacement acheté (hors emplacements offerts)
-  base-price: 150
-  # Chaque emplacement acheté coûte 8 % de plus que le précédent
-  multiplier: 1.08
+  base-price: 50
+  # Chaque emplacement acheté coûte 3 % de plus que le précédent
+  multiplier: 1.03
   # Plafond du prix d'un emplacement
-  max-price: 2500
+  max-price: 300
   # Emplacements offerts par Alderic à la fondation (une seule fois)
-  free-chunks: 6
+  free-chunks: 10
   # Coins versés dans la caisse à la fondation
   first-meeting-coins: 100
 
@@ -28,6 +28,8 @@ city-expand:
 #  Valeurs par défaut dans CityTier.java (charte = coût pour passer au palier suivant)
 #  Dix chapitres : 1→2 : 150 | 2→3 : 400 | 3→4 : 800 | 4→5 : 1500 | 5→6 : 2500
 #  6→7 : 4000 | 7→8 : 6000 | 8→9 : 8500 | 9→10 : 12000 (le dragon est vaincu au chapitre IX)
+#  Parcelles à revendiquer (chapitres I à VIII) : 12, 24, 40, 60, 85, 110, 140, 175 ; haut fait : 300
+#  Emplacements offerts par charte : 10, 12, 15, 18, 20, 25, 28, 32, 40 (et 10 à la fondation)
 # ============================================================
 city-tiers: {}
 #  Exemple :
@@ -71,27 +73,43 @@ ui-pack:
 
 # ============================================================
 #  MODS DU SERVEUR (serveur hybride mods + plugins, ex. Youer)
-#  Certains habitants dépendent d'un mod. Sans lui, ils se recrutent et
-#  s'installent, mais ne commercent pas et ne confient pas de quêtes.
+#  Certains habitants dépendent d'un mod (ou de deux). Sans lui, ils se recrutent et
+#  s'installent, mais ne commercent pas et ne confient pas de quêtes. D'autres gagnent
+#  seulement du contenu quand un mod est là (Gandalf, Robin des Bois, Indiana Jones).
 #  auto = détection | on = forcer « présent » | off = forcer « absent » (test)
+#  Bilan sur le serveur : /city mods
 # ============================================================
 mod-integrations:
   # Dragon Mounts Remastered (identifiant dmr) : Harold, le dresseur de dragons
   dmr: auto
   # Tax' Ocean Villager (identifiant taxov) : Jack Sparrow et les navires du large
   taxov: auto
+  # Légendes liées aux mods (sans leur mod : recrutées et installées, mais ni boutique ni quêtes)
+  toughasnails: auto       # Tough As Nails : Robinson Crusoé (chapitre I)
+  tide: auto               # Tide : Capitaine Achab (chapitre II)
+  wildernature: auto       # Wilder Nature : Obélix (avec Farmer's Delight) ; contenu en plus pour Robin des Bois
+  farmersdelight: auto     # Farmer's Delight : Obélix (avec Wilder Nature)
+  epicfight: auto          # Epic Fight : Miyamoto Musashi (chapitre IV)
+  handcrafted: auto        # Handcrafted : Geppetto (avec Furniture)
+  furniture: auto          # Furniture : Geppetto (avec Handcrafted)
+  irons_spellbooks: auto   # Iron's Spells 'n Spellbooks : Gandalf (facultatif : sans lui, magie vanilla)
+  smallships: auto         # Small Ships : Ragnar (chapitre VII)
+  valarian_conquest: auto  # Valarian Conquest : Jeanne d'Arc (chapitre VIII)
+  mowziesmobs: auto        # Mowzie's Mobs : Hercule (chapitre X)
+  mostructures: auto       # Mo' Structures : récits en plus pour Indiana Jones
+  ati_structures: auto     # ATi Structures : récits en plus pour Indiana Jones
 
 # ============================================================
 #  ÉCONOMIE DES PNJ
 #  - Ce qu'un joueur vend entre dans le stock du PNJ (capacité limitée).
 #  - Plus l'entrepôt est plein, moins il paie ; plein, il n'achète plus.
-#  - Le stock se revend au prix de rachat × resale-multiplier (toujours plus cher).
+#  - Le stock est la réserve de la ville : on s’y sert gratuitement (menu Entrepôt) ;
+#    ce qu’on y prend, et ce qu’on en fabrique, reste non revendable.
 #  - Les articles fabriqués consomment des ingrédients dans les stocks.
 #  - Les items achetés aux PNJ sont marqués : ni revendables, ni valables
 #    pour les quêtes des PNJ (mais utilisables pour bâtir et livrer les chantiers).
 # ============================================================
 npc-economy:
-  resale-multiplier: 2.0
   # Prix plein tant que le stock est sous ce % de la capacité
   full-price-until: 40
   # % du prix plein payé quand l'entrepôt est presque plein
@@ -114,7 +132,8 @@ npc-quests:
   special-reward-premium: 1.5
 
 # ============================================================
-#  SKINS DES PNJ (Alderic, Brennan, Jack Sparrow et Gandalf ont le leur dans le plugin)
+#  SKINS DES PNJ (Alderic, Brennan, Jack Sparrow, Gandalf et les légendes liées aux mods
+#  ont le leur dans le plugin)
 #  1. Sur https://mineskin.org, importez l'image du skin (ou le pseudo d'un joueur).
 #  2. Copiez « Texture Value » dans value et « Texture Signature » dans signature.
 #  3. Redémarrez : le skin s'applique au PNJ (même déjà présent) et à son portrait.
@@ -1185,6 +1204,7 @@ beatrice:
 #  ★ ROBIN DES BOIS — hors-la-loi (bonus, chapitre II)
 #  Il « redistribue » le butin des pillards : marchandises de seconde main
 #  nettement moins chères, mais en quantité limitée. Il rachète les fioles des capitaines pillards.
+#  Avec Wilder Nature (facultatif) : les cerfs du roi, la venaison, le tableau des primes.
 # ============================================================
 robin:
   xp-per-stack: 1
@@ -1209,9 +1229,11 @@ robin:
       - {material: GOLDEN_APPLE, price: 30, quantity: 1, supply: {max: 1, restock-minutes: 720}}
       - {material: IRON_HORSE_ARMOR, price: 22, quantity: 1, supply: {max: 1, restock-minutes: 720}}
       - {material: SADDLE, price: 12, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "wildernature:bounty_board", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
     4:
       - {material: BOW, price: 12, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {power: 2, unbreaking: 1}}
       - {material: CROSSBOW, price: 25, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {piercing: 3}}
+      - {material: "wildernature:fur_cloak", price: 90, quantity: 1, supply: {max: 1, restock-minutes: 720}}
     5:
       - {material: BOW, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 1440}, enchantments: {power: 4, punch: 1, unbreaking: 3}, name: "§2Arc de Sherwood"}
   quests:
@@ -1228,11 +1250,13 @@ robin:
       objectives-count: 2
       item-pool:
         - {material: OMINOUS_BOTTLE, base-amount: 1, min-level: 2}
+        - {material: "wildernature:venison", base-amount: 8, value: 0.75, min-level: 2}
       entity-pool:
         - {entity: PILLAGER, base-amount: 8, value: 4}
         - {entity: VINDICATOR, base-amount: 3, value: 8, min-level: 2}
         - {entity: EVOKER, base-amount: 1, value: 20, min-level: 4}
         - {entity: RAVAGER, base-amount: 1, value: 25, min-level: 5}
+        - {entity: "wildernature:deer", nom: "Cerfs du roi", base-amount: 5, value: 3}
 
 # ============================================================
 #  ★ JACK SPARROW — pirate (bonus, chapitre III)
@@ -1489,9 +1513,14 @@ docbrown:
         - {entity: CREEPER, base-amount: 6, value: 3}
 
 # ============================================================
-#  ★ GANDALF — mage (bonus, chapitre VIII)
-#  La magie et le Néant : perles de l'Ender, chorus, carapaces de shulker, échos, étoiles du Nether.
-#  Livres enchantés, yeux de l'Ender, tables d'enchantement, balises, totems.
+#  ★ GANDALF — magicien errant (bonus, chapitre VI : le voyageur des routes)
+#  Contenu selon le mod Iron's Spells 'n Spellbooks (identifiant irons_spellbooks, facultatif) :
+#   - sans le mod (« sans-mod ») : la magie vanilla — perles de l'Ender, livres enchantés, tables
+#     d'enchantement, balises ; l'End ne s'ouvre qu'au chapitre IX, ses objets sont aux rangs 4 et 5 ;
+#   - avec le mod (« avec-mod » ou objets « irons_spellbooks:… ») : encres, parchemins de sort,
+#     grimoires, mithril, tenue du sorcier ; récits contre les mages et les boss du mod.
+#  Raccommodage et totem d'immortalité restent au rang Maître dans les deux cas.
+#  Parchemins : « components » donne le sort et son niveau (format du mod, vérifié au démarrage).
 # ============================================================
 gandalf:
   xp-per-stack: 1
@@ -1499,67 +1528,120 @@ gandalf:
   level-thresholds: {2: 800, 3: 3000, 4: 8000, 5: 18000}
   # Rachat (joueur → PNJ) : prix d'un lot à pleine demande, taille du lot, capacité de l'entrepôt
   sell-prices:
-    ENDER_PEARL: {price: 6, quantity: 4, capacity: 256}
-    CHORUS_FRUIT: {price: 8, quantity: 32, capacity: 512}
-    SHULKER_SHELL: {price: 24, quantity: 2, capacity: 32}
-    ECHO_SHARD: {price: 10, quantity: 1, capacity: 32}
-    DRAGON_BREATH: {price: 8, quantity: 2, capacity: 32}
-    NETHER_STAR: {price: 150, quantity: 1, capacity: 4}
+    ENDER_PEARL: {price: 6, quantity: 4, capacity: 256, sans-mod: irons_spellbooks}
+    CHORUS_FRUIT: {price: 8, quantity: 32, capacity: 512, sans-mod: irons_spellbooks}
+    SHULKER_SHELL: {price: 24, quantity: 2, capacity: 32, sans-mod: irons_spellbooks}
+    ECHO_SHARD: {price: 10, quantity: 1, capacity: 32, sans-mod: irons_spellbooks}
+    DRAGON_BREATH: {price: 8, quantity: 2, capacity: 32, sans-mod: irons_spellbooks}
+    NETHER_STAR: {price: 150, quantity: 1, capacity: 4, sans-mod: irons_spellbooks}
+    # Avec Iron's Spells : l'essence des arcanes et le mithril (la ferraille vaut le quart d'un
+    # lingot : 1 lingot fondu donne 4 ferrailles, 4 ferrailles refont 1 lingot)
+    "irons_spellbooks:arcane_essence": {price: 12, quantity: 4, capacity: 128}
+    "irons_spellbooks:cinder_essence": {price: 10, quantity: 2, capacity: 64}
+    "irons_spellbooks:raw_mithril": {price: 12, quantity: 1, capacity: 32}
+    "irons_spellbooks:mithril_scrap": {price: 18, quantity: 1, capacity: 16}
+    LAPIS_LAZULI: {price: 8, quantity: 16, capacity: 512, avec-mod: irons_spellbooks}
+    AMETHYST_SHARD: {price: 8, quantity: 16, capacity: 512, avec-mod: irons_spellbooks}
   # Boutique : 'requires' = ingrédients pris dans un stock (cle_pnj:MATERIAU pour un autre artisan),
   #            'supply' = approvisionnement propre (max, +1 toutes les restock-minutes)
   shop:
     1:
-      - {material: ENDER_EYE, price: 14, quantity: 2, requires: {ENDER_PEARL: 2, "anselme:BLAZE_ROD": 1}}
-      - {material: EXPERIENCE_BOTTLE, price: 12, quantity: 4, supply: {max: 8, restock-minutes: 60}}
-      - {material: ENCHANTING_TABLE, price: 74, quantity: 1, requires: {"brennan:OBSIDIAN": 4, "isabeau:BOOK": 1, "godefroy:DIAMOND": 2}}
+      - {material: EXPERIENCE_BOTTLE, price: 12, quantity: 4, supply: {max: 8, restock-minutes: 60}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTING_TABLE, price: 74, quantity: 1, requires: {"brennan:OBSIDIAN": 4, "isabeau:BOOK": 1, "godefroy:DIAMOND": 2}, sans-mod: irons_spellbooks}
+      - {material: "irons_spellbooks:common_ink", price: 10, quantity: 1, supply: {max: 4, restock-minutes: 60}}
+      - {material: "irons_spellbooks:copper_spell_book", price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - material: "irons_spellbooks:scroll"
+        price: 25
+        quantity: 1
+        supply: {max: 2, restock-minutes: 120}
+        name: "§6Parchemin : Trait de feu §7(niv. 1)"
+        components: '[irons_spellbooks:spell_container={maxSpells:1,spellWheel:0b,mustEquip:0b,data:[{id:"irons_spellbooks:firebolt",index:0,level:1,locked:1b}]}]'
     2:
-      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {protection: 3}}
-      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {efficiency: 3}}
-      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {sharpness: 3}}
-      - {material: ENCHANTED_BOOK, price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {unbreaking: 2}}
-      - {material: ENCHANTED_BOOK, price: 35, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {feather_falling: 3}}
-      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {power: 3}}
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {protection: 3}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {efficiency: 3}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {sharpness: 3}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {unbreaking: 2}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 35, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {feather_falling: 3}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}, enchantments: {power: 3}, sans-mod: irons_spellbooks}
+      - {material: "irons_spellbooks:uncommon_ink", price: 25, quantity: 1, supply: {max: 3, restock-minutes: 120}}
+      - {material: "irons_spellbooks:gold_spell_book", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "irons_spellbooks:lightning_bottle", price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - material: "irons_spellbooks:scroll"
+        price: 45
+        quantity: 1
+        supply: {max: 2, restock-minutes: 240}
+        name: "§6Parchemin : Projectile magique §7(niv. 2)"
+        components: '[irons_spellbooks:spell_container={maxSpells:1,spellWheel:0b,mustEquip:0b,data:[{id:"irons_spellbooks:magic_missile",index:0,level:2,locked:1b}]}]'
     3:
-      - {material: ENCHANTED_BOOK, price: 70, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {fortune: 2}}
-      - {material: ENCHANTED_BOOK, price: 70, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {looting: 2}}
-      - {material: ENCHANTED_BOOK, price: 80, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {silk_touch: 1}}
-      - {material: ENCHANTED_BOOK, price: 50, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {respiration: 3}}
-      - {material: ENDER_CHEST, price: 38, quantity: 1, requires: {"brennan:OBSIDIAN": 8, ENDER_PEARL: 1, "anselme:BLAZE_ROD": 1}}
-      - {material: RECOVERY_COMPASS, price: 199, quantity: 1, requires: {ECHO_SHARD: 8, "thorvald:IRON_INGOT": 4, "godefroy:REDSTONE": 1}}
+      - {material: ENCHANTED_BOOK, price: 70, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {fortune: 2}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 70, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {looting: 2}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 80, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {silk_touch: 1}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 50, quantity: 1, supply: {max: 1, restock-minutes: 360}, enchantments: {respiration: 3}, sans-mod: irons_spellbooks}
+      - {material: RECOVERY_COMPASS, price: 199, quantity: 1, requires: {ECHO_SHARD: 8, "thorvald:IRON_INGOT": 4, "godefroy:REDSTONE": 1}, sans-mod: irons_spellbooks}
+      - {material: "irons_spellbooks:rare_ink", price: 60, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+      - {material: "irons_spellbooks:iron_spell_book", price: 160, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "irons_spellbooks:wizard_helmet", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "irons_spellbooks:wizard_chestplate", price: 90, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "irons_spellbooks:wizard_leggings", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "irons_spellbooks:wizard_boots", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - material: "irons_spellbooks:scroll"
+        price: 90
+        quantity: 1
+        supply: {max: 1, restock-minutes: 240}
+        name: "§6Parchemin : Soin §7(niv. 3)"
+        components: '[irons_spellbooks:spell_container={maxSpells:1,spellWheel:0b,mustEquip:0b,data:[{id:"irons_spellbooks:heal",index:0,level:3,locked:1b}]}]'
     4:
-      - {material: ENCHANTED_BOOK, price: 100, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {protection: 4}}
-      - {material: ENCHANTED_BOOK, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {efficiency: 5}}
-      - {material: ENCHANTED_BOOK, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {sharpness: 5}}
-      - {material: ENCHANTED_BOOK, price: 150, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {fortune: 3}}
-      - {material: ENCHANTED_BOOK, price: 90, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {unbreaking: 3}}
-      - {material: SHULKER_BOX, price: 57, quantity: 1, requires: {SHULKER_SHELL: 2, "bastien:#LOGS": 2}}
-      - {material: BEACON, price: 357, quantity: 1, requires: {NETHER_STAR: 1, "brennan:OBSIDIAN": 3, "leon:SAND": 5}}
+      # L'End s'ouvre au chapitre IX : ses objets attendent les rangs Expert et Maître
+      - {material: ENDER_EYE, price: 14, quantity: 2, requires: {ENDER_PEARL: 2, "anselme:BLAZE_ROD": 1}, sans-mod: irons_spellbooks}
+      - {material: ENDER_CHEST, price: 38, quantity: 1, requires: {"brennan:OBSIDIAN": 8, ENDER_PEARL: 1, "anselme:BLAZE_ROD": 1}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 100, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {protection: 4}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {efficiency: 5}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 120, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {sharpness: 5}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 150, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {fortune: 3}, sans-mod: irons_spellbooks}
+      - {material: ENCHANTED_BOOK, price: 90, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {unbreaking: 3}, sans-mod: irons_spellbooks}
+      - {material: SHULKER_BOX, price: 57, quantity: 1, requires: {SHULKER_SHELL: 2, "bastien:#LOGS": 2}, sans-mod: irons_spellbooks}
+      - {material: BEACON, price: 357, quantity: 1, requires: {NETHER_STAR: 1, "brennan:OBSIDIAN": 3, "leon:SAND": 5}, sans-mod: irons_spellbooks}
+      - {material: "irons_spellbooks:epic_ink", price: 150, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "irons_spellbooks:diamond_spell_book", price: 320, quantity: 1, supply: {max: 1, restock-minutes: 4320}}
+      - {material: "irons_spellbooks:mithril_ingot", price: 120, quantity: 1, requires: {"irons_spellbooks:mithril_scrap": 4}}
     5:
       - {material: ENCHANTED_BOOK, price: 250, quantity: 1, supply: {max: 1, restock-minutes: 720}, enchantments: {mending: 1}}
       - {material: TOTEM_OF_UNDYING, price: 400, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
-      - {material: END_CRYSTAL, price: 106, quantity: 4, requires: {"leon:SAND": 28, ENDER_PEARL: 4, "anselme:BLAZE_ROD": 2, "anselme:GHAST_TEAR": 4}}
+      - {material: END_CRYSTAL, price: 106, quantity: 4, requires: {"leon:SAND": 28, ENDER_PEARL: 4, "anselme:BLAZE_ROD": 2, "anselme:GHAST_TEAR": 4}, sans-mod: irons_spellbooks}
+      - {material: "irons_spellbooks:legendary_ink", price: 350, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "irons_spellbooks:netherite_spell_book", price: 650, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
   quests:
     quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
     main:
       xp-reward-per-level: 30
       objectives-count: 2
       item-pool:
-        - {material: ENDER_PEARL, base-amount: 8}
-        - {material: CHORUS_FRUIT, base-amount: 32}
-        - {material: BLAZE_ROD, base-amount: 4}
         - {material: LAPIS_LAZULI, base-amount: 32}
+        - {material: ENDER_PEARL, base-amount: 8, sans-mod: irons_spellbooks}
+        - {material: BLAZE_ROD, base-amount: 4, sans-mod: irons_spellbooks}
+        - {material: CHORUS_FRUIT, base-amount: 32, min-level: 4, sans-mod: irons_spellbooks}
+        - {material: AMETHYST_SHARD, base-amount: 32, avec-mod: irons_spellbooks}
+        - {material: BOOK, base-amount: 8, avec-mod: irons_spellbooks}
+        - {material: "irons_spellbooks:arcane_essence", base-amount: 8, min-level: 2}
+        - {material: "irons_spellbooks:raw_mithril", base-amount: 2, min-level: 3}
     special:
       xp-reward-per-level: 70
       objectives-count: 2
       item-pool:
-        - {material: SHULKER_SHELL, base-amount: 2, min-level: 2}
-        - {material: ECHO_SHARD, base-amount: 2, min-level: 3}
-        - {material: DRAGON_BREATH, base-amount: 4, min-level: 3}
-        - {material: NETHER_STAR, base-amount: 1, min-level: 5}
+        - {material: ECHO_SHARD, base-amount: 2, min-level: 3, sans-mod: irons_spellbooks}
+        - {material: SHULKER_SHELL, base-amount: 2, min-level: 4, sans-mod: irons_spellbooks}
+        - {material: DRAGON_BREATH, base-amount: 4, min-level: 4, sans-mod: irons_spellbooks}
+        - {material: NETHER_STAR, base-amount: 1, min-level: 5, sans-mod: irons_spellbooks}
+        - {material: "irons_spellbooks:cinder_essence", base-amount: 4, min-level: 2}
       entity-pool:
-        - {entity: ENDERMAN, base-amount: 8, value: 4}
-        - {entity: SHULKER, base-amount: 4, value: 8, min-level: 3}
-        - {entity: WITHER_SKELETON, base-amount: 4, value: 8, min-level: 2}
+        - {entity: ENDERMAN, base-amount: 8, value: 4, sans-mod: irons_spellbooks}
+        - {entity: WITHER_SKELETON, base-amount: 4, value: 8, min-level: 2, sans-mod: irons_spellbooks}
+        - {entity: SHULKER, base-amount: 4, value: 8, min-level: 5, sans-mod: irons_spellbooks}
+        - {entity: "irons_spellbooks:cultist", base-amount: 3, value: 6}
+        - {entity: "irons_spellbooks:pyromancer", base-amount: 2, value: 12}
+        - {entity: "irons_spellbooks:cryomancer", base-amount: 2, value: 12, min-level: 2}
+        - {entity: "irons_spellbooks:necromancer", base-amount: 2, value: 15, min-level: 3}
+        - {entity: "irons_spellbooks:archevoker", base-amount: 1, value: 30, min-level: 4}
 
 # ============================================================
 #  ★ GERALT DE RIV — sorceleur (bonus, chapitre X)
@@ -1759,6 +1841,551 @@ harold:
         - {entity: SHULKER, base-amount: 4, value: 8, min-level: 3}
 
 # ============================================================
+#  LÉGENDES LIÉES AUX MODS (quêtes bonus de la trame)
+#  Chacune dépend d'un mod (deux pour Obélix et Geppetto, voir mod-integrations). Sans lui, elle
+#  se recrute et s'installe, mais ne commerce pas et ne confie pas de quêtes ; ses objets notés
+#  « mod:objet » sont ignorés. Les blocs requis de son atelier sont vanilla, ceux du mod sont
+#  des bonus.
+#  Prix des ressources vanilla : ceux des autres artisans (aucun arbitrage) ; prix des objets
+#  de mods : à équilibrer en jeu.
+#  Familles d'objets : « #minecraft:wool » (tag), « handcrafted:*_chair » (motif), « -x » retire x ;
+#  dans une quête, « nom » donne le libellé de la famille.
+# ============================================================
+#  ★ ROBINSON CRUSOÉ — naufragé (bonus, chapitre I)
+#  Requiert Tough As Nails (toughasnails) : soif, température, gourdes, eau purifiée.
+#  La survie : l'eau douce, le chaud et le froid.
+# ============================================================
+robinson:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    CACTUS: {price: 2, quantity: 16, capacity: 512}
+    MELON_SLICE: {price: 2, quantity: 16, capacity: 512}
+    SWEET_BERRIES: {price: 3, quantity: 16, capacity: 512}
+    LEATHER: {price: 4, quantity: 4, capacity: 128}
+    "#minecraft:wool": {price: 4, quantity: 8, capacity: 256}
+    "#minecraft:leaves": {price: 2, quantity: 32, capacity: 1024}
+  shop:
+    1:
+      - {material: "toughasnails:purified_water_bottle", price: 3, quantity: 1, supply: {max: 6, restock-minutes: 20}}
+      - {material: "toughasnails:empty_leather_canteen", price: 12, quantity: 1, requires: {LEATHER: 2}}
+      - {material: "toughasnails:apple_juice", price: 6, quantity: 1, supply: {max: 4, restock-minutes: 60}}
+      - {material: "toughasnails:melon_juice", price: 6, quantity: 1, requires: {MELON_SLICE: 4}}
+    2:
+      - {material: "toughasnails:leather_purified_water_canteen", price: 20, quantity: 1, requires: {LEATHER: 2}}
+      - {material: "toughasnails:cactus_juice", price: 8, quantity: 1, requires: {CACTUS: 2}}
+      - {material: "toughasnails:leaf_helmet", price: 15, quantity: 1, requires: {"#minecraft:leaves": 8}}
+      - {material: "toughasnails:leaf_chestplate", price: 25, quantity: 1, requires: {"#minecraft:leaves": 16}}
+      - {material: "toughasnails:leaf_leggings", price: 20, quantity: 1, requires: {"#minecraft:leaves": 14}}
+      - {material: "toughasnails:leaf_boots", price: 15, quantity: 1, requires: {"#minecraft:leaves": 8}}
+    3:
+      - {material: "toughasnails:empty_iron_canteen", price: 45, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+      - {material: "toughasnails:wool_helmet", price: 20, quantity: 1, requires: {"#minecraft:wool": 5}}
+      - {material: "toughasnails:wool_chestplate", price: 35, quantity: 1, requires: {"#minecraft:wool": 8}}
+      - {material: "toughasnails:wool_leggings", price: 30, quantity: 1, requires: {"#minecraft:wool": 7}}
+      - {material: "toughasnails:wool_boots", price: 20, quantity: 1, requires: {"#minecraft:wool": 4}}
+      - {material: "toughasnails:charc_os", price: 10, quantity: 1, supply: {max: 4, restock-minutes: 60}}
+      - {material: "toughasnails:ice_cream", price: 10, quantity: 1, supply: {max: 4, restock-minutes: 60}}
+    4:
+      - {material: "toughasnails:gold_purified_water_canteen", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "toughasnails:thermometer", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "toughasnails:water_purifier", price: 150, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+    5:
+      - {material: "toughasnails:diamond_purified_water_canteen", price: 300, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "toughasnails:thermoregulator", price: 400, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - material: WRITTEN_BOOK
+        price: 30
+        quantity: 1
+        supply: {max: 1, restock-minutes: 1440}
+        name: "§aJournal de Robinson"
+        book:
+          title: "Journal de Robinson"
+          author: "Robinson Crusoé"
+          pages:
+            - "§lJournal de Robinson§r\n\nVingt-huit ans, deux mois et dix-neuf jours.\n\nVoici ce que l'île m'a appris, pour ceux qui reconstruisent Valmont."
+            - "§lL'eau§r\n\nL'eau des rivières rend malade. Faites-la bouillir sur un feu de camp, ou passez-la à l'épurateur : une fiole d'eau purifiée vaut un trésor."
+            - "§lLe chaud§r\n\nDans le désert, au plein midi, cherchez l'ombre et gardez une gourde pleine. Le jus de cactus désaltère quand l'eau manque."
+            - "§lLe froid§r\n\nSur les pics enneigés, la nuit tue plus sûrement qu'un loup. La laine tient chaud : capuche, polaire, pantalon, bottes."
+            - "§lVendredi§r\n\nUn ami vaut mieux que toutes les cabanes. Parlez aux villageois, échangez. On ne survit pas seul."
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: CACTUS, base-amount: 32}
+        - {material: MELON_SLICE, base-amount: 32}
+        - {material: SWEET_BERRIES, base-amount: 32}
+        - {material: LEATHER, base-amount: 8, min-level: 2}
+        - {material: "#minecraft:wool", nom: "Laine (toutes couleurs)", base-amount: 16, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: "toughasnails:purified_water_bottle", base-amount: 4, value: 1.2}
+        - {material: "toughasnails:cactus_juice", base-amount: 3, value: 3.5, min-level: 2}
+        - {material: "toughasnails:iron_purified_water_canteen", base-amount: 1, value: 20, min-level: 4}
+      entity-pool:
+        - {entity: HUSK, base-amount: 10, value: 2}
+        - {entity: STRAY, base-amount: 10, value: 2.5, min-level: 3}
+
+# ============================================================
+#  ★ CAPITAINE ACHAB — chasseur du grand poisson (bonus, chapitre II)
+#  Requiert Tide (tide) : plus de 100 poissons, pêche en grotte, dans la lave et dans l'End.
+#  Martin rachète les poissons vanilla, Achab ceux de Tide.
+# ============================================================
+achab:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    "tide:brook_trout": {price: 6, quantity: 8, capacity: 256}
+    "tide:carp": {price: 6, quantity: 8, capacity: 256}
+    "tide:bluegill": {price: 6, quantity: 8, capacity: 256}
+    "tide:anchovy": {price: 8, quantity: 16, capacity: 512}
+    "tide:catfish": {price: 6, quantity: 4, capacity: 128}
+    "tide:cave_eel": {price: 8, quantity: 2, capacity: 64}
+    "tide:deep_grouper": {price: 8, quantity: 1, capacity: 32}
+    "tide:coelacanth": {price: 40, quantity: 1, capacity: 16}
+    "tide:ash_perch": {price: 16, quantity: 2, capacity: 32}
+    "tide:ember_koi": {price: 20, quantity: 1, capacity: 16}
+    "tide:blazing_swordfish": {price: 50, quantity: 1, capacity: 8}
+    "tide:enderfin": {price: 50, quantity: 1, capacity: 8}
+  shop:
+    1:
+      - {material: "tide:bait", price: 6, quantity: 8, supply: {max: 4, restock-minutes: 60}}
+      - {material: "tide:fishing_line", price: 10, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: "tide:fishing_hook", price: 10, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: "tide:white_fishing_bobber", price: 5, quantity: 1, supply: {max: 3, restock-minutes: 60}}
+    2:
+      - {material: "tide:stone_fishing_rod", price: 25, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "tide:iron_fishing_rod", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "tide:feather_fishing_bobber", price: 12, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+    3:
+      - {material: "tide:golden_fishing_rod", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "tide:angling_table", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "tide:fish_display", price: 40, quantity: 1, supply: {max: 2, restock-minutes: 720}}
+    4:
+      - {material: "tide:diamond_fishing_rod", price: 260, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "tide:nautilus_fishing_bobber", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: TRIDENT, price: 320, quantity: 1, supply: {max: 1, restock-minutes: 1440}, enchantments: {impaling: 3}, name: "§bHarpon d'Achab"}
+    5:
+      - {material: "tide:netherite_fishing_rod", price: 520, quantity: 1, supply: {max: 1, restock-minutes: 4320}}
+      - {material: "tide:midas_fishing_rod", price: 650, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - {material: TRIDENT, price: 550, quantity: 1, supply: {max: 1, restock-minutes: 10080}, enchantments: {impaling: 5, loyalty: 3, unbreaking: 3}, name: "§bLe Harpon du Pequod"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: "tide:brook_trout", base-amount: 8}
+        - {material: "tide:carp", base-amount: 8}
+        - {material: "tide:bluegill", base-amount: 8}
+        - {material: "tide:anchovy", base-amount: 16}
+        - {material: "tide:catfish", base-amount: 4, min-level: 2}
+        - {material: "tide:cave_eel", base-amount: 3, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: "tide:deep_grouper", base-amount: 2, min-level: 2}
+        - {material: "tide:ash_perch", base-amount: 2, min-level: 4}
+        - {material: "tide:enderfin", base-amount: 1, min-level: 5}
+      entity-pool:
+        - {entity: DROWNED, base-amount: 10, value: 2}
+        - {entity: GUARDIAN, base-amount: 8, value: 6, min-level: 3}
+
+# ============================================================
+#  ★ OBÉLIX — livreur de menhirs (bonus, chapitre IV)
+#  Requiert Wilder Nature (wildernature) ET Farmer's Delight (farmersdelight) : s'il en manque
+#  un, il se recrute et s'installe sans commercer. Le gibier et les banquets.
+# ============================================================
+obelix:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    "wildernature:venison": {price: 6, quantity: 8, capacity: 256}
+    "wildernature:bison_meat": {price: 8, quantity: 8, capacity: 256}
+    "wildernature:turkey_meat": {price: 5, quantity: 8, capacity: 256}
+    PORKCHOP: {price: 5, quantity: 8, capacity: 256}
+    "farmersdelight:ham": {price: 4, quantity: 1, capacity: 64}
+    "wildernature:bison_horn": {price: 12, quantity: 1, capacity: 16}
+  shop:
+    1:
+      - {material: "wildernature:cooked_venison", price: 12, quantity: 4, requires: {"wildernature:venison": 4}}
+      - {material: "farmersdelight:flint_knife", price: 10, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: "farmersdelight:roast_chicken", price: 15, quantity: 1, supply: {max: 3, restock-minutes: 60}}
+    2:
+      - {material: "farmersdelight:smoked_ham", price: 18, quantity: 1, requires: {"farmersdelight:ham": 1}}
+      - {material: "farmersdelight:cooking_pot", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "farmersdelight:iron_knife", price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+    3:
+      - {material: "farmersdelight:roast_chicken_block", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "farmersdelight:stuffed_pumpkin_block", price: 70, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "wildernature:fur_cloak", price: 90, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+    4:
+      - {material: "farmersdelight:honey_glazed_ham_block", price: 140, quantity: 1, requires: {"farmersdelight:ham": 2}}
+      - {material: "farmersdelight:shepherds_pie_block", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "farmersdelight:diamond_knife", price: 150, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - material: SMOOTH_STONE
+        price: 25
+        quantity: 1
+        supply: {max: 2, restock-minutes: 720}
+        name: "§9Menhir d'Obélix"
+        lore:
+          - "§7Livré par Obélix en personne."
+          - "§7Il n'est pas lourd. Si, un peu."
+    5:
+      - material: POTION
+        price: 120
+        quantity: 1
+        supply: {max: 1, restock-minutes: 1440}
+        potion: STRONG_STRENGTH
+        name: "§9Potion magique"
+        lore:
+          - "§7Une gorgée, et l'on soulève des menhirs."
+          - "§7(Obélix n'y a pas droit.)"
+      - {material: "wildernature:bison_trophy", price: 250, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - {material: "farmersdelight:netherite_knife", price: 400, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: "wildernature:venison", base-amount: 16}
+        - {material: "wildernature:turkey_meat", base-amount: 16}
+        - {material: PORKCHOP, base-amount: 16}
+        - {material: "wildernature:bison_meat", base-amount: 8, min-level: 2}
+        - {material: "farmersdelight:ham", base-amount: 4, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: "farmersdelight:honey_glazed_ham", base-amount: 2, value: 10, min-level: 3}
+      entity-pool:
+        - {entity: "wildernature:boar", base-amount: 6, value: 3}
+        - {entity: "wildernature:deer", base-amount: 5, value: 3}
+        - {entity: "wildernature:bison", base-amount: 4, value: 5, min-level: 2}
+        - {entity: PILLAGER, nom: "Pillards (« des Romains »)", base-amount: 10, value: 3, min-level: 4}
+
+# ============================================================
+#  ★ MIYAMOTO MUSASHI — rōnin (bonus, chapitre IV : les sièges commencent)
+#  Requiert Epic Fight (epicfight) : tachis, uchigatana, épées longues, lances, tenue du vagabond,
+#  livres de compétences (« components » : la compétence apprise, format du mod).
+# ============================================================
+musashi:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    IRON_INGOT: {price: 12, quantity: 8, capacity: 256}
+    BAMBOO: {price: 4, quantity: 32, capacity: 1024}
+    STRING: {price: 4, quantity: 16, capacity: 512}
+    LEATHER: {price: 4, quantity: 4, capacity: 128}
+    GOLD_INGOT: {price: 10, quantity: 4, capacity: 64}
+  shop:
+    1:
+      - {material: "epicfight:bokken", price: 15, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+      - {material: "epicfight:iron_dagger", price: 25, quantity: 1, requires: {IRON_INGOT: 1}}
+      - {material: "epicfight:stray_hat", price: 20, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+    2:
+      - {material: "epicfight:iron_tachi", price: 60, quantity: 1, requires: {IRON_INGOT: 3}}
+      - {material: "epicfight:iron_spear", price: 50, quantity: 1, requires: {IRON_INGOT: 2}}
+      - {material: "epicfight:stray_robe", price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "epicfight:stray_pants", price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+    3:
+      - {material: "epicfight:uchigatana", price: 180, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "epicfight:iron_longsword", price: 70, quantity: 1, requires: {IRON_INGOT: 3}}
+      - {material: "epicfight:iron_greatsword", price: 90, quantity: 1, requires: {IRON_INGOT: 4}}
+      - {material: "epicfight:skillbook", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 1440}, name: "§cLivre de compétence : Parer", components: '[epicfight:skill="epicfight:parrying"]'}
+    4:
+      - {material: "epicfight:diamond_tachi", price: 260, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "epicfight:skillbook", price: 300, quantity: 1, supply: {max: 1, restock-minutes: 4320}, name: "§cLivre de compétence : Maître des épées", components: '[epicfight:skill="epicfight:swordmaster"]'}
+    5:
+      - {material: "epicfight:uchigatana", price: 600, quantity: 1, supply: {max: 1, restock-minutes: 10080}, enchantments: {sharpness: 5, unbreaking: 3}, name: "§cLe Sabre de Musashi"}
+      - {material: "epicfight:netherite_tachi", price: 520, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: IRON_INGOT, base-amount: 12}
+        - {material: BAMBOO, base-amount: 64}
+        - {material: STRING, base-amount: 24}
+        - {material: LEATHER, base-amount: 8, min-level: 2}
+        - {material: GOLD_INGOT, base-amount: 6, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      entity-pool:
+        - {entity: ZOMBIE, base-amount: 20, value: 1.5}
+        - {entity: SKELETON, base-amount: 15, value: 1.5}
+        - {entity: PILLAGER, base-amount: 10, value: 3, min-level: 2}
+        - {entity: VINDICATOR, base-amount: 6, value: 8, min-level: 3}
+        - {entity: WITHER_SKELETON, base-amount: 8, value: 8, min-level: 4}
+
+# ============================================================
+#  ★ GEPPETTO — maître ébéniste (bonus, chapitre V)
+#  Requiert Handcrafted (handcrafted) ET Furniture (furniture) : s'il en manque un, il se recrute
+#  et s'installe sans commercer. Le bois et le mobilier.
+# ============================================================
+geppetto:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    CHERRY_LOG: {price: 7, quantity: 16, capacity: 256}
+    "#minecraft:planks": {price: 6, quantity: 64, capacity: 2048}
+    "#minecraft:logs_that_burn": {price: 8, quantity: 32, capacity: 1024}
+    "#minecraft:wool": {price: 4, quantity: 8, capacity: 256}
+  shop:
+    1:
+      - {material: "handcrafted:oak_chair", price: 12, quantity: 1, requires: {"#minecraft:planks": 6}}
+      - {material: "handcrafted:oak_table", price: 18, quantity: 1, requires: {"#minecraft:planks": 8}}
+      - {material: "handcrafted:oak_bench", price: 14, quantity: 1, requires: {"#minecraft:planks": 6}}
+      - {material: "handcrafted:hammer", price: 20, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+    2:
+      - {material: "handcrafted:oak_drawer", price: 30, quantity: 1, requires: {"#minecraft:planks": 10}}
+      - {material: "handcrafted:oak_cupboard", price: 32, quantity: 1, requires: {"#minecraft:planks": 10}}
+      - {material: "handcrafted:oak_desk", price: 35, quantity: 1, requires: {"#minecraft:planks": 12}}
+      - {material: "handcrafted:white_cushion", price: 6, quantity: 1, requires: {"#minecraft:wool": 1}}
+      - {material: "handcrafted:red_cushion", price: 6, quantity: 1, requires: {"#minecraft:wool": 1}}
+      - {material: "handcrafted:blue_cushion", price: 6, quantity: 1, requires: {"#minecraft:wool": 1}}
+    3:
+      - {material: "handcrafted:oak_couch", price: 45, quantity: 1, requires: {"#minecraft:planks": 12, "#minecraft:wool": 2}}
+      - {material: "handcrafted:oak_fancy_bed", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "furniture:oak_clock", price: 40, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "furniture:lamp_white", price: 25, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+      - {material: "furniture:lamp_red", price: 25, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+    4:
+      - {material: "furniture:oak_grandfather_clock", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "furniture:iron_fish_tank", price: 150, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "handcrafted:fancy_painting", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+    5:
+      - {material: "furniture:telescope", price: 300, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - {material: "furniture:oak_wardrobe", price: 150, quantity: 1, supply: {max: 1, restock-minutes: 4320}}
+      - material: ARMOR_STAND
+        price: 50
+        quantity: 1
+        supply: {max: 1, restock-minutes: 10080}
+        name: "§6Pinocchio"
+        lore:
+          - "§7Un pantin de bois, bien sage."
+          - "§7Son nez ne bouge pas. Pour l'instant."
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: "#minecraft:planks", nom: "Planches (toutes essences)", base-amount: 64}
+        - {material: "#minecraft:logs_that_burn,-#minecraft:cherry_logs", nom: "Bûches (toutes essences)", base-amount: 32}
+        - {material: STICK, base-amount: 64, value: 0.05}
+        - {material: "#minecraft:wool", nom: "Laine (toutes couleurs)", base-amount: 16, min-level: 2}
+        - {material: CHERRY_LOG, base-amount: 16, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: "handcrafted:*_chair", nom: "Chaises (toutes essences)", base-amount: 4, value: 5}
+        - {material: "handcrafted:*_table", nom: "Tables (toutes essences)", base-amount: 2, value: 8}
+        - {material: "handcrafted:*_cushion", nom: "Coussins", base-amount: 4, value: 2, min-level: 2}
+        - {material: "furniture:lamp_*", nom: "Lampes", base-amount: 2, value: 10, min-level: 3}
+        - {material: "furniture:*_grandfather_clock", nom: "Horloge comtoise", base-amount: 1, value: 50, min-level: 4}
+
+# ============================================================
+#  ★ RAGNAR — roi des mers du Nord (bonus, chapitre VII)
+#  Requiert Small Ships (smallships) : cogues, drakkars, galères et bricks à construire et à
+#  piloter, voiles, canons. Version du serveur (2.0.0-b2.1) : ni barque à rames ni galère de
+#  guerre — la cogue ouvre la boutique, le drakkar de Ragnar la couronne.
+# ============================================================
+ragnar:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    SPRUCE_LOG: {price: 10, quantity: 32, capacity: 1024}
+    "#minecraft:planks": {price: 6, quantity: 64, capacity: 2048}
+    "#minecraft:wool": {price: 4, quantity: 8, capacity: 256}
+    STRING: {price: 4, quantity: 16, capacity: 512}
+    IRON_INGOT: {price: 12, quantity: 8, capacity: 256}
+    GUNPOWDER: {price: 4, quantity: 8, capacity: 256}
+  shop:
+    1:
+      - {material: "smallships:spruce_cog", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "smallships:sail", price: 20, quantity: 1, requires: {"#minecraft:wool": 3}}
+      - material: HONEY_BOTTLE
+        price: 6
+        quantity: 1
+        supply: {max: 4, restock-minutes: 60}
+        name: "§3Hydromel"
+        lore:
+          - "§7La boisson des rois du Nord."
+          - "§7À boire dans un crâne, de préférence."
+    2:
+      - {material: "smallships:cannon_ball", price: 24, quantity: 8, requires: {GUNPOWDER: 4, IRON_INGOT: 2}}
+      - {material: IRON_AXE, price: 60, quantity: 1, supply: {max: 1, restock-minutes: 480}, enchantments: {sharpness: 2}, name: "§3Hache de raid"}
+    3:
+      - {material: "smallships:spruce_drakkar", price: 400, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "smallships:cannon", price: 180, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+    4:
+      - {material: "smallships:dark_oak_galley", price: 600, quantity: 1, supply: {max: 1, restock-minutes: 4320}}
+      - {material: "smallships:spruce_brigg", price: 700, quantity: 1, supply: {max: 1, restock-minutes: 4320}}
+    5:
+      - {material: "smallships:dark_oak_drakkar", price: 900, quantity: 1, supply: {max: 1, restock-minutes: 10080}, name: "§3Le Dragon de Ragnar"}
+      - {material: NETHERITE_AXE, price: 550, quantity: 1, supply: {max: 1, restock-minutes: 10080}, enchantments: {sharpness: 5, unbreaking: 3}, name: "§3Hache de Ragnar"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: SPRUCE_LOG, base-amount: 48}
+        - {material: "#minecraft:wool", nom: "Laine (toutes couleurs)", base-amount: 24}
+        - {material: STRING, base-amount: 24}
+        - {material: IRON_INGOT, base-amount: 12, min-level: 2}
+        - {material: GUNPOWDER, base-amount: 12, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: "smallships:cannon_ball", base-amount: 16, value: 1.2, min-level: 2}
+      entity-pool:
+        - {entity: DROWNED, base-amount: 10, value: 2}
+        - {entity: PILLAGER, base-amount: 12, value: 3}
+        - {entity: GUARDIAN, base-amount: 8, value: 6, min-level: 3}
+        - {entity: RAVAGER, base-amount: 2, value: 25, min-level: 4}
+
+# ============================================================
+#  ★ JEANNE D'ARC — cheffe de guerre (bonus, chapitre VIII : la cathédrale)
+#  Requiert Valarian Conquest (valarian_conquest ; ses soldats sont déclarés sous
+#  « ethans_custom_mod ») : épées et boucliers des factions, armures templières, engins de siège.
+#  Les parchemins de citoyenneté ne sont pas vendus : ils servent à un récit.
+# ============================================================
+jeanne:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    IRON_INGOT: {price: 12, quantity: 8, capacity: 256}
+    LEATHER: {price: 4, quantity: 4, capacity: 128}
+    ARROW: {price: 4, quantity: 32, capacity: 1024}
+    GUNPOWDER: {price: 4, quantity: 8, capacity: 256}
+    GOLD_INGOT: {price: 10, quantity: 4, capacity: 64}
+  shop:
+    1:
+      - {material: "valarian_conquest:mercenary_sword", price: 40, quantity: 1, requires: {IRON_INGOT: 2}}
+      - {material: "valarian_conquest:mercenary_shield", price: 35, quantity: 1, requires: {IRON_INGOT: 1}}
+      - {material: WHITE_BANNER, price: 12, quantity: 1, supply: {max: 2, restock-minutes: 120}, name: "§eÉtendard de Jeanne", lore: ["§7« Jhesus Maria »", "§7Il a mené une armée jusqu'à Reims."]}
+    2:
+      - {material: "valarian_conquest:valarian_sword", price: 70, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "valarian_conquest:valarian_shield", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "valarian_conquest:ballista_arrow", price: 20, quantity: 8, supply: {max: 2, restock-minutes: 120}}
+      - {material: "valarian_conquest:valarian_banner", price: 15, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+    3:
+      - {material: "valarian_conquest:templar_sword", price: 160, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "valarian_conquest:templar_shield", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "valarian_conquest:templar_armor_1_helmet", price: 140, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "valarian_conquest:catapult_rock", price: 30, quantity: 8, supply: {max: 2, restock-minutes: 240}}
+    4:
+      - {material: "valarian_conquest:templar_armor_2_chestplate", price: 280, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "valarian_conquest:cannon_ball", price: 40, quantity: 8, requires: {GUNPOWDER: 4}}
+      - {material: "valarian_conquest:ballista_spawn_egg", price: 600, quantity: 1, supply: {max: 1, restock-minutes: 4320}}
+    5:
+      - {material: "valarian_conquest:catapult_spawn_egg", price: 1200, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - {material: "valarian_conquest:cannon_spawn_egg", price: 1500, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - {material: "valarian_conquest:templar_sword", price: 550, quantity: 1, supply: {max: 1, restock-minutes: 10080}, enchantments: {sharpness: 5, unbreaking: 3}, name: "§eL'Épée de Fierbois"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: IRON_INGOT, base-amount: 12}
+        - {material: ARROW, base-amount: 48, value: 0.09}
+        - {material: LEATHER, base-amount: 12}
+        - {material: GUNPOWDER, base-amount: 12, min-level: 2}
+        - {material: GOLD_INGOT, base-amount: 6, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      entity-pool:
+        - {entity: PILLAGER, base-amount: 12, value: 3}
+        - {entity: VINDICATOR, base-amount: 6, value: 8}
+        - {entity: EVOKER, base-amount: 2, value: 20, min-level: 2}
+        - {entity: "valarian_conquest:troll", base-amount: 1, value: 40, min-level: 3}
+        - {entity: RAVAGER, base-amount: 2, value: 25, min-level: 4}
+
+# ============================================================
+#  ★ HERCULE — demi-dieu (bonus, chapitre X, avec les hauts faits)
+#  Requiert Mowzie's Mobs (mowziesmobs) : Foliaath, Umvuthana, Ferrous Wroughtnaut, Frostmaw,
+#  Umvuthi, Naga… Les monstres légendaires et leurs trophées.
+# ============================================================
+hercule:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 600, 3: 2400, 4: 6000, 5: 13000}
+  sell-prices:
+    "mowziesmobs:foliaath_seed": {price: 20, quantity: 1, capacity: 16}
+    "mowziesmobs:naga_fang": {price: 40, quantity: 1, capacity: 16}
+    "mowziesmobs:ice_crystal": {price: 120, quantity: 1, capacity: 4}
+    BONE: {price: 4, quantity: 16, capacity: 512}
+    LEATHER: {price: 4, quantity: 4, capacity: 128}
+  shop:
+    1:
+      - {material: "mowziesmobs:dart", price: 12, quantity: 16, supply: {max: 3, restock-minutes: 60}}
+      - {material: "mowziesmobs:blowgun", price: 40, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "mowziesmobs:spear", price: 50, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+    2:
+      - material: LEATHER_CHESTPLATE
+        price: 60
+        quantity: 1
+        supply: {max: 1, restock-minutes: 480}
+        enchantments: {protection: 2}
+        name: "§dPeau du lion de Némée"
+        lore:
+          - "§7Aucune flèche ne l'a jamais percée."
+        components: '[minecraft:dyed_color={rgb:13144128}]'
+      - {material: "mowziesmobs:naga_fang_dagger", price: 120, quantity: 1, requires: {"mowziesmobs:naga_fang": 1}}
+    3:
+      - {material: "mowziesmobs:geomancer_beads", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "mowziesmobs:geomancer_robe", price: 120, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "mowziesmobs:geomancer_belt", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "mowziesmobs:geomancer_sandals", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+    4:
+      - {material: "mowziesmobs:foliaath_seed", price: 40, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "mowziesmobs:wrought_helmet", price: 600, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+    5:
+      - {material: "mowziesmobs:wrought_axe", price: 1200, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - {material: MACE, price: 900, quantity: 1, supply: {max: 1, restock-minutes: 10080}, enchantments: {density: 4, unbreaking: 3}, name: "§dLa Massue d'Hercule"}
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 30
+      objectives-count: 2
+      item-pool:
+        - {material: BONE, base-amount: 32}
+        - {material: LEATHER, base-amount: 16}
+        - {material: STRING, base-amount: 24}
+        - {material: IRON_INGOT, base-amount: 12, min-level: 2}
+        - {material: DIAMOND, base-amount: 3, min-level: 3}
+    special:
+      xp-reward-per-level: 70
+      objectives-count: 2
+      item-pool:
+        - {material: "mowziesmobs:naga_fang", base-amount: 2, min-level: 4}
+      entity-pool:
+        - {entity: "mowziesmobs:foliaath", base-amount: 3, value: 8}
+        - {entity: "mowziesmobs:umvuthana,mowziesmobs:umvuthana_raptor,mowziesmobs:umvuthana_crane", nom: "Guerriers Umvuthana", base-amount: 4, value: 10, min-level: 2}
+        - {entity: "mowziesmobs:naga", base-amount: 2, value: 25, min-level: 3}
+        - {entity: "mowziesmobs:grottol", base-amount: 1, value: 40, min-level: 4}
+
+# ============================================================
 #  SOMMET — Summit Listener
 # ============================================================
 summit:
@@ -1871,6 +2498,8 @@ soldats:
   vitesse-patrouille: 0.6                     # vitesse de ronde (1 = un joueur ; en combat, ils courent)
   vision: 16                                  # distance à laquelle un garde repère un monstre
   portee-arc: 14                              # distance de tir des archers
+  groupe-taille: 6                            # siège : gardes par groupe ; chaque groupe tient un secteur du front, puis va à la rencontre d'une escouade ennemie
+  max-par-cible: 3                            # gardes au contact d'un même ennemi au plus (les autres en choisissent un autre ou se tiennent prêts ; 0 = sans limite)
   roles:
     soldat:  {nom: "Soldat",  rang: 1, minutes: 10, vie: 30, combat: melee,    arme: IRON_SWORD,    casque: IRON_HELMET,    plastron: IRON_CHESTPLATE,      jambieres: IRON_LEGGINGS,    bottes: IRON_BOOTS}
     archer:  {nom: "Archer",  rang: 2, minutes: 15, vie: 24, combat: distance, arme: BOW,           casque: LEATHER_HELMET, plastron: CHAINMAIL_CHESTPLATE, jambieres: LEATHER_LEGGINGS, bottes: LEATHER_BOOTS}
@@ -1895,6 +2524,10 @@ evenements:
 #  (et aux joueurs, voir joueurs-blesses), sinon marchent sur la mairie. Ils apparaissent hors
 #  de la ville, d'un côté de la lisière (annoncé : « au nord »…), vague après vague ; les gardes
 #  accourent de ce côté. Barre rouge en haut de l'écran.
+#  Chaque vague arrive progressivement, par escouades réparties sur toute la largeur du front ;
+#  chaque escouade avance sur sa voie, en formation derrière son meneur. La garde se répartit en
+#  groupes (soldats.groupe-taille) qui vont chacun à la rencontre d'une escouade : plusieurs
+#  mêlées à la fois plutôt qu'une ruée sur un seul point.
 #  Victoire : toutes les vagues repoussées dans le temps imparti → récompense dans la caisse et
 #  XP pour Roland. Sinon, les assaillants se retirent sans rien rapporter.
 #  Dès l'alerte et pendant les répits, la garde prend position sur ce front ; à la fin, elle
@@ -1907,6 +2540,12 @@ sieges:
   pause-vagues-secondes: 30  # répit entre deux vagues
   duree-minutes: 20          # au-delà, le siège est perdu (les assaillants se retirent)
   distance-apparition: 12    # blocs au-delà de la lisière où apparaissent les assaillants
+  arrivee-secondes: 15       # chaque vague arrive progressivement, escouade après escouade, sur cette durée (0 = d'un coup)
+  largeur-front: 40          # largeur (blocs) de la zone d'apparition, le long de la lisière attaquée
+  points-entree: 4           # points d'entrée répartis sur cette largeur (1 à 8 ; au sol, hors de la ville)
+  # Escouades : min à max assaillants autour d'un meneur (tireurs en retrait), chacune sur sa voie ;
+  # max-par-cible : assaillants au contact d'un même défenseur au plus (0 = sans limite)
+  escouades: {min: 4, max: 8, max-par-cible: 3}
   joueurs-blesses: true      # pendant un siège, monstres et soldats ennemis peuvent blesser les joueurs, même en ville
   vagues: {1: 2, 4: 3, 7: 4, 9: 5}   # nombre de vagues selon le palier de la ville
   # Assaillants par vague : (base + par-palier × palier) × (1 + par-joueur × (joueurs connectés - 1)), max au plus
@@ -1992,19 +2631,44 @@ besoins:
 #  Chez un artisan installé : gestion (clic sur son portrait) → Actions → Employés (menu commun à
 #  tous les joueurs) et Annexe de travail (zone créée comme un bâtiment, avec ses exigences et ses
 #  niveaux). Le jour, un employé se rend à l'annexe ; à chaque cycle, il ajoute à l'entrepôt de
-#  l'artisan un exemplaire de chaque objet que celui-ci rachète (les objets de valeur plus
-#  rarement). La nuit, il dort. Production seulement quand un joueur est connecté.
+#  l'artisan par-cycle exemplaires de chaque objet que celui-ci rachète (les objets de valeur plus
+#  rarement) : la ville récolte pour les joueurs, qui se servent gratuitement dans l'entrepôt.
+#  Ordre de grandeur : ≈ une pile par heure de chaque objet courant pour un employé (annexe
+#  niveau 1), ≈ 360 avec 3 employés et une annexe niveau 5. La nuit, il dort. Production
+#  seulement quand un joueur est connecté.
 #  Bilan : /city emplois. Test (op) : /city emplois produire.
 #  ÉQUILIBRAGE : nombre d'employés, durée des cycles, valeur des objets, plafond de l'entrepôt.
 # ============================================================
 emplois:
   employes-max: {1: 1, 2: 2, 3: 2, 4: 3, 5: 3}     # employés au plus par artisan, selon son rang
-  cycle-minutes: {1: 6, 2: 5, 3: 4, 4: 3.5, 5: 3}  # durée d'un cycle selon le niveau de l'annexe (de jour seulement)
-  par-cycle: 1          # exemplaires de chaque objet courant produits par employé et par cycle
+  cycle-minutes: {1: 4, 2: 3.5, 3: 3, 4: 2.5, 5: 2}  # durée d'un cycle selon le niveau de l'annexe (de jour seulement)
+  par-cycle: 8          # exemplaires de chaque objet courant produits par employé et par cycle
   valeur-pleine: 0.5    # objet valant au plus 0,5 coin l'unité : produit à chaque cycle ; au-delà, chance = 0,5 / valeur
   valeur-max: 20        # objet valant plus de 20 coins l'unité : jamais produit (têtes, étoile du Nether…)
   plafond: 50           # % de la capacité de l'entrepôt au-delà duquel les employés ne produisent plus cet objet
   vitesse: 1.0          # multiplicateur global (2 = cycles deux fois plus courts)
+
+# ============================================================
+#  CARTE — parcelles de la ville sur les cartes JourneyMap
+#  Le plugin écrit plugins/CityCore/carte.json à chaque claim, unclaim ou fondation (et le revoit
+#  toutes les 30 s) ; le mod serveur « CityCore — Compagnon » (companions/citycore-companion) le
+#  lit et dessine la ville sur la carte plein écran et la minicarte de chaque joueur : chaque
+#  parcelle teintée, contour extérieur de la ville, nom au centre, bulle au survol, quadrillage
+#  des chunks en option. À installer sur le serveur : JourneyMap (6.0.5 ou plus) + ce mod ; côté
+#  joueurs, JourneyMap suffit. État : /city carte ; relire ces réglages : /city carte recharger.
+# ============================================================
+carte:
+  activee: true                # false : la ville disparaît des cartes
+  nom: ""                      # nom affiché sur la carte ; vide = nom de la ville
+  couleur: "F1CF5E"            # couleur RRGGBB du remplissage et du contour (or de Valmont)
+  remplissage: 0.15            # opacité du remplissage de chaque parcelle (0 = transparent, 1 = opaque)
+  bordure: 0.9                 # opacité du contour extérieur de la ville
+  epaisseur: 2.0               # épaisseur du contour extérieur, en pixels
+  minicarte: true              # false : carte plein écran seulement
+  quadrillage: true            # contour fin de chaque parcelle (chunk), sous le contour de la ville
+  quadrillage-couleur: ""      # couleur RRGGBB du quadrillage ; vide = couleur de la ville
+  quadrillage-opacite: 0.35    # opacité du quadrillage
+  quadrillage-epaisseur: 1.0   # épaisseur du quadrillage, en pixels
 
 # ============================================================
 #  BÂTIMENTS — inspection des constructions (plan « Valmont vivante », phase 2)
@@ -2229,9 +2893,12 @@ batiments:
         - {bloc: ENCHANTING_TABLE, nombre: 1, nom: "table d'enchantement"}
         - {bloc: BOOKSHELF, nombre: 4, nom: "bibliothèque", pluriel: "bibliothèques"}
       bonus:
-        - {bloc: AMETHYST_CLUSTER, nom: "améthyste"}
-        - {bloc: END_ROD, nom: "bâton de l'End"}
-        - {bloc: "#candles", nom: "bougies"}
+        - {bloc: AMETHYST_CLUSTER, nom: "améthyste", sans-mod: irons_spellbooks}
+        - {bloc: END_ROD, nom: "bâton de l'End", sans-mod: irons_spellbooks}
+        - {bloc: "#candles", nom: "bougies", sans-mod: irons_spellbooks}
+        - {bloc: "irons_spellbooks:inscription_table", nom: "table d'inscription"}
+        - {bloc: "irons_spellbooks:scroll_forge", nom: "forge à parchemins"}
+        - {bloc: "irons_spellbooks:alchemist_cauldron", nom: "chaudron d'alchimiste"}
     geralt:
       requis:
         - {bloc: GRINDSTONE, nombre: 1, nom: "meule"}
@@ -2252,11 +2919,89 @@ batiments:
         - {bloc: BLUE_ICE, nom: "glace bleue"}
         - {bloc: OBSIDIAN, nom: "obsidienne"}
         - {bloc: DRAGON_HEAD, nom: "tête de dragon"}
+    # Légendes liées aux mods : blocs requis vanilla, blocs des mods en bonus
+    robinson:
+      toit: 30
+      requis:
+        - {bloc: "#cauldrons", nombre: 1, nom: "chaudron"}
+        - {bloc: "#campfires", nombre: 1, nom: "feu de camp", pluriel: "feux de camp"}
+      bonus:
+        - {bloc: COMPOSTER, nom: "composteur"}
+        - {bloc: "toughasnails:water_purifier", nom: "épurateur d'eau"}
+        - {bloc: "toughasnails:rain_collector", nom: "collecteur de pluie"}
+    achab:
+      toit: 30
+      requis:
+        - {bloc: WATER, nombre: 4, nom: "bloc d'eau", pluriel: "blocs d'eau (accès à l'eau)"}
+        - {bloc: BARREL, nombre: 2, nom: "tonneau", pluriel: "tonneaux"}
+      bonus:
+        - {bloc: BELL, nom: "cloche"}
+        - {bloc: "tide:angling_table", nom: "table de pêche"}
+        - {bloc: "tide:fish_display", nom: "présentoir à poisson"}
+    obelix:
+      requis:
+        - {bloc: "#campfires", nombre: 1, nom: "feu de camp", pluriel: "feux de camp"}
+        - {bloc: SMOKER, nombre: 1, nom: "fumoir"}
+        - {bloc: BARREL, nombre: 2, nom: "tonneau", pluriel: "tonneaux"}
+      bonus:
+        - {bloc: "farmersdelight:cooking_pot", nom: "marmite"}
+        - {bloc: "farmersdelight:skillet", nom: "poêle à frire"}
+        - {bloc: "wildernature:deer_trophy", nom: "trophée de cerf"}
+    musashi:
+      requis:
+        - {bloc: GRINDSTONE, nombre: 1, nom: "meule"}
+        - {bloc: TARGET, nombre: 1, nom: "cible"}
+        - {bloc: "BAMBOO_BLOCK,STRIPPED_BAMBOO_BLOCK,BAMBOO_PLANKS,BAMBOO_MOSAIC", nombre: 4, nom: "bloc de bambou", pluriel: "blocs de bambou"}
+      bonus:
+        - {bloc: "farmersdelight:tatami", nom: "tatami"}
+        - {bloc: "LANTERN,SOUL_LANTERN", nom: "lanterne"}
+        - {bloc: "POTTED_AZALEA_BUSH,POTTED_FLOWERING_AZALEA_BUSH", nom: "azalée en pot"}
+    geppetto:
+      requis:
+        - {bloc: CRAFTING_TABLE, nombre: 1, nom: "établi"}
+        - {bloc: GRINDSTONE, nombre: 1, nom: "meule"}
+        - {bloc: "#planks", nombre: 16, nom: "planche", pluriel: "planches (toutes essences)"}
+      bonus:
+        - {bloc: "handcrafted:*_table", nom: "table"}
+        - {bloc: "furniture:*_grandfather_clock", nom: "horloge comtoise"}
+        - {bloc: "furniture:lamp_*", nom: "lampe"}
+    ragnar:
+      toit: 30
+      requis:
+        - {bloc: WATER, nombre: 4, nom: "bloc d'eau", pluriel: "blocs d'eau (accès à l'eau)"}
+        - {bloc: CRAFTING_TABLE, nombre: 1, nom: "établi"}
+        - {bloc: SPRUCE_PLANKS, nombre: 16, nom: "planche d'épicéa", pluriel: "planches d'épicéa"}
+      bonus:
+        - {bloc: "#banners", nom: "bannière"}
+        - {bloc: BELL, nom: "cloche"}
+        - {bloc: BARREL, nom: "tonneau"}
+    jeanne:
+      requis:
+        - {bloc: CARTOGRAPHY_TABLE, nombre: 1, nom: "table de cartographie"}
+        - {bloc: "#banners", nombre: 2, nom: "bannière", pluriel: "bannières"}
+        - {bloc: "#anvil", nombre: 1, nom: "enclume"}
+      bonus:
+        - {bloc: "valarian_conquest:templar_banner", nom: "bannière templière"}
+        - {bloc: "valarian_conquest:spikes", nom: "piques"}
+        - {bloc: "valarian_conquest:templar", nom: "table templière"}
+    hercule:
+      requis:
+        - {bloc: "#anvil", nombre: 1, nom: "enclume"}
+        - {bloc: TARGET, nombre: 1, nom: "cible"}
+        - {bloc: CHISELED_STONE_BRICKS, nombre: 4, nom: "brique de pierre sculptée", pluriel: "briques de pierre sculptées"}
+      bonus:
+        - {bloc: QUARTZ_PILLAR, nom: "colonne de quartz"}
+        - {bloc: "#campfires", nom: "feu de camp"}
+        - {bloc: "#banners", nom: "bannière"}
 
 # ============================================================
 #  DIALOGUES DES PNJ (texte écrit lettre par lettre au-dessus de la barre d’objets)
-#  La barre d’action ne tient que sur une ligne : une réplique plus longue est coupée entre
-#  deux mots et affichée en morceaux successifs, le nom du personnage repris à chaque fois.
+#  Joueurs équipés du pack : les lettres apparaissent l’une après l’autre à partir d’un bord gauche
+#  fixe ; une ligne s’arrête à largeur-pixels et la suite passe à la ligne (deux lignes, puis une
+#  page de deux lignes de plus pour les très longues). Sans le pack, la barre d’action ne tient qu’une
+#  ligne : la réplique est coupée entre deux mots et affichée en morceaux successifs, le nom du
+#  personnage repris à chaque fois.
 # ============================================================
 dialogues:
-  largeur: 58   # caractères au plus par morceau (interface à l’échelle 4 en 1080p : environ 75)
+  largeur: 58   # sans le pack : caractères au plus par morceau (interface à l’échelle 4 en 1080p : environ 75)
+  largeur-pixels: 400   # avec le pack : largeur d’une ligne en pixels d’interface (écran à l’échelle 4 en 1080p : 479)

@@ -5,7 +5,6 @@ import org.bukkit.configuration.file.FileConfiguration;
 /**
  * Réglages globaux de l'économie des PNJ (sections npc-economy et npc-quests de config.yml).
  *
- * @param resaleMultiplier         prix de revente du stock = prix de rachat × multiplicateur
  * @param fullPriceUntil           % de remplissage de l'entrepôt sous lequel le PNJ paie plein tarif
  * @param minPricePercent          % du prix plein payé quand l'entrepôt est presque plein
  * @param consumptionPercentPerHour % de la capacité consommé par heure (joueurs connectés), 0 = off
@@ -20,7 +19,6 @@ import org.bukkit.configuration.file.FileConfiguration;
  * @param specialRewardPremium     idem pour les quêtes spéciales
  */
 public record EconomyConfig(
-        double resaleMultiplier,
         int    fullPriceUntil,
         int    minPricePercent,
         double consumptionPercentPerHour,
@@ -35,7 +33,6 @@ public record EconomyConfig(
 ) {
     public static EconomyConfig load(FileConfiguration cfg) {
         return new EconomyConfig(
-                Math.max(1.0, cfg.getDouble("npc-economy.resale-multiplier", 2.0)),
                 clamp(cfg.getInt("npc-economy.full-price-until", 40), 0, 99),
                 clamp(cfg.getInt("npc-economy.min-price-percent", 35), 1, 100),
                 Math.max(0, cfg.getDouble("npc-economy.consumption-percent-per-hour", 8)),

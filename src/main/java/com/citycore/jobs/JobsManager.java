@@ -30,7 +30,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * dans la limite de son rang. Ils travaillent dans son annexe de travail (bâtiment « Annexe »
  * créé depuis ses Actions, avec ses exigences et ses niveaux). Le jour seulement, quand un joueur
  * est connecté, chaque employé produit à chaque cycle (plus court quand l'annexe monte de niveau)
- * un exemplaire de chaque objet que l'artisan rachète.
+ * par-cycle exemplaires (8 par défaut) de chaque objet que l'artisan rachète : la ville récolte
+ * pour les joueurs, qui se servent gratuitement dans l'entrepôt.
  *
  * Garde-fous d'équilibrage :
  *  - nombre d'employés limité par le rang de l'artisan, cycle de plusieurs minutes, travail le

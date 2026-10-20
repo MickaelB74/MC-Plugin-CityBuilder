@@ -466,8 +466,18 @@ public class QuestManager {
                         objectives.add(QuestObjective.ofMaterial(mat, amount));
                     }
 
-                    case "E" -> objectives.add(
-                            QuestObjective.ofEntity(EntityType.valueOf(o[1]), amount));
+                    case "E" -> {
+                        // Créature d'un mod désinstallé depuis : la quête est écartée proprement
+                        EntityType creature;
+                        try {
+                            creature = EntityType.valueOf(o[1]);
+                        } catch (IllegalArgumentException e) {
+                            plugin.getLogger().warning("Quête « " + id + " » ignorée : créature " + o[1]
+                                    + " introuvable (mod désinstallé ?).");
+                            return null;
+                        }
+                        objectives.add(QuestObjective.ofEntity(creature, amount));
+                    }
 
                     case "B" -> objectives.add(                 // ← NOUVEAU
                             QuestObjective.ofBiome(Biome.valueOf(o[1]), amount));

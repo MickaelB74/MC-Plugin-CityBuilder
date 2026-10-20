@@ -69,7 +69,10 @@ public final class QuestScreens {
 
     public boolean openPersonal(Player p, NPCPersonalQuestGUI personalGUI) {
         QuestGUI gui = quests.get(personalGUI.getNpc());
-        return gui != null && actions != null && kit.active(p) && kit.show(new Stories(p, gui, personalGUI));
+        // Rafraîchissement après un clic : la page affichée est gardée
+        int page = p.getOpenInventory().getTopInventory().getHolder() instanceof Stories shown
+                && shown.npc == personalGUI.getNpc() ? shown.page : 0;
+        return gui != null && actions != null && kit.active(p) && kit.show(new Stories(p, gui, personalGUI, page));
     }
 
     /* =========================
@@ -96,6 +99,14 @@ public final class QuestScreens {
                 if (v != null) v.open(player); else player.closeInventory();
             });
             c.sprite("rib_quetes_pnj", sx(1), sy(0));
+            // Ruban « Quêtes » : ouvre le journal (habitants suivis, affichage du suivi des quêtes)
+            if (gui.hasJournal()) {
+                zone(1, 0, 6, 1, "§6📋 Journal de quêtes", List.of(
+                        "§7Quêtes suivies et affichage du suivi :",
+                        "§7visible, accroché à la liste des",
+                        "§7joueurs (Tab) ou masqué.",
+                        "", "§e▶ Cliquez pour ouvrir"), t -> gui.openJournal(player));
+            }
             info(c, 7, "§d📜 Quêtes de " + npc.displayName, List.of(
                     "§7Principale : repos de §f" + market.cfg().mainCooldownMinutes() + " min §7après validation",
                     "§7Spéciale : repos de §f" + market.cfg().specialCooldownMinutes() + " min",
@@ -219,12 +230,15 @@ public final class QuestScreens {
         private final QuestGUI            gui;
         private final NPCPersonalQuestGUI personalGUI;
         private final CityNPC             npc;
+        /** Page affichée : 5 récits sur une seule page, sinon 4 par page et les flèches en bas. */
+        private final int                 page;
 
-        Stories(Player p, QuestGUI gui, NPCPersonalQuestGUI personalGUI) {
+        Stories(Player p, QuestGUI gui, NPCPersonalQuestGUI personalGUI, int page) {
             super(QuestScreens.this.kit, p);
             this.gui         = gui;
             this.personalGUI = personalGUI;
             this.npc         = personalGUI.getNpc();
+            this.page        = page;
         }
 
         @Override
@@ -244,10 +258,15 @@ public final class QuestScreens {
             UUID uuid = player.getUniqueId();
             int level = data.getLevel(npc);
             List<CityNPC.RankedQuest> all = npc.getAllPersonalQuests();
-            for (int i = 0; i < Math.min(5, all.size()); i++) {
-                CityNPC.RankedQuest ranked = all.get(i);
+            // Plus de 5 récits (récits ajoutés par un mod) : 4 par page, flèches sur la dernière rangée
+            int perPage = all.size() <= 5 ? 5 : 4;
+            int pages = Math.max(1, (all.size() + perPage - 1) / perPage);
+            int pg = Math.max(0, Math.min(page, pages - 1));
+            if (pages > 1) pager(c, pg, pages, p -> kit.show(new Stories(player, gui, personalGUI, p)));
+            for (int i = 0; i < perPage && pg * perPage + i < all.size(); i++) {
+                CityNPC.RankedQuest ranked = all.get(pg * perPage + i);
                 NPCPersonalQuest quest = ranked.quest();
-                int row = 1 + i, index = i;
+                int row = 1 + i, index = pg * perPage + i;
                 if (ranked.level() > level) {
                     lockedRow(c, row, quest, ranked.level());
                     continue;

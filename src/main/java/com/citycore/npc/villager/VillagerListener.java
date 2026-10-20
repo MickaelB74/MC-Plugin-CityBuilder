@@ -182,7 +182,7 @@ public class VillagerListener implements Listener {
         }
         if (VillagerGUI.titleInventory(npcType).equals(title)) {
             if (slot == VillagerGUI.SLOT_BACK) { gui.open(player); return; }
-            handleStockPurchase(player, clicked);
+            handleStockPurchase(player, clicked, event.isShiftClick());
             return;
         }
         if (VillagerGUI.titleShop(npcType).equals(title)) {
@@ -309,8 +309,14 @@ public class VillagerListener implements Listener {
             citizen.getNavigator().cancelNavigation();
         }
 
-        // Dialogue building_assign (variante si l'habitant est lié à un mod absent)
+        // Dialogue building_assign (variante si l'habitant est lié à un mod absent, ou enrichi par
+        // un mod facultatif présent : building_assign_mod)
         List<String> lines = gui.isAvailable() ? npcType.getDialogue("building_assign") : List.of();
+        if (gui.isAvailable() && !npcType.optionalMods.isEmpty()
+                && npcType.optionalMods.stream().allMatch(com.citycore.integration.ModIntegrations::present)
+                && !npcType.getDialogue("building_assign_mod").isEmpty()) {
+            lines = npcType.getDialogue("building_assign_mod");
+        }
         if (lines.isEmpty()) lines = npcType.getDialogue("building_assign_unavailable");
         if (lines.isEmpty()) lines = npcType.getDialogue("building_assign");
         if (!lines.isEmpty()) {
@@ -379,38 +385,34 @@ public class VillagerListener implements Listener {
        ENTREPÔT (STOCK → JOUEUR)
        ========================= */
 
-    private void handleStockPurchase(Player player, ItemStack clicked) {
+    private void handleStockPurchase(Player player, ItemStack clicked, boolean stack) {
         Material mat = materialOf(clicked);
-        if (mat != null) buyStock(player, mat);
+        if (mat != null) takeStock(player, mat, stack);
     }
 
-    /** Rachète un lot de matière première dans l'entrepôt du PNJ (objet marqué non revendable). */
-    public void buyStock(Player player, Material mat) {
+    /**
+     * Prend dans l'entrepôt du PNJ, gratuitement : un lot, ou une pile entière ({@code stack}).
+     * L'entrepôt est la réserve de la ville (y déposer est payé, s'y servir ne coûte rien) ; l'objet
+     * est marqué non revendable, sans quoi on pourrait le revendre aussitôt au PNJ.
+     */
+    public void takeStock(Player player, Material mat, boolean stack) {
         SellPrice sp = gui.getConfig().getSellPrice(mat);
         if (sp == null) return;
 
         int stock = dataManager.getInventoryAmount(npcType, mat);
-        if (stock < sp.quantity()) {
-            player.sendMessage("§c❌ Stock insuffisant.");
+        int wanted = stack ? Math.max(sp.quantity(), mat.getMaxStackSize()) : sp.quantity();
+        int amount = Math.min(stock, wanted);
+        if (amount <= 0) {
+            player.sendMessage("§c❌ Réserve vide.");
             return;
         }
+        if (!dataManager.removeFromInventory(npcType, mat, amount)) return;
 
-        int price = market.resaleLotPrice(sp, market.isEmployee(player, npcType));
-        if (!economy.has(player, price)) {
-            player.sendMessage("§c❌ Fonds insuffisants. Nécessaire : §f" + price + " coins");
-            return;
-        }
-        if (!dataManager.removeFromInventory(npcType, mat, sp.quantity())) return;
-        economy.withdrawPlayer(player, price);
-
-        ItemStack bought = new ItemStack(mat, sp.quantity());
-        ItemTags.tag(bought, plainName());
-        ItemTags.give(player, bought);
-
-        int xpGained = price * gui.getConfig().getXpPerCoin();
-        player.sendMessage("§a✅ Acheté §f" + sp.quantity() + " " + VillagerGUI.formatName(mat)
-                + " §apour §6" + price + " coins §7(§b+" + xpGained + " XP§7)");
-        grantXp(player, xpGained);
+        ItemStack taken = new ItemStack(mat, amount);
+        ItemTags.tagStock(taken, plainName());
+        ItemTags.give(player, taken);
+        player.sendMessage("§a✅ Pris dans la réserve : §f" + amount + " " + VillagerGUI.formatName(mat)
+                + " §8(gratuit, non revendable)");
         gui.openInventory(player);
     }
 

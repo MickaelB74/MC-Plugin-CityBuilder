@@ -48,6 +48,13 @@ public class CityCoreHUD {
         this.ui = ui;
     }
 
+    /** Suivi des quêtes « accroché » à la liste des joueurs (null = jamais affiché ici). */
+    private com.citycore.quest.QuestHUD quests;
+
+    public void setQuests(com.citycore.quest.QuestHUD quests) {
+        this.quests = quests;
+    }
+
     public CityCoreHUD(JavaPlugin plugin, CityManager cityManager, Economy economy,
                        PlayerDataManager playerDataManager, CityQuestManager cityQuestManager) {
         this.plugin            = plugin;
@@ -97,9 +104,11 @@ public class CityCoreHUD {
         String citySize  = city != null ? city.getClaimedChunks() + "/" + city.getMaxChunks() : "—";
 
         // Joueur équipé du pack : panneaux dessinés de part et d'autre de la liste des joueurs
+        // (et, suivi des quêtes accroché, panneau « Quêtes » sous celui de la cité)
         if (ui != null && ui.active(player)) {
             player.sendPlayerListHeaderAndFooter(pixelHeader(player.getName(), playerLevel, playerXP, xpRequired,
-                    coins, job == null ? null : jobName, city, cityLevelValue), Component.empty());
+                    coins, job == null ? null : jobName, city, cityLevelValue,
+                    quests == null ? null : quests.tabRows(player)), Component.empty());
             return;
         }
 
@@ -143,7 +152,8 @@ public class CityCoreHUD {
 
                 .build();
 
-        player.sendPlayerListHeaderAndFooter(header, Component.empty());
+        // Suivi des quêtes accroché (sans le pack) : ses lignes sous la liste des joueurs
+        player.sendPlayerListHeaderAndFooter(header, quests == null ? Component.empty() : quests.tabFooter(player));
     }
 
     /* =========================
@@ -158,9 +168,12 @@ public class CityCoreHUD {
      * (centre), le panneau de la cité (à gauche) et celui du joueur (à droite) ; la ligne vide
      * suivante réserve la hauteur de la plaque. Les joueurs connectés restent listés au milieu,
      * entre les deux panneaux.
+     *
+     * @param questRows suivi des quêtes accroché : panneau « Quêtes » sous celui de la cité, dans la
+     *                  même colonne (null = pas de panneau)
      */
     private Component pixelHeader(String playerName, int level, int xp, int xpRequired, int coins,
-                                  String jobName, City city, int cityLevel) {
+                                  String jobName, City city, int cityLevel, List<UiHud.Row> questRows) {
         com.citycore.ui.UiCanvas c = ui.canvas(0);
         UiHud.panel(c, -HUD_W / 2, 0, TAB_OFFSET, SERVER_TITLE, List.of(), 0);
 
@@ -199,6 +212,12 @@ public class CityCoreHUD {
                 UiHud.Row.value("Bourse", fmt(coins), UiHud.GOLD),
                 UiHud.Row.value("Métier", jobName == null ? "Aucun" : jobName, UiHud.CREAM));
         UiHud.panel(c, TAB_GAP, 0, TAB_OFFSET, playerName, playerRows, TAB_ROWS);
+
+        // Suivi des quêtes accroché : sous le panneau de la cité (hauteur maximale + 4 px), à l'écart
+        // des joueurs au centre et de la minicarte en haut à droite
+        if (questRows != null && !questRows.isEmpty()) {
+            UiHud.panel(c, -TAB_GAP - HUD_W, TAB_QUEST_TOP, TAB_OFFSET, "Quêtes", questRows, TAB_QUEST_ROWS);
+        }
 
         c.end(0); // avance nulle : la ligne reste centrée et ne repousse pas la liste des joueurs
         return Component.text().append(c.build())

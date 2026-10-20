@@ -19,7 +19,7 @@ public final class JobsConfig {
     private final JavaPlugin plugin;
     private final TreeMap<Integer, Integer> maxEmployees = new TreeMap<>();
     private final TreeMap<Integer, Double> cycleMinutes = new TreeMap<>();
-    private double perCycle = 1;
+    private double perCycle = 8;
     private double fullValue = 0.5;
     private double maxValue = 20;
     private int ceiling = 50;
@@ -53,9 +53,9 @@ public final class JobsConfig {
                 try { cycleMinutes.put(Integer.parseInt(k), Math.max(0.5, c.getDouble(k))); } catch (NumberFormatException ignored) { }
             }
         }
-        if (cycleMinutes.isEmpty()) cycleMinutes.putAll(Map.of(1, 6.0, 2, 5.0, 3, 4.0, 4, 3.5, 5, 3.0));
+        if (cycleMinutes.isEmpty()) cycleMinutes.putAll(Map.of(1, 4.0, 2, 3.5, 3, 3.0, 4, 2.5, 5, 2.0));
 
-        perCycle  = Math.max(0, s.getDouble("par-cycle", 1));
+        perCycle  = Math.max(0, s.getDouble("par-cycle", 8));
         fullValue = Math.max(0.01, s.getDouble("valeur-pleine", 0.5));
         maxValue  = Math.max(fullValue, s.getDouble("valeur-max", 20));
         ceiling   = Math.max(0, Math.min(100, s.getInt("plafond", 50)));
@@ -71,7 +71,7 @@ public final class JobsConfig {
     /** Durée d'un cycle (ms) pour une annexe de ce niveau (≥ 1), divisée par la vitesse globale. */
     public long cycleMs(int annexLevel) {
         Map.Entry<Integer, Double> e = cycleMinutes.floorEntry(Math.max(1, annexLevel));
-        double minutes = e != null ? e.getValue() : 6;
+        double minutes = e != null ? e.getValue() : 4;
         return Math.round(minutes * 60_000 / speed);
     }
 

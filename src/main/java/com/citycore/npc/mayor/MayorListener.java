@@ -114,7 +114,7 @@ public class MayorListener implements Listener {
         // ── Sous-menu bâtiments (liste) ───────────────────────────
         if (isBuildingGui) {
             if (mg == null) return;
-            boolean handled = mg.getBuildingGUI().handleMainClick(player, slot);
+            boolean handled = mg.getBuildingGUI().handleMainClick(player, slot, event.getClick());
             if (!handled) mg.open(player);
             return;
         }
@@ -135,6 +135,11 @@ public class MayorListener implements Listener {
         }
 
         // ── Menu principal maire ──────────────────────────────────
+        // Parcelles : le type de clic choisit l'action (revendiquer, limites, rendre)
+        if (isMayorGui && slot == MayorGUI.SLOT_PARCELS && mg != null) {
+            mg.handleParcelClick(player, event.getClick());
+            return;
+        }
         NPCGui gui = guiRegistry.getByTitle(title);
         if (gui == null) return;
         gui.handleClick(player, slot);

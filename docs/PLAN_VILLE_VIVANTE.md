@@ -18,6 +18,7 @@ sièges par vagues, fêtes, soldats de la garde. Pas de monuments ni d'autre ges
 | 7 | Fêtes | calendrier de la phase 4 | petite à moyenne | à faire |
 | — | Emplois : les habitants travaillent pour les artisans (hors phase) | 3, 6 | moyenne à grosse | **codée, à tester en jeu** |
 | — | Animations Epic Fight des PNJ (mod serveur compagnon, hors phase) | — | petite à moyenne | **codée, à tester en jeu** |
+| — | Légendes liées aux mods : 8 nouvelles légendes, Gandalf au chapitre VI, contenu facultatif (hors phase, voir `docs/INTEGRATION_MODS.md`) | 4 (récit de siège de Musashi) | grosse | **codée, à tester en jeu** |
 
 L'ordre suit les dépendances : en ville, les joueurs et les artisans ne peuvent pas être blessés,
 donc un siège n'a d'enjeu que s'il y a des habitants à protéger. Les soldats sont formés à partir
@@ -916,17 +917,19 @@ Paquet `com.citycore.jobs` : `JobsManager` (embauche, production, lieu de travai
   travail », barre et temps avant le prochain gain, puis « ✔ +11 objets à l'entrepôt » ; « ⏸ » et
   la raison s'il ne peut pas travailler (artisan sans atelier, annexe incomplète). La nuit, il
   rentre dormir. Sans annexe, il vit comme un habitant ordinaire.
-- **Production** : à chaque cycle, chaque employé ajoute à l'entrepôt de l'artisan **un exemplaire
-  de chaque objet que l'artisan rachète** — « généré » (il ne coupe ni ne mine rien).
+- **Production** : à chaque cycle, chaque employé ajoute à l'entrepôt de l'artisan **8 exemplaires
+  de chaque objet que l'artisan rachète** — « généré » (il ne coupe ni ne mine rien). Les joueurs
+  se servent gratuitement dans l'entrepôt (objets marqués non revendables) : la ville récolte
+  pour eux (relevé le 2026-10-20 : 1 exemplaire par cycle était trop peu).
 
 ### Équilibrage (section `emplois`)
 
 | Garde-fou | Réglage | Valeur |
 |---|---|---|
 | Employés par artisan, selon son rang | `employes-max` | 1, 2, 2, 3, 3 (rangs 1 à 5) |
-| Durée d'un cycle, selon le niveau de l'annexe | `cycle-minutes` | 6, 5, 4, 3,5, 3 min |
+| Durée d'un cycle, selon le niveau de l'annexe | `cycle-minutes` | 4, 3,5, 3, 2,5, 2 min |
 | Travail | — | de jour seulement (≈ 10 min sur 20), joueur connecté, artisan installé, annexe conforme |
-| Exemplaires par objet courant et par cycle | `par-cycle` | 1 |
+| Exemplaires par objet courant et par cycle | `par-cycle` | 8 (≈ une pile par heure et par employé, annexe niveau 1) |
 | Objets de valeur | `valeur-pleine` | au-delà de 0,5 coin l'unité, chance = 0,5 / valeur (une pomme 1 coin : 1 cycle sur 2) |
 | Trophées | `valeur-max` | jamais produits au-delà de 20 coins l'unité (têtes, étoile du Nether, cœur de la mer…) |
 | Plafond de l'entrepôt | `plafond` | plus de production au-delà de 50 % de la capacité : les ventes des joueurs restent au plein prix jusqu'à 40 % |
@@ -1025,8 +1028,9 @@ monstres (plutôt que de les rendre avec le modèle de Minecraft).
 
 ### Ce qui est codé
 
-- **Mod serveur NeoForge « CityCore — Epic Fight »** (`companions/citycore-epicfight`, mod
-  `citycore_epicfight`) ; rien à installer chez les joueurs :
+- **Mod serveur NeoForge « CityCore — Compagnon »**, module Epic Fight
+  (`companions/citycore-companion`, mod `citycore_companion`, qui porte aussi l'affichage de la
+  ville sur JourneyMap : voir `docs/INTEGRATION_MODS.md`) ; rien à installer chez les joueurs :
   - à chaque tick, le déplacement réel de chaque PNJ est traduit en « touches » (avancer, reculer,
     pas de côté, par rapport à son regard) et envoyé aux joueurs qui le voient, seulement quand il
     change (pas d'à-coup : arrêt confirmé après 4 ticks immobiles) → marche, marche arrière,
@@ -1045,30 +1049,32 @@ monstres (plutôt que de les rendre avec le modèle de Minecraft).
   Minecraft, une étiquette d'entité (`citycore.geste.attaque` / `citycore.geste.tir`) signale le
   geste au mod, qui la retire au tick suivant. Sans le mod, l'étiquette reste sans effet. Le
   plugin ne dépend d'aucun mod.
-- Réglages du mod : `config/citycore_epicfight.toml` du serveur (vitesses de marche et de course,
-  gestes, mode combat, journal détaillé pour les tests).
+- Réglages du mod : section `epicfight` de `config/citycore_companion.toml` du serveur (vitesses
+  de marche et de course, gestes, mode combat, journal détaillé pour les tests).
 - Le mod utilise des classes internes d'Epic Fight (pas d'API officielle) : calé sur Epic Fight
   21.17.3.1. Une incompatibilité est écrite une fois dans le journal, sans gêner le serveur.
 
 ### Installation
 
-1. Construire le mod : dans `companions/citycore-epicfight`, `./gradlew build` →
-   `build/libs/citycore-epicfight-1.0.0.jar` (compilé avec le jar d'Epic Fight du serveur).
-2. Le copier dans le dossier `mods` du serveur, à côté d'Epic Fight ; redémarrer. Journal
-   attendu : « Epic Fight présent : les PNJ de CityCore seront animés ».
+1. Construire le mod : dans `companions/citycore-companion`, `./gradlew build` →
+   `build/libs/citycore-companion-1.0.0.jar` (compilé avec le jar d'Epic Fight du serveur).
+2. Retirer l'ancien `citycore-epicfight-*.jar` du dossier `mods` du serveur, y copier le nouveau
+   jar à côté d'Epic Fight ; redémarrer. Journal attendu : « Epic Fight présent : les PNJ de
+   CityCore seront animés ».
 
 ### À tester en jeu
 
 - Un artisan ou un habitant qui se promène : animation de marche d'Epic Fight, arrêt net quand il
   s'arrête, plus de glissade.
 - Un garde qui patrouille, puis `/city siege start` : les gardes rejoignent le front (en courant si
-  leur vitesse dépasse `deplacements.course`), frappent avec les enchaînements de l'épée, les archers jouent l'animation de tir ;
+  leur vitesse dépasse `epicfight.deplacements.course`), frappent avec les enchaînements de l'épée, les archers jouent l'animation de tir ;
   même chose pour les soldats ennemis (siège « bannière »).
 - Un garde qui recule en combat : marche arrière.
 - Entraînement chez Roland (`/city garde former`) : coups ou tirs animés.
 - Se déconnecter et revenir près des PNJ : ils sont animés tout de suite.
-- Si besoin : `journal = true` dans `config/citycore_epicfight.toml` (PNJ trouvés, marche/arrêt,
-  gestes), et ajuster `deplacements.course` si les PNJ courent trop ou pas assez.
+- Si besoin : `journal = true` dans la section `epicfight` de `config/citycore_companion.toml`
+  (PNJ trouvés, marche/arrêt, gestes), et ajuster `epicfight.deplacements.course` si les PNJ
+  courent trop ou pas assez.
 - Points incertains (non vérifiables hors jeu) : façon dont Youer présente les PNJ Citizens au
   mod ; Epic Fight qui renverrait lui-même un autre mode pour les PNJ ; rendu exact des
   animations de tir sans visée préalable.

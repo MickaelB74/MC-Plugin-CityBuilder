@@ -66,6 +66,7 @@ public class CityCore extends JavaPlugin {
     private com.citycore.needs.NeedsManager needs;
     private com.citycore.jobs.JobsManager jobs;
     private com.citycore.city.CityChunkLoader chunkLoader;
+    private com.citycore.city.CityMapExport   mapExport;
 
     @Override
     public void onEnable() {
@@ -88,12 +89,17 @@ public class CityCore extends JavaPlugin {
         // ── ChatInput ────────────────────────────────────────────
         ChatInputManager.init(this);
         ItemTags.init(this);
+        // Ce qu'on fabrique avec des objets de la réserve (entrepôts gratuits) reste non revendable
+        getServer().getPluginManager().registerEvents(new com.citycore.economy.TagPropagation(this), this);
 
         // ── Managers de base ─────────────────────────────────────
         cityManager         = new CityManager(databaseManager, this);
         npcManager          = new NPCManager(this);
         notificationManager = new NPCNotificationManager(databaseManager);
         playerDataManager   = new PlayerDataManager(databaseManager);
+        // Préférences des joueurs (affichage du suivi des quêtes, style des menus…) : base SQLite
+        com.citycore.player.PlayerPrefs playerPrefs = new com.citycore.player.PlayerPrefs(this, databaseManager);
+        getServer().getPluginManager().registerEvents(playerPrefs, this);
         TypewriterUtil.setCityNameSupplier(cityManager::getCityName);
         // Répliques plus larges que l'écran : coupées en morceaux successifs (dialogues.largeur)
         TypewriterUtil.setMaxWidth(getConfig().getInt("dialogues.largeur", 58));
@@ -179,6 +185,7 @@ public class CityCore extends JavaPlugin {
         cityQuestManager = new CityQuestManager(
                 databaseManager, cityManager, buildingManager, npcDataManager, market, this);
         cityQuestManager.migrateTierScheme(); // ancienne trame en 7 chapitres → 10
+        cityQuestManager.migrateChunkScheme(); // barème des parcelles « grande ville » : rattrapage
         cityQuestManager.startSyncTask();
 
         findNpcQuestManager = new FindNpcQuestManager(
@@ -203,10 +210,41 @@ public class CityCore extends JavaPlugin {
         market.setConsumptionOverride(needs::abstractConsumption);
         siege.setResultListener(needs::recordSiege);
 
+        // ── Récits des légendes : siège en cours, bâtiment où l'on se trouve, distance à la ville ──
+        com.citycore.quest.personal.QuestHooks.setSiegeEnemy(siege::isSiegeEnemy);
+        com.citycore.quest.personal.QuestHooks.setBuildingAt((world, loc) -> {
+            com.citycore.building.Building b = buildingManager.getBuildingAt(world.getName(), loc.getBlockX(), loc.getBlockZ());
+            // Hauteur connue : le joueur doit être dedans (un bloc de marge), pas sur le toit
+            if (b != null && b.hasHeight() && (loc.getBlockY() < b.yMin() - 1 || loc.getBlockY() > b.yMax() + 1)) return null;
+            return b;
+        });
+        java.util.Map<String, double[]> centers = new java.util.concurrent.ConcurrentHashMap<>();
+        java.util.Map<String, Long> centersAt = new java.util.concurrent.ConcurrentHashMap<>();
+        com.citycore.quest.personal.QuestHooks.setCityCenter(world -> {
+            // Moyenne des chunks revendiqués, relue au plus une fois par minute
+            long now = System.currentTimeMillis();
+            Long at = centersAt.get(world.getName());
+            if (at == null || now - at > 60_000) {
+                List<long[]> chunks = cityManager.getClaimedChunkCoords(world.getName());
+                if (chunks.isEmpty()) centers.remove(world.getName());
+                else centers.put(world.getName(), new double[]{
+                        chunks.stream().mapToLong(c -> c[0]).average().orElse(0) * 16 + 8,
+                        chunks.stream().mapToLong(c -> c[1]).average().orElse(0) * 16 + 8});
+                centersAt.put(world.getName(), now);
+            }
+            return centers.get(world.getName());
+        });
+
         // ── La ville vit où que soient les joueurs : ses chunks restent chargés (joueur connecté) ──
         chunkLoader = new com.citycore.city.CityChunkLoader(this, cityManager);
         getServer().getPluginManager().registerEvents(chunkLoader, this);
         chunkLoader.start();
+
+        // ── Parcelles de la ville sur les cartes JourneyMap (carte.json, lu par le mod compagnon) ──
+        // Réécrit à chaque claim, unclaim ou fondation, et revu toutes les 30 s
+        mapExport = new com.citycore.city.CityMapExport(this, cityManager);
+        cityManager.addClaimListener(mapExport::requestExport);
+        mapExport.start();
 
         // ── Emplois : les habitants travaillent pour les artisans (annexes de travail) ──
         jobs = new com.citycore.jobs.JobsManager(this, buildingManager, buildingInspector, npcDataManager, market, inhabitants);
@@ -226,6 +264,7 @@ public class CityCore extends JavaPlugin {
         // ── Interfaces illustrées « Valmont » (pack de ressources) ──
         com.citycore.ui.UiAtlas     uiAtlas     = new com.citycore.ui.UiAtlas();
         uiPack = new com.citycore.ui.UiPack(this, getFile(), uiAtlas);
+        uiPack.setPrefs(playerPrefs); // style des menus (/city ui) rangé avec les autres préférences
         com.citycore.ui.UiPortraits uiPortraits = new com.citycore.ui.UiPortraits(this, npcManager);
         com.citycore.ui.UiKit       uiKit       = new com.citycore.ui.UiKit(this, uiAtlas, uiPack, uiPortraits, economy);
         if (uiPack != null && getConfig().getBoolean("ui-pack.enabled", true)) {
@@ -236,6 +275,14 @@ public class CityCore extends JavaPlugin {
                 uiPack.startHosting();
             } catch (Exception e) {
                 getLogger().warning("⚠ Pack d'interface indisponible (" + e.getMessage() + ") — menus classiques.");
+            }
+            // Répliques des PNJ sur deux lignes pour les joueurs équipés du pack (police décalée du pack)
+            try {
+                com.citycore.ui.UiDialogue dialogueUi = new com.citycore.ui.UiDialogue(this, uiAtlas, uiPack);
+                dialogueUi.setMaxWidth(getConfig().getInt("dialogues.largeur-pixels", 400));
+                TypewriterUtil.setMultiLine(dialogueUi);
+            } catch (Exception e) {
+                getLogger().warning("⚠ Répliques sur deux lignes indisponibles (" + e.getMessage() + ") — morceaux d'une ligne.");
             }
         }
         getServer().getPluginManager().registerEvents(uiPack, this);
@@ -265,6 +312,8 @@ public class CityCore extends JavaPlugin {
         mayorScreens.setPopulation(needs, inhabitants);     // clic sur le portrait d'Alderic : « Population »
         mayorGUI.setPopulationReport(needs::report);        // menu classique : bilan dans le chat
         mayorGUI.setThemed(mayorScreens);
+        // « Ajouter un bâtiment », changement de type et inspection sans passer par /city build (admin)
+        mayorGUI.getBuildingGUI().setCreation(buildingCreation, buildingInspector);
 
         getServer().getPluginManager().registerEvents(
                 new MayorListener(npcManager, guiRegistry, introManager, cityManager, this), this);
@@ -348,9 +397,12 @@ public class CityCore extends JavaPlugin {
         });
 
         // ── HUD Quêtes NPC ────────────────────────────────────────
-        QuestHUD questHUD = new QuestHUD(this, questManager, npcDataManager, questGUIs);
+        QuestHUD questHUD = new QuestHUD(this, questManager, npcDataManager, questGUIs, playerPrefs);
         questHUD.setUi(uiKit); // panneau illustré « Quêtes actives » à gauche de l'écran
         questHUD.setIntegrations(modIntegrations);
+        // Suivi « accroché » : panneau « Quêtes » de la liste des joueurs, renvoyée à chaque progression
+        questHUD.setTabRefresher(cityHUD::updatePlayer);
+        cityHUD.setQuests(questHUD);
         questHUD.startUpdating();
 
         // ── QuestListener — instancié AVANT SummitListener ───────
@@ -385,18 +437,27 @@ public class CityCore extends JavaPlugin {
         cityCommand.setEconomyCheck(economyCheck);
         cityCommand.setCityQuestManager(cityQuestManager);
         cityCommand.setCityAdvancements(cityAdvancements);
+        cityCommand.setModIntegrations(modIntegrations); // /city mods
         cityCommand.setUiPack(uiPack);
         // Journal de quêtes illustré (/city quests : onglets Suivi et Récits) ; menu classique sans le pack
         com.citycore.ui.screens.QuestTrackingScreen questJournal =
                 new com.citycore.ui.screens.QuestTrackingScreen(uiKit, questHUD, npcManager, storyJournal);
         questJournal.setClassic(questSelectionGUI::open, questSelectionGUI::openStories);
         cityCommand.setQuestTracking(questJournal);
+        // Où sont-ils ? (/city locate) : carte de Valmont et position des personnages découverts
+        cityCommand.setLocate(new com.citycore.ui.screens.LocateScreens(uiKit, npcManager, npcDataManager, cityManager,
+                npc -> npcDataManager.getState(npc) != NPCState.WANDERER || introManager.hasAnyoneMet(npc)));
+        // Journal (habitants suivis, affichage du suivi) ouvert depuis l'écran des quêtes de chaque habitant
+        for (QuestGUI gui : questGUIs) {
+            gui.setJournal(p -> { if (!questJournal.open(p)) questSelectionGUI.open(p); });
+        }
         cityCommand.setBuildingCreation(buildingCreation);
         cityCommand.setBuildingInspector(buildingInspector);
         cityCommand.setInhabitants(inhabitants);
         cityCommand.setSiege(siege, calendar);
         cityCommand.setNeeds(needs);
         cityCommand.setJobs(jobs);
+        cityCommand.setMapExport(mapExport);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);
@@ -405,6 +466,7 @@ public class CityCore extends JavaPlugin {
         CityTabCompleter cityTabCompleter = new CityTabCompleter(cityManager, buildingManager, npcManager);
         cityTabCompleter.setBuildingCreation(buildingCreation);
         cityTabCompleter.setInhabitants(inhabitants);
+        cityTabCompleter.setUiPack(uiPack); // garde : former et renvoyer en commande seulement sans les écrans illustrés
         cityCmd.setTabCompleter(cityTabCompleter);
 
         // ── Summit — instancié APRÈS QuestListener ────────────────

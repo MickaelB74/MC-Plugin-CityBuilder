@@ -1,5 +1,6 @@
 package com.citycore.siege;
 
+import com.citycore.inhabitant.Engagements;
 import com.citycore.inhabitant.InhabitantManager;
 import com.citycore.inhabitant.InhabitantSkins;
 import com.citycore.inhabitant.NpcCombat;
@@ -52,6 +53,13 @@ import java.util.function.Supplier;
  * habitants et aux gardes (sinon aux joueurs proches), au contact ou à l'arc ; faute de cible, ils
  * marchent sur la mairie. Ni butin ni message de mort ; jamais enregistrés (registre en mémoire).
  * Un porte-étendard ouvre chaque vague, la bannière de sa faction sur la tête.
+ *
+ * Champ de bataille : les soldats vont par escouades (voir Squad), chacune sur sa voie du front,
+ * en formation derrière son meneur tant qu'il n'y a personne à combattre (les tireurs en retrait).
+ * Chacun choisit un adversaire proche, de préférence près de son escouade, et pas plus de
+ * sieges.escouades.max-par-cible soldats ne s'en prennent au contact au même défenseur : les
+ * autres en cherchent un autre, ou restent en formation. Des mêlées se forment ainsi à
+ * plusieurs endroits du front plutôt qu'une ruée sur un seul point.
  */
 public final class EnemyArmy implements Listener {
 
@@ -64,16 +72,20 @@ public final class EnemyArmy implements Listener {
         final NPC npc;
         final SiegeConfig.Unit unit;
         final boolean champion, standard;
+        final Squad squad;          // son escouade (null : soldat isolé, il marche sur l'objectif)
         LivingEntity target;
-        long lastPick, lastShot;
+        LivingEntity engaged;       // cible comptée dans les mêlées en cours (au contact seulement)
+        long lastPick, nextPick, lastShot;
+        long lastSwing, riposteUntil;
+        int slot = -1;              // place dans la formation (-1 : meneur)
+        Location moveGoal;          // place visée en formation (évite de relancer le chemin à chaque passage)
 
-        long lastSwing;
-
-        Soldier(NPC npc, SiegeConfig.Unit unit, boolean champion, boolean standard) {
+        Soldier(NPC npc, SiegeConfig.Unit unit, boolean champion, boolean standard, Squad squad) {
             this.npc = npc;
             this.unit = unit;
             this.champion = champion;
             this.standard = standard;
+            this.squad = squad;
         }
     }
 
@@ -87,6 +99,7 @@ public final class EnemyArmy implements Listener {
     private final java.util.function.Predicate<Location> inCity; // chunk revendiqué par la ville
     private NPCRegistry registry;
     private final Map<Integer, Soldier> soldiers = new LinkedHashMap<>();
+    private final Engagements tally = new Engagements(); // soldats au contact de chaque défenseur
     private Supplier<Location> objective = () -> null; // mairie, sinon côté attaqué
     private KillListener killListener;
     private int ticks;
@@ -137,6 +150,15 @@ public final class EnemyArmy implements Listener {
         return list;
     }
 
+    /** Corps des soldats présents, rangés par escouade (clé null : sans escouade) — relevé pour la garde. */
+    void collect(Map<Squad, List<LivingEntity>> into) {
+        for (Soldier s : soldiers.values()) {
+            if (s.npc.isSpawned() && s.npc.getEntity() instanceof LivingEntity body && !body.isDead()) {
+                into.computeIfAbsent(s.squad, k -> new ArrayList<>()).add(body);
+            }
+        }
+    }
+
     /** Distance (au carré) entre at et le soldat le plus proche ; MAX_VALUE s'il n'y en a pas. */
     public double nearestSq(Location at) {
         double best = Double.MAX_VALUE;
@@ -156,8 +178,12 @@ public final class EnemyArmy implements Listener {
        RECRUTEMENT, RETRAIT
        ========================= */
 
-    /** Fait apparaître un soldat ; standard = porte-étendard (bannière de la faction sur la tête). */
-    public NPC spawn(SiegeConfig.Unit unit, Location at, SiegeConfig.Faction faction, boolean champion, boolean standard) {
+    /**
+     * Fait apparaître un soldat ; standard = porte-étendard (bannière de la faction sur la tête) ;
+     * squad = son escouade (null : isolé).
+     */
+    NPC spawn(SiegeConfig.Unit unit, Location at, SiegeConfig.Faction faction, boolean champion, boolean standard,
+              Squad squad) {
         if (registry == null || unit == null || at == null) return null;
         String color = champion ? "§4" : faction.color();
         NPC npc = registry.createNPC(EntityType.PLAYER, color + unit.name());
@@ -186,7 +212,7 @@ public final class EnemyArmy implements Listener {
                 .speedModifier(config.armySpeed())
                 .range(48)
                 .stuckAction((n, nav) -> false); // bloqué : il cherche un autre chemin (jamais téléporté chez l'habitant)
-        soldiers.put(npc.getId(), new Soldier(npc, unit, champion, standard));
+        soldiers.put(npc.getId(), new Soldier(npc, unit, champion, standard, squad));
         return npc;
     }
 
@@ -210,6 +236,7 @@ public final class EnemyArmy implements Listener {
     public void clear() {
         for (Soldier s : soldiers.values()) s.npc.destroy();
         soldiers.clear();
+        tally.clear();
     }
 
     /* =========================
@@ -221,77 +248,144 @@ public final class EnemyArmy implements Listener {
         ticks++;
         long now = System.currentTimeMillis();
         List<LivingEntity> defenders = inhabitants.defenders();
+        // Un passage sur la liste : soldats regroupés par escouade, et mêlées en cours (soldats au
+        // contact de chaque défenseur), recomptées à partir des cibles actuelles
+        Map<Squad, List<Soldier>> bySquad = new LinkedHashMap<>();
+        tally.clear();
+        for (Soldier s : soldiers.values()) {
+            if (!s.npc.isSpawned() || !(s.npc.getEntity() instanceof LivingEntity body)) continue;
+            if (s.squad != null) bySquad.computeIfAbsent(s.squad, k -> new ArrayList<>()).add(s);
+            s.engaged = !s.unit.ranged() && valid(s.target, body) ? s.target : null;
+            tally.add(s.engaged);
+        }
+        for (Map.Entry<Squad, List<Soldier>> e : bySquad.entrySet()) survey(e.getKey(), e.getValue());
         for (Soldier s : new ArrayList<>(soldiers.values())) {
             if (!s.npc.isSpawned() || !(s.npc.getEntity() instanceof LivingEntity body)) continue;
-            NpcCombat.sanitize(body); // vitesse invalide : remise à zéro avant l'envoi aux joueurs
-            // Riposte : celui qui vient de le frapper (garde ou joueur, à moins de 16 blocs) devient sa cible
-            Player attacker = body.getKiller();
-            if (attacker != null && attacker != s.target && valid(attacker, body)
-                    && attacker.getLocation().distanceSquared(body.getLocation()) < 16 * 16 && !isSoldier(attacker)) {
-                s.target = attacker;
-                s.lastPick = now;
-            } else if (!valid(s.target, body) || now - s.lastPick > 2000) {
-                s.target = pickTarget(body, defenders);
-                s.lastPick = now;
+            behave(s, body, defenders, now);
+        }
+    }
+
+    /**
+     * Relevé d'une escouade : son meneur (le champion, le porte-étendard, sinon le premier soldat
+     * au contact), la place de chacun dans la formation, son centre et sa dispersion.
+     */
+    private void survey(Squad squad, List<Soldier> members) {
+        Soldier lead = null;
+        for (Soldier s : members) if (leadership(s) > leadership(lead)) lead = s;
+        int melee = 0, ranged = 0;
+        List<LivingEntity> bodies = new ArrayList<>(members.size());
+        for (Soldier s : members) {
+            bodies.add((LivingEntity) s.npc.getEntity());
+            s.slot = s == lead ? -1 : s.unit.ranged() ? ranged++ : melee++;
+        }
+        squad.survey(bodies, lead == null ? null : (LivingEntity) lead.npc.getEntity(), b -> {
+            NPC n = registry.getNPC(b);
+            Soldier s = n == null ? null : soldiers.get(n.getId());
+            return s != null && s.target == null; // en formation : sans adversaire
+        });
+    }
+
+    /** Aptitude à mener l'escouade (le plus haut l'emporte ; à égalité, le premier arrivé). */
+    private static int leadership(Soldier s) {
+        if (s == null) return -1;
+        return s.champion ? 4 : s.standard ? 3 : s.unit.ranged() ? 1 : 2;
+    }
+
+    /** Un soldat, deux fois par seconde : choix de l'adversaire, puis combat, formation ou marche. */
+    private void behave(Soldier s, LivingEntity body, List<LivingEntity> defenders, long now) {
+        NpcCombat.sanitize(body); // vitesse invalide : remise à zéro avant l'envoi aux joueurs
+        // Riposte : celui qui vient de le frapper (garde ou joueur, à moins de 16 blocs) devient sa cible
+        Player attacker = body.getKiller();
+        if (attacker != null && attacker != s.target && body.getNoDamageTicks() > 0 && valid(attacker, body)
+                && attacker.getLocation().distanceSquared(body.getLocation()) < 16 * 16 && !isSoldier(attacker)) {
+            engage(s, attacker, now);
+            s.riposteUntil = s.nextPick = now + 3000; // il lui tient tête un moment, même déjà entouré
+        } else if (!valid(s.target, body) || now >= s.nextPick
+                || (now >= s.riposteUntil && s.engaged != null && !tally.acceptable(s.engaged, config.maxPerTarget()))) {
+            // Cible perdue, choix à revoir (toutes les ~1,5 s), ou trop de soldats déjà sur elle
+            engage(s, pickTarget(s, body, defenders), now);
+        }
+        Squad sq = s.squad;
+        boolean leads = sq == null || sq.leader == body;
+        if (s.target == null) {
+            if (leads) march(s, body, now); else keepFormation(s, body, sq);
+            return;
+        }
+        if (s.unit.ranged()) {
+            double dist = body.getLocation().distance(s.target.getLocation());
+            if (!inCity.test(body.getLocation())) {
+                // Hors de la ville : il y entre d'abord avec son escouade, comme tous les assaillants
+                // (pas de tir de loin depuis la lisière) ; en marchant, il ne tire que sur une cible proche
+                if (leads) march(s, body, now); else keepFormation(s, body, sq);
+                if (dist <= 10 && body.hasLineOfSight(s.target)) shoot(s, body, now);
+                return;
             }
-            if (s.target == null) { march(s, body); continue; }
-            if (s.unit.ranged()) {
-                double dist = body.getLocation().distance(s.target.getLocation());
-                if (!inCity.test(body.getLocation())) {
-                    // Hors de la ville : il y entre d'abord, comme tous les assaillants (pas de tir de loin
-                    // depuis la lisière) ; en marchant, il ne tire que sur une cible proche
-                    march(s, body);
-                    if (dist <= 10 && body.hasLineOfSight(s.target)) shoot(s, body, now);
-                    continue;
-                }
-                if (dist <= BOW_RANGE && body.hasLineOfSight(s.target)) {
-                    if (s.npc.getNavigator().isNavigating()) s.npc.getNavigator().cancelNavigation();
-                    s.npc.faceLocation(s.target.getEyeLocation());
-                    shoot(s, body, now);
-                } else {
-                    follow(s, false);
-                }
+            if (dist <= BOW_RANGE && body.hasLineOfSight(s.target)) {
+                if (s.npc.getNavigator().isNavigating()) s.npc.getNavigator().cancelNavigation();
+                s.moveGoal = null;
+                s.npc.faceLocation(s.target.getEyeLocation());
+                shoot(s, body, now);
+            } else if (!leads && sq.leader != null && sq.leader.getWorld().equals(body.getWorld())
+                    && sq.leader.getLocation().distanceSquared(body.getLocation()) < 12 * 12) {
+                keepFormation(s, body, sq); // en retrait de son escouade, il attend que la cible soit à portée
             } else {
-                // Au contact : il suit sa cible et frappe à portée. Les coups sont portés ici : ses
-                // cibles sont des « joueurs » pour Minecraft (habitants, gardes, joueurs), et le
-                // contrôle PvP annulerait une attaque ordinaire
                 follow(s, false);
-                if (body.getLocation().distanceSquared(s.target.getLocation()) <= NpcCombat.REACH * NpcCombat.REACH
-                        && now - s.lastSwing >= (s.champion ? 800 : 1000)) {
-                    s.lastSwing = now;
-                    s.npc.faceLocation(s.target.getEyeLocation());
-                    com.citycore.inhabitant.NpcGestures.attack(body);
-                    NpcCombat.strike(body, s.target, NpcCombat.meleeDamage(body));
-                }
+            }
+        } else {
+            // Au contact : il suit sa cible et frappe à portée. Les coups sont portés ici : ses
+            // cibles sont des « joueurs » pour Minecraft (habitants, gardes, joueurs), et le
+            // contrôle PvP annulerait une attaque ordinaire
+            s.moveGoal = null;
+            follow(s, false);
+            if (body.getLocation().distanceSquared(s.target.getLocation()) <= NpcCombat.REACH * NpcCombat.REACH
+                    && now - s.lastSwing >= (s.champion ? 800 : 1000)) {
+                s.lastSwing = now;
+                s.npc.faceLocation(s.target.getEyeLocation());
+                com.citycore.inhabitant.NpcGestures.attack(body);
+                NpcCombat.strike(body, s.target, NpcCombat.meleeDamage(body));
             }
         }
     }
 
-    /** Suit sa cible (aggressive = frappe au contact). */
+    /** Nouvelle cible (ou aucune) : mêlées tenues à jour, prochain choix dans ~1,5 s (décalé d'un soldat à l'autre). */
+    private void engage(Soldier s, LivingEntity target, long now) {
+        LivingEntity counted = s.unit.ranged() ? null : target;
+        tally.swap(s.engaged, counted);
+        s.engaged = counted;
+        s.target = target;
+        s.lastPick = now;
+        s.nextPick = now + 1500 + Math.floorMod(s.npc.getId(), 5) * 120L;
+    }
+
+    /**
+     * Suit sa cible (aggressive = frappe au contact). Portée du chemin fixée ici : un court trajet
+     * en formation (SafeNavigation) laisse une petite portée par défaut, trop courte pour une
+     * cible à une trentaine de blocs ; elle reste limitée aux chunks déjà chargés.
+     */
     private void follow(Soldier s, boolean aggressive) {
         EntityTarget current = s.npc.getNavigator().getEntityTarget();
         if (current != null && current.getTarget() == s.target && current.isAggressive() == aggressive) return;
         s.npc.getNavigator().setTarget(s.target, aggressive);
-        s.npc.getNavigator().getLocalParameters().speedModifier(config.armySpeed() * 1.15f);
+        float range = Math.max(SafeNavigation.MIN_RANGE, SafeNavigation.loadedRange(s.npc.getEntity().getLocation(), 48f));
+        s.npc.getNavigator().getLocalParameters().speedModifier(config.armySpeed() * 1.15f).range(range);
     }
 
-    /** Cible : l'habitant ou le garde le plus proche (48 blocs), sinon un joueur proche (24 blocs). */
-    private LivingEntity pickTarget(LivingEntity body, List<LivingEntity> defenders) {
-        LivingEntity best = null;
-        double bestDist = 48 * 48;
-        for (LivingEntity d : defenders) {
-            if (!d.getWorld().equals(body.getWorld())) continue;
-            double dist = d.getLocation().distanceSquared(body.getLocation());
-            if (dist < bestDist) { bestDist = dist; best = d; }
-        }
+    /**
+     * Cible : un habitant ou un garde proche (32 blocs), de préférence près de son escouade, que
+     * pas plus de sieges.escouades.max-par-cible soldats n'attaquent déjà au contact (sans limite
+     * pour un tireur) ; sinon un joueur proche (24 blocs) ; sinon aucune (il reste en formation).
+     */
+    private LivingEntity pickTarget(Soldier s, LivingEntity body, List<LivingEntity> defenders) {
+        Location at = body.getLocation();
+        Location sector = s.squad != null ? s.squad.center() : null;
+        int cap = s.unit.ranged() ? 0 : config.maxPerTarget();
+        LivingEntity best = tally.pick(at, defenders, 32, cap, s.target, sector, 16);
         if (best != null) return best;
-        bestDist = 24 * 24;
+        List<Player> players = new ArrayList<>();
         for (Player p : body.getWorld().getPlayers()) {
-            if (p.hasMetadata("NPC") || !fighting(p)) continue;
-            double dist = p.getLocation().distanceSquared(body.getLocation());
-            if (dist < bestDist) { bestDist = dist; best = p; }
+            if (!p.hasMetadata("NPC") && fighting(p)) players.add(p);
         }
-        return best;
+        return players.isEmpty() ? null : tally.pick(at, players, 24, cap, s.target, sector, 16);
     }
 
     private static boolean fighting(Player p) {
@@ -304,15 +398,48 @@ public final class EnemyArmy implements Listener {
         return t.getLocation().distanceSquared(from.getLocation()) < 56 * 56;
     }
 
-    /** Pas de cible : en marche vers la mairie (ou le côté attaqué), par étapes au sol. */
-    private void march(Soldier s, LivingEntity body) {
-        if (s.npc.getNavigator().isNavigating() && s.npc.getNavigator().getEntityTarget() == null) return;
-        Location goal = objective.get();
+    /**
+     * Pas de cible (meneur ou soldat isolé) : en marche vers l'objectif de son escouade (percée
+     * en face de son entrée, puis cœur de la ville, puis mairie), par étapes au sol ; le meneur
+     * marche un peu moins vite que ses hommes et attend un instant ses traînards.
+     */
+    private void march(Soldier s, LivingEntity body, long now) {
+        Squad sq = s.squad;
+        boolean walking = s.npc.getNavigator().isNavigating() && s.npc.getNavigator().getEntityTarget() == null;
+        if (sq != null && sq.leader == body && sq.size() > 1 && sq.shouldWait(now)) {
+            if (walking) s.npc.getNavigator().cancelNavigation();
+            return;
+        }
+        if (walking) return;
+        s.moveGoal = null;
+        Location goal = sq != null ? sq.goal(body.getLocation()) : null;
+        if (goal == null) goal = objective.get();
         if (goal == null || !goal.getWorld().equals(body.getWorld())) return;
         Location step = SiegeManager.stepToward(body.getLocation(), goal, 28);
         if (step != null && step.distanceSquared(body.getLocation()) > 9) {
-            SafeNavigation.walkTo(s.npc, step, config.armySpeed(), false);
+            float pace = sq != null && sq.size() > 1 ? 0.9f : 1f;
+            SafeNavigation.walkTo(s.npc, step, config.armySpeed() * pace, false);
         }
+    }
+
+    /**
+     * Sans adversaire, un membre de l'escouade tient sa place dans la formation (voir
+     * Squad.slot) ; il ne relance son chemin que si sa place s'est déplacée de quelques blocs.
+     * Place impraticable : il suit son meneur.
+     */
+    private void keepFormation(Soldier s, LivingEntity body, Squad sq) {
+        if (sq == null || sq.leader == null) { march(s, body, System.currentTimeMillis()); return; }
+        Location slot = sq.slot(Math.max(0, s.slot), s.unit.ranged());
+        if (slot == null) slot = sq.leader.getLocation();
+        Location at = body.getLocation();
+        if (!slot.getWorld().equals(at.getWorld())) return;
+        double d2 = at.distanceSquared(slot);
+        if (d2 <= 1.5 * 1.5) { s.moveGoal = null; return; } // à sa place
+        boolean walking = s.npc.getNavigator().isNavigating() && s.npc.getNavigator().getEntityTarget() == null;
+        if (walking && s.moveGoal != null && s.moveGoal.getWorld().equals(slot.getWorld())
+                && s.moveGoal.distanceSquared(slot) < 3 * 3) return;
+        float speed = config.armySpeed() * (d2 > 8 * 8 ? 1.15f : 1f); // en retard : il presse le pas
+        s.moveGoal = SafeNavigation.walkTo(s.npc, slot, speed, false) == SafeNavigation.Result.WALKING ? slot : null;
     }
 
     /** Une flèche vers la cible (légère courbe), non ramassable, retirée ensuite. */

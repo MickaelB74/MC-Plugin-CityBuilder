@@ -14,9 +14,10 @@ import org.bukkit.util.Vector;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Sons des sièges (phase 4), au début et à la fin seulement : cloche d'alarme de la ville et cor
- * de guerre venu du côté attaqué ; chute du porte-étendard ; victoire (cloches et feux
- * d'artifice au-dessus de la mairie) ou défaite. Aucun son d'ambiance pendant le combat.
+ * Sons des sièges (phase 4), au début, à la fin et aux moments clés seulement : cloche d'alarme de
+ * la ville et cor de guerre venu du côté attaqué ; entrée du champion dans la bataille (cor venu
+ * de lui) ; chute du porte-étendard ; victoire (cloches et feux d'artifice au-dessus de la mairie)
+ * ou défaite. Aucun son d'ambiance pendant le combat (ni à chaque escouade qui arrive).
  */
 final class SiegeSounds {
 

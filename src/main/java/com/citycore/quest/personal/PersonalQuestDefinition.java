@@ -36,6 +36,7 @@ public record PersonalQuestDefinition(
         FISH,        // PlayerFishEvent (prise) — contexte : ItemStack pêché
         BREED,       // EntityBreedEvent — contexte : Entity (le petit)
         TRADE,       // PlayerTradeEvent (échange avec un villageois) — contexte : AbstractVillager
-        PLACE        // BlockPlaceEvent — contexte : Block posé
+        PLACE,       // BlockPlaceEvent — contexte : Block posé
+        DELIVER      // Objets remis au personnage depuis ses récits (voir Delivery) — contexte : null
     }
 }

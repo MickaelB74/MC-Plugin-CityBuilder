@@ -682,6 +682,20 @@ public class ValmontArt {
                 "P.......sSSS",
                 "PPPPPPPPPPPP",
                 "............");
+        // Suivi accroché : liste des joueurs (Tab) avec ses panneaux, celui des quêtes sous la cité
+        icon("pos_tab",
+                "............",
+                "PPPPPPPPPPPP",
+                "P..........P",
+                "P.YY....YY.P",
+                "P.oo.ww.oo.P",
+                "P.oo....oo.P",
+                "P....ww....P",
+                "P.YY.......P",
+                "P.cc.ww....P",
+                "P.cc.......P",
+                "PPPPPPPPPPPP",
+                "............");
         icon("info",
                 "....kkkk....",
                 "...kwwwwk...",
@@ -1498,6 +1512,7 @@ public class ValmontArt {
         small.put("ic_job_locked", iconButton(GRAY,   "hammer", true));
         small.put("ic_story",      iconButton(BROWN,  "book",   false));
         small.put("ic_purse",      iconButton(GOLD,   "coins",  false));
+        small.put("ic_map",        iconButton(TEAL,   "map",    false)); // vue d'ensemble (/city locate)
         for (var e : small.entrySet()) save(e.getValue(), e.getKey());
 
         // ── Bannières 108 x 18 ──────────────────────────────
@@ -1541,6 +1556,7 @@ public class ValmontArt {
         save(segment(3, new int[]{G4, G2, G1}), "seg_gold");
         save(segment(2, new int[]{0xFFA5E07A, 0xFF45922F}), "seg_thin");
         BufferedImage px3 = img(3, 3); fill(px3, 0, 0, 3, 3, 0xFFFFFFFF); save(px3, "px");
+        BufferedImage px2 = img(2, 2); fill(px2, 0, 0, 2, 2, 0xFFFFFFFF); save(px2, "px2"); // carte (/city locate)
 
         // ── Portraits ───────────────────────────────────────
         for (String k : List.of("nature", "route", "port", "atelier", "forge", "taverne", "mine", "chapelle", "mairie", "dragon")) {
@@ -1577,9 +1593,16 @@ public class ValmontArt {
         save(button(54, 18, BROWN, "pos_margin", "MARGE"), "pos_gauche");
         save(button(54, 18, BROWN, "pos_near", "PRÈS"), "pos_pres");
         save(selected54(), "sel54");
+        // Affichage du suivi des quêtes : visible, accroché à la liste des joueurs (Tab), masqué
         save(button(108, 18, GREEN, "check", "VISIBLE"), "hud_on");
+        save(button(108, 18, TEAL, "pos_tab", "ACCROCHÉ"), "hud_tab");
         save(button(108, 18, GRAY, "cross", "MASQUÉ"), "hud_off");
         save(button(54, 18, BLUE, "check", "TOUS"), "track_all");
+
+        // ── Où sont-ils ? (/city locate) ────────────────────
+        BufferedImage bgLoc = bgLocate();
+        save(bgLoc, "bg_locate");
+        previewLocate(previews, bgLoc);
 
         // ── Aperçus ─────────────────────────────────────────
         writePreviews(previews, bgChar, bgList, bgQ, bgP, bgCQ, bgB);
@@ -1979,6 +2002,64 @@ public class ValmontArt {
         bevel(im, M + sx(0) + 1, by + 1, 16, 16, PURPLE);
         drawIcon(im, "quill", M + sx(0) + 3, by + 3);
         return im;
+    }
+
+    /**
+     * Où sont-ils ? (/city locate) : grille des personnages (colonnes 0-2, rangées 1-4) et pages
+     * (rangée 5), carte (colonnes 3-8, rangées 1-4 : parchemin de carte vierge sous les pixels
+     * dessinés par le plugin, les zones inconnues restent ainsi) et plaque des coordonnées.
+     */
+    static BufferedImage bgLocate() {
+        BufferedImage im = windowBase(71);
+        recess(im, M + sx(0), M + sy(0), 126, 18, true);         // bannière (colonnes 0-6)
+        socket(im, sx(7), sy(0));
+        socket(im, sx(8), sy(0));
+        for (int r = 1; r <= 4; r++) for (int c = 0; c < 3; c++) cardWell(im, M + sx(c), M + sy(r), r * 13 + c);
+        recess(im, M + sx(0), M + sy(5), 54, 18, true);          // pages
+        // Carte : cadre sombre, parchemin de carte vierge à l'intérieur (106 x 70)
+        int mx = M + sx(3), my = M + sy(1);
+        rect(im, mx, my, 108, 72, OUT);
+        parchment(im, mx + 1, my + 1, 106, 70, 73);
+        for (int i = mx + 1; i < mx + 107; i++) px(im, i, my + 1, P1);   // ombre du cadre
+        for (int j = my + 1; j < my + 71; j++) px(im, mx + 1, j, P1);
+        // Plaque des coordonnées (rangée 5)
+        recess(im, M + sx(3), M + sy(5), 108, 18, true);
+        rect(im, M + sx(3) + 1, M + sy(5) + 1, 106, 16, G1);
+        return im;
+    }
+
+    /** Aperçu de l'écran « Où sont-ils ? » avec une carte et des marques factices. */
+    static void previewLocate(File dir, BufferedImage bg) throws IOException {
+        Preview p = new Preview(bg);
+        p.textC("OÙ SONT-ILS ?", 88, 3, G3, true);
+        p.textC("THORVALD · FORGERON", sx(0) + 63, sy(0) + 4, P4, true);
+        p.put(load("ic_map"), sx(7), sy(0)).put(load("ic_close"), sx(8), sy(0));
+        for (int k = 0; k < 12; k++) {
+            int col = k % 3, row = 1 + k / 3;
+            if (k < 8) p.put(load(k == 2 ? "ring_gold" : "ring_green"), sx(col), sy(row)).item(col, row, 0xFFB07850);
+            else p.put(load("ring_gray"), sx(col), sy(row)).put(load("lock"), sx(col) + 3, sy(row) + 3);
+        }
+        p.put(load("ic_prev_off"), sx(0), sy(5)).put(load("ic_next"), sx(2), sy(5));
+        // Carte factice : prairie, rivière, ville (bordure dorée), marques
+        for (int j = 0; j < 35; j++) for (int i = 0; i < 53; i++) {
+            double n = smooth(i, j, 6, 3);
+            int c = n < 0.25 ? 0xFF4060C8 : n < 0.3 ? 0xFFD8CC8C : (i + j) % 7 == 0 ? 0xFF5E8A2E : 0xFF6E9C34;
+            boolean city = i >= 18 && i < 34 && j >= 10 && j < 26;
+            boolean edge = city && (i == 18 || i == 33 || j == 10 || j == 25);
+            if (city && !edge && (i * 7 + j * 3) % 11 < 3) c = 0xFF8C7A5A;
+            if (edge) c = 0xFFF1CF5E;
+            fill(p.im, 20 + 62 + 2 * i, 20 + 36 + 2 * j, 2, 2, c);
+        }
+        int[][] npcs = {{22, 14}, {29, 20}, {24, 22}};
+        for (int[] n : npcs) {
+            fill(p.im, 20 + 62 + 2 * (n[0] - 1), 20 + 36 + 2 * (n[1] - 1), 6, 6, OUT);
+            fill(p.im, 20 + 62 + 2 * n[0] - 2, 20 + 36 + 2 * n[1], 6, 2, 0xFFD8402F);
+            fill(p.im, 20 + 62 + 2 * n[0], 20 + 36 + 2 * n[1] - 2, 2, 6, 0xFFD8402F);
+        }
+        int sxm = 20 + 62 + 2 * 27, sym = 20 + 36 + 2 * 17;
+        fill(p.im, sxm - 4, sym - 4, 10, 10, OUT);
+        fill(p.im, sxm - 4, sym, 10, 2, G3); fill(p.im, sxm, sym - 4, 2, 10, G3);
+        p.save(new File(dir, "localiser.png"));
     }
 
     /** Cadre doré de l'option choisie (54 x 18, intérieur transparent). */

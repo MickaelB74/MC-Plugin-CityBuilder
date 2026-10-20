@@ -38,9 +38,15 @@ public final class ConfigUpdater {
     /**
      * Sections remplacées par celles du jar en passant à une version (l'ancienne reste dans la
      * copie de sauvegarde). 6 : Jack Sparrow devient un personnage du mod Tax' Ocean Villager.
+     * 24 : la carte JourneyMap revient (chunks revendiqués, quadrillage) dans le mod compagnon ;
+     * un fichier v22 garde l'ancienne section carte, que la règle 23 effacerait : on la remplace.
+     * 27 : Gandalf passe au chapitre VI et à Iron's Spells 'n Spellbooks (contenu selon le mod) ;
+     * Robin des Bois gagne le contenu facultatif de Wilder Nature.
      */
     private static final java.util.Map<Integer, List<String>> REPLACED_SECTIONS = java.util.Map.of(
-            6, List.of("jacksparrow"));
+            6, List.of("jacksparrow"),
+            24, List.of("carte"),
+            27, List.of("gandalf", "robin"));
 
     /**
      * Valeurs par défaut changées en passant à une version : la ligne n'est remplacée que si elle
@@ -49,6 +55,11 @@ public final class ConfigUpdater {
      * 15 : la garde monte jusqu'à 50 (au lieu de 12), formations simultanées en conséquence.
      * 17 : trois emplacements à remplir pour les uniformes de l'armée ennemie (liste vide en 16).
      * 23 : section carte retirée (export pour JourneyMap abandonné), avec son bloc de commentaires.
+     * 26 : emplois plus productifs (8 par cycle, cycles plus courts) ; l'entrepôt devient gratuit,
+     *      le prix de revente (resale-multiplier) disparaît.
+     * 27 : l'atelier de Gandalf compte en bonus les blocs d'Iron's Spells quand le mod est là.
+     * 28 : barème « grande ville » des parcelles : emplacements moins chers, plus d'emplacements
+     *      offerts à la fondation.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -73,6 +84,34 @@ public final class ConfigUpdater {
             23, List.<String[]>of(
                     new String[]{"(?m)^# =+\\r?\\n#  CARTE [^\\r\\n]*\\r?\\n(?:#[^\\r\\n]*\\r?\\n)*carte:[^\\r\\n]*(?:\\r?\\n|$)(?:  [^\\r\\n]*(?:\\r?\\n|$))*",
                             "", "carte (retirée)"}),
+            26, List.<String[]>of(
+                    new String[]{"(?m)^  par-cycle: 1(?=\\s)", "  par-cycle: 8", "emplois.par-cycle (8)"},
+                    new String[]{"(?m)^" + java.util.regex.Pattern.quote("  cycle-minutes: {1: 6, 2: 5, 3: 4, 4: 3.5, 5: 3}"),
+                            "  cycle-minutes: {1: 4, 2: 3.5, 3: 3, 4: 2.5, 5: 2}", "emplois.cycle-minutes (plus courts)"},
+                    new String[]{"(?m)^  resale-multiplier: [^\\n]*\\n", "", "npc-economy.resale-multiplier (retiré)"},
+                    new String[]{java.util.regex.Pattern.quote("#  - Le stock se revend au prix de rachat × resale-multiplier (toujours plus cher)."),
+                            "#  - Le stock est la réserve de la ville : on s’y sert gratuitement (menu Entrepôt) ;\n"
+                                    + "#    ce qu’on y prend, et ce qu’on en fabrique, reste non revendable.",
+                            "commentaire de la section npc-economy"}),
+            28, List.<String[]>of(
+                    new String[]{"(?m)^  base-price: 150(?=\\s)", "  base-price: 50", "city-expand.base-price (50)"},
+                    new String[]{"(?m)^  multiplier: 1\\.08(?=\\s)", "  multiplier: 1.03", "city-expand.multiplier (1,03)"},
+                    new String[]{"(?m)^  max-price: 2500(?=\\s)", "  max-price: 300", "city-expand.max-price (300)"},
+                    new String[]{"(?m)^  free-chunks: 6(?=\\s)", "  free-chunks: 10", "city-expand.free-chunks (10)"},
+                    new String[]{java.util.regex.Pattern.quote("  # Chaque emplacement acheté coûte 8 % de plus que le précédent"),
+                            "  # Chaque emplacement acheté coûte 3 % de plus que le précédent", "commentaire de city-expand"}),
+            27, List.<String[]>of(
+                    new String[]{java.util.regex.Pattern.quote(
+                            "        - {bloc: AMETHYST_CLUSTER, nom: \"améthyste\"}\n"
+                                    + "        - {bloc: END_ROD, nom: \"bâton de l'End\"}\n"
+                                    + "        - {bloc: \"#candles\", nom: \"bougies\"}\n"),
+                            "        - {bloc: AMETHYST_CLUSTER, nom: \"améthyste\", sans-mod: irons_spellbooks}\n"
+                                    + "        - {bloc: END_ROD, nom: \"bâton de l'End\", sans-mod: irons_spellbooks}\n"
+                                    + "        - {bloc: \"#candles\", nom: \"bougies\", sans-mod: irons_spellbooks}\n"
+                                    + "        - {bloc: \"irons_spellbooks:inscription_table\", nom: \"table d'inscription\"}\n"
+                                    + "        - {bloc: \"irons_spellbooks:scroll_forge\", nom: \"forge à parchemins\"}\n"
+                                    + "        - {bloc: \"irons_spellbooks:alchemist_cauldron\", nom: \"chaudron d'alchimiste\"}\n",
+                            "batiments.ateliers.gandalf (bonus d'Iron's Spells)"}),
             17, List.<String[]>of(
                     new String[]{"(?m)^    skins: \\[\\]$",
                             "    skins:\n"
@@ -230,8 +269,8 @@ public final class ConfigUpdater {
         String withGuard = addMissingChildren(updated, lines, user, "soldats");
         if (!withGuard.equals(updated)) added.add("soldats (garde)");
         updated = withGuard;
-        // Nouveaux réglages des sièges (types, armée ennemie…) et du calendrier : ajoutés sous leur section
-        for (String section : new String[]{"sieges", "evenements", "besoins", "emplois", "npc-economy"}) {
+        // Nouveaux réglages des sièges (types, armée ennemie…), du calendrier, des dialogues… : ajoutés sous leur section
+        for (String section : new String[]{"sieges", "evenements", "besoins", "emplois", "npc-economy", "dialogues"}) {
             String with = addMissingChildren(updated, lines, user, section);
             if (!with.equals(updated)) added.add(section + " (nouveaux réglages)");
             updated = with;
@@ -240,6 +279,10 @@ public final class ConfigUpdater {
         String withBuildings = addMissingChildren(updated, lines, user, "batiments");
         if (!withBuildings.equals(updated)) added.add("batiments (nouveaux réglages)");
         updated = withBuildings;
+        // Ateliers des nouveaux personnages : ajoutés sous batiments.ateliers (section existante)
+        String withAteliers = addMissingGrandChildren(updated, lines, user, "batiments", "ateliers");
+        if (!withAteliers.equals(updated)) added.add("batiments.ateliers (nouveaux personnages)");
+        updated = withAteliers;
         if (append.length() > 0) updated = updated.stripTrailing() + "\n" + append;
         return updated;
     }
@@ -295,6 +338,42 @@ public final class ConfigUpdater {
         Matcher header = Pattern.compile("(?m)^" + Pattern.quote(section) + ":[^\\n]*\\n").matcher(text);
         if (!header.find()) return text;
         return text.substring(0, header.end()) + String.join("\n", missing) + "\n" + text.substring(header.end());
+    }
+
+    /**
+     * Comme {@link #addMissingChildren}, un niveau plus bas : les clés « section.sous-section.clé »
+     * que le jar possède et pas le fichier (atelier d'un nouveau personnage, indentation de 4), avec
+     * leurs lignes plus indentées, ajoutées juste sous la ligne « sous-section: » de la section.
+     */
+    static String addMissingGrandChildren(String text, String[] jarLines, YamlConfiguration user,
+                                          String section, String sub) {
+        if (!user.isConfigurationSection(section + "." + sub)) return text;
+        List<String> missing = new ArrayList<>();
+        boolean inSection = false, inSub = false, copying = false;
+        Pattern child = Pattern.compile("^    ([A-Za-z0-9_-]+):");
+        for (String line : jarLines) {
+            if (line.startsWith(section + ":")) { inSection = true; continue; }
+            if (!inSection) continue;
+            if (!line.isBlank() && !line.startsWith(" ") && !line.startsWith("#")) break; // section suivante
+            if (line.startsWith("  " + sub + ":")) { inSub = true; continue; }
+            if (!inSub) continue;
+            if (!line.isBlank() && line.startsWith("  ") && !line.startsWith("   ")) break; // fin de la sous-section
+            Matcher m = child.matcher(line);
+            if (m.find()) {
+                copying = !user.contains(section + "." + sub + "." + m.group(1));
+                if (copying) missing.add(line);
+            } else if (copying && line.startsWith("     ")) {
+                missing.add(line);                                    // contenu de la clé ajoutée
+            } else if (!line.startsWith("     ")) {
+                copying = false;                                      // commentaire, ligne vide
+            }
+        }
+        if (missing.isEmpty()) return text;
+        Matcher header = Pattern.compile("(?m)^" + Pattern.quote(section) + ":[^\\n]*\\n").matcher(text);
+        if (!header.find()) return text;
+        Matcher subHeader = Pattern.compile("(?m)^  " + Pattern.quote(sub) + ":[^\\n]*\\n").matcher(text);
+        if (!subHeader.find(header.end())) return text;
+        return text.substring(0, subHeader.end()) + String.join("\n", missing) + "\n" + text.substring(subHeader.end());
     }
 
     private static int jarVersion(JavaPlugin plugin) {

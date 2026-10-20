@@ -1,5 +1,7 @@
 package com.citycore.util;
 
+import com.citycore.ui.UiDialogue;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -14,8 +16,12 @@ import java.util.function.Supplier;
 
 /**
  * Dialogues des PNJ affichés lettre par lettre dans la barre d'action (au-dessus de la barre
- * d'objets), et uniquement là : rien n'est recopié dans le chat. Une réplique plus large que
- * l'écran est coupée entre deux mots et affichée en plusieurs morceaux successifs (voir wrap).
+ * d'objets), et uniquement là : rien n'est recopié dans le chat.
+ *
+ * Joueur équipé du pack : une réplique longue s'écrit sur deux lignes centrées (voir
+ * {@link UiDialogue}), une page de deux lignes de plus seulement pour les très longues. Sans le
+ * pack, la barre d'action ne tient qu'une ligne : la réplique est coupée entre deux mots et
+ * affichée en plusieurs morceaux successifs (voir wrap).
  *
  * Un seul dialogue à la fois par joueur : un dialogue lancé pendant qu'un autre se joue attend
  * son tour. Pendant un dialogue, les autres messages de la barre d'action du plugin (entrée dans
@@ -25,6 +31,13 @@ public class TypewriterUtil {
 
     private static final int CHARS_PER_TICK = 2;
     private static final int DELAY_BETWEEN_LINES = 50; // 2,5 secondes pour lire la ligne complète
+
+    /** Répliques sur deux lignes (joueurs équipés du pack) ; null = toujours en morceaux. */
+    private static UiDialogue multiLine;
+
+    public static void setMultiLine(UiDialogue dialogue) {
+        multiLine = dialogue;
+    }
 
     /** Fournit le nom de la ville pour le marqueur {ville} des dialogues. */
     private static Supplier<String> cityNameSupplier = () -> "la ville";
@@ -137,9 +150,14 @@ public class TypewriterUtil {
             if (onFinish != null) onFinish.run();
             return;
         }
-        // Répliques trop longues pour la barre d'action : coupées en morceaux successifs
+        // Répliques trop longues pour une ligne : pages de deux lignes (pack), sinon morceaux successifs
+        boolean twoLines = multiLine != null && multiLine.supports(player);
         List<String> wrapped = new java.util.ArrayList<>();
-        for (String line : lines) wrapped.addAll(wrap(resolve(line, player)));
+        for (String line : lines) {
+            String resolved = resolve(line, player);
+            List<String> pages = twoLines ? multiLine.pages(resolved) : null;
+            wrapped.addAll(pages != null ? pages : wrap(resolved));
+        }
         lines = wrapped;
         Deque<Dialogue> queue = queues.get(player.getUniqueId());
         if (queue != null) {
@@ -181,6 +199,11 @@ public class TypewriterUtil {
         }
 
         String fullLine = resolve(dialogue.lines().get(lineIndex), player);
+        // Page de deux lignes (pack) : écrite par la police décalée, caractère visible par caractère
+        if (multiLine != null && fullLine.indexOf('\n') >= 0) {
+            playPage(plugin, player, dialogue, lineIndex, fullLine);
+            return;
+        }
 
         new BukkitRunnable() {
             int charIndex = 0;
@@ -213,6 +236,45 @@ public class TypewriterUtil {
                     if (cut > 0 && fullLine.charAt(cut - 1) == '§') cut++;
                     player.sendActionBar(fullLine.substring(0, Math.min(cut, fullLine.length())) + "§7▌");
                 }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    /**
+     * Page de deux lignes : même rythme qu'une ligne simple, puis la page reste affichée le temps
+     * de la lire (plus longtemps qu'une ligne simple : elle est plus longue). Le jeu efface la barre
+     * d'action 3 s après le dernier envoi : la page est renvoyée chaque seconde pendant la lecture.
+     */
+    private static void playPage(JavaPlugin plugin, Player player, Dialogue dialogue, int lineIndex, String page) {
+        int total = UiDialogue.visibleLength(page);
+        int hold  = DELAY_BETWEEN_LINES + total / 4;
+        Component full = multiLine.render(page, total);
+        new BukkitRunnable() {
+            int revealed = 0;
+            int held = -1;    // -1 : en cours d'écriture ; sinon ticks de lecture écoulés
+
+            @Override
+            public void run() {
+                if (!player.isOnline()) {
+                    queues.remove(player.getUniqueId());
+                    cancel();
+                    return;
+                }
+                if (held < 0) {
+                    revealed += CHARS_PER_TICK;
+                    if (revealed < total) {
+                        player.sendActionBar(multiLine.render(page, revealed));
+                        return;
+                    }
+                    held = 0;
+                }
+                if (held >= hold) {
+                    cancel();
+                    playLine(plugin, player, dialogue, lineIndex + 1);
+                    return;
+                }
+                if (held % 20 == 0) player.sendActionBar(full);
+                held++;
             }
         }.runTaskTimer(plugin, 0L, 1L);
     }

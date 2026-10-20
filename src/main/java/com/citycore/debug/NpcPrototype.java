@@ -628,7 +628,10 @@ public class NpcPrototype implements Listener {
 
     private void notifyOps(String message) {
         plugin.getLogger().info("[Proto] " + message.replaceAll("§.", ""));
-        for (Player p : Bukkit.getOnlinePlayers()) if (p.isOp()) p.sendMessage(PREFIX + message);
+        // Suivi du prototype : pour qui a le droit de s'en servir (citycore.admin.proto, op par défaut)
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (p.hasPermission(com.citycore.command.CityPermissions.ADMIN_PROTO)) p.sendMessage(PREFIX + message);
+        }
     }
 
     private static int parse(String s, int def) {

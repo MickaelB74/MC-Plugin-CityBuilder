@@ -25,6 +25,7 @@ public class QuestGUI {
     public static final int SLOT_SPECIAL  = 6;
     public static final int SLOT_PERSONAL = 4; // slot central — uniquement si quêtes perso
     public static final int SLOT_BACK     = 8;
+    public static final int SLOT_JOURNAL  = 0; // journal de quêtes : suivi et affichage du suivi
 
     private final CityNPC             npcType;
     private final QuestConfig         questConfig;
@@ -36,6 +37,22 @@ public class QuestGUI {
 
     public void setThemed(com.citycore.ui.screens.QuestScreens themed) {
         this.themed = themed;
+    }
+
+    /** Ouvre le journal de quêtes, onglet « Suivi » (null = pas d'accès depuis ce menu). */
+    private java.util.function.Consumer<Player> journal;
+
+    public void setJournal(java.util.function.Consumer<Player> journal) {
+        this.journal = journal;
+    }
+
+    public boolean hasJournal() {
+        return journal != null;
+    }
+
+    /** Journal de quêtes : habitants suivis, position du panneau, affichage du suivi. */
+    public void openJournal(Player player) {
+        if (journal != null) journal.accept(player);
     }
 
     public QuestGUI(CityNPC npcType, QuestConfig questConfig,
@@ -72,6 +89,16 @@ public class QuestGUI {
         // ── Quêtes Personnelles (slot central, si disponibles) ───
         if (hasPersonalQuests(npcLevel)) {
             inv.setItem(SLOT_PERSONAL, buildPersonalQuestButton(npcLevel));
+        }
+
+        // ── Journal de quêtes (suivi, affichage visible / accroché / masqué) ──
+        if (journal != null) {
+            inv.setItem(SLOT_JOURNAL, makeItem(Material.MAP, "§6📋 Journal de quêtes", List.of(
+                    "§7Quêtes suivies et affichage du suivi :",
+                    "§7visible, accroché à la liste des",
+                    "§7joueurs (Tab) ou masqué.",
+                    "",
+                    "§e▶ Cliquez pour ouvrir")));
         }
 
         inv.setItem(SLOT_BACK, makeItem(Material.ARROW, "§7← Retour", List.of()));
@@ -225,10 +252,11 @@ public class QuestGUI {
        ========================= */
 
     public String buildObjectiveLabel(QuestObjective obj) {
+        // Libellé de l'entrée de quête (famille « Laine (toutes couleurs) », objet ou créature de mod)
         if (obj.isMaterialObjective()) {
-            return "§f" + formatName(obj.material().name());
+            return "§f" + QuestConfig.label(npcType, obj);
         } else if (obj.isEntityObjective()) {
-            return "§fTuer " + formatName(obj.entity().name());
+            return "§fTuer " + QuestConfig.label(npcType, obj);
         } else if (obj.isBiomeObjective()) {
             return "§7Explorer §f" + formatName(obj.biome().name());
         } else if (obj.isPersonalObjective()) {

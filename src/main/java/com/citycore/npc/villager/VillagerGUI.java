@@ -142,11 +142,9 @@ public class VillagerGUI {
         if (lines.isEmpty()) {
             lines = List.of(npcType.displayName + " §f: §oJe ne peux rien pour vous ici... pas encore.");
         }
-        com.citycore.integration.ModIntegrations.Mod mod = com.citycore.integration.ModIntegrations.requiredBy(npcType);
-        String modName = mod == null ? "Un mod requis" : "Le mod " + mod.displayName;
-        com.citycore.util.TypewriterUtil.play(plugin, player, lines, () -> player.sendMessage(
-                "§8(" + modName + " n'est pas installé sur ce serveur : " + plainName()
-                        + " ne peut ni commercer ni confier de quêtes.)"));
+        // « (Le mod Tide n'est pas installé…) », ou « Les mods A et B ne sont pas tous les deux installés… »
+        String message = com.citycore.integration.ModIntegrations.unavailableMessage(npcType, plainName());
+        com.citycore.util.TypewriterUtil.play(plugin, player, lines, () -> player.sendMessage(message));
     }
 
     /* =========================
@@ -194,7 +192,7 @@ public class VillagerGUI {
         lore.add("§7Assignez-lui un bâtiment pour");
         lore.add("§7débloquer son commerce.");
         lore.add("");
-        lore.add("§8/city build assign <bâtiment> " + npcType.tag.replace("citycore_", ""));
+        lore.add("§8« Chercher un bâtiment » : ses ateliers possibles.");
         inv.setItem(0, makeItem(Material.COMPASS, "§a" + plainName() + " — Dans la ville", lore));
 
         // Bouton recherche bâtiment
@@ -241,8 +239,8 @@ public class VillagerGUI {
                             "§7Aucun atelier libre ou réservé",
                             "§7à ce personnage.",
                             "",
-                            "§8Créez-en un avec",
-                            "§8/city build new atelier " + npcType.skinId
+                            "§8Créez-en un chez Alderic :",
+                            "§8« Bâtiments » → « Ajouter un bâtiment »"
                     )));
         } else {
             int slot = 0;
@@ -310,8 +308,8 @@ public class VillagerGUI {
                         "§7entrepôt se remplit.")));
         inv.setItem(SLOT_INVENTORY, makeItem(Material.CHEST, "§6📦 Entrepôt",
                 List.of("§7Réserves de " + npcType.displayName + "§7.",
-                        "§7Rachetez-lui ses matières",
-                        "§7premières (non revendables).")));
+                        "§7Servez-vous gratuitement",
+                        "§7(objets non revendables).")));
         inv.setItem(SLOT_SHOP, makeItem(Material.GOLD_INGOT, "§b🛒 Boutique",
                 List.of("§7Ses fabrications et raretés.",
                         "§7Produites à partir des stocks",
@@ -423,22 +421,24 @@ public class VillagerGUI {
         player.openInventory(inv);
     }
 
-    /** Bulle d'une réserve de l'entrepôt (stock, prix de revente). */
+    /** Bulle d'une réserve de l'entrepôt (stock ; on s'y sert gratuitement). */
     public List<String> stockLore(Player player, Material mat, SellPrice sp) {
-        boolean employee = market.isEmployee(player, npcType);
         int stock = dataManager.getInventoryAmount(npcType, mat);
-        int price = market.resaleLotPrice(sp, employee);
+        int stack = Math.max(sp.quantity(), mat.getMaxStackSize());
         List<String> lore = new ArrayList<>();
         lore.add(market.stockBar(stock, sp.capacity()));
         lore.add("");
-        lore.add("§7Prix : §6" + price + " coins §7/ " + sp.quantity()
-                + (employee ? " §a(-" + market.cfg().jobShopDiscount() + "% employé)" : ""));
-        lore.add("§8Rachat actuel par le PNJ : "
+        lore.add("§aGratuit §7: réserve de la ville");
+        lore.add("§8Dépôt payé par le PNJ : "
                 + format(market.currentLotPrice(npcType, mat, false)) + " / " + sp.quantity());
         lore.add("");
-        lore.add(stock >= sp.quantity()
-                ? "§eCliquez pour acheter " + sp.quantity()
-                : "§cStock insuffisant");
+        if (stock <= 0) {
+            lore.add("§cRéserve vide");
+        } else {
+            lore.add("§eClic §7: prendre " + Math.min(stock, sp.quantity()));
+            if (stock > sp.quantity()) lore.add("§eMaj + clic §7: prendre " + Math.min(stock, stack));
+            lore.add("§8Objets pris : non revendables");
+        }
         return lore;
     }
 
@@ -572,9 +572,12 @@ public class VillagerGUI {
     }
 
     private String tokenName(Requirement r) {
-        return r.token().startsWith("#")
-                ? formatName(r.token().substring(1)) + " §8(au choix)§7"
-                : formatName(r.token());
+        // Un seul objet (vanilla ou mod) : son nom ; un groupe, un tag ou un motif : « … (au choix) »
+        if (r.materials().size() == 1) return formatName(r.materials().iterator().next());
+        String token = r.token().startsWith("#") ? r.token().substring(1) : r.token();
+        String name = token.contains("*") || token.contains(":") || token.contains(",")
+                ? formatName(r.materials().iterator().next()) : formatName(token);
+        return name + " §8(au choix)§7";
     }
 
     private int menuSize(int entries) {

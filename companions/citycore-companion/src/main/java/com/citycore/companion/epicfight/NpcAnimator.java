@@ -1,5 +1,7 @@
-package com.citycore.epicfight;
+package com.citycore.companion.epicfight;
 
+import com.citycore.companion.CityCoreCompanion;
+import com.citycore.companion.Settings;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -104,6 +106,11 @@ final class NpcAnimator {
     public void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
         tick++;
+        // Module éteint dans les réglages (epicfight.actif) : les PNJ suivis s'arrêtent, plus rien n'est envoyé
+        if (!Settings.EF_ENABLED.get()) {
+            if (!npcs.isEmpty()) stopAll();
+            return;
+        }
         if (tick % SCAN_TICKS == 0) scan(server);
         for (Iterator<NpcState> it = npcs.values().iterator(); it.hasNext(); ) {
             NpcState s = it.next();
@@ -131,7 +138,7 @@ final class NpcAnimator {
     @SubscribeEvent
     public void onStartTracking(PlayerEvent.StartTracking event) {
         if (!(event.getTarget() instanceof ServerPlayer npc) || !(event.getEntity() instanceof ServerPlayer viewer)) return;
-        if (!isNpc(npc)) return;
+        if (!Settings.EF_ENABLED.get() || !isNpc(npc)) return;
         npcs.computeIfAbsent(npc.getId(), id -> new NpcState(npc));
         pending.add(new PendingSync(viewer.getUUID(), npc.getId(), tick + SYNC_DELAY));
     }
@@ -141,6 +148,24 @@ final class NpcAnimator {
         npcs.clear();
         pending.clear();
         lastLoggedCount = -1;
+    }
+
+    /** Module éteint : les PNJ en marche sont annoncés arrêtés (sinon ils marcheraient sur place), puis oubliés. */
+    private void stopAll() {
+        for (NpcState s : npcs.values()) {
+            if (s.npc.isRemoved()) continue;
+            if (s.running && !sprintUnavailable) setSprintFlag(s.npc, false);
+            if (!s.moving) continue;
+            try {
+                broadcast(s.npc, new SPUpdatePlayerInput(s.npc.getId(), 0f, 0f));
+            } catch (Throwable t) {
+                warnOnce("arret", t);
+            }
+        }
+        npcs.clear();
+        pending.clear();
+        lastLoggedCount = -1;
+        CityCoreCompanion.LOGGER.info("Module Epic Fight éteint (epicfight.actif = false) : PNJ plus animés");
     }
 
     /* ───────────────────────── PNJ ───────────────────────── */
@@ -162,7 +187,7 @@ final class NpcAnimator {
         }
         if (Settings.LOG.get() && npcs.size() != lastLoggedCount) {
             lastLoggedCount = npcs.size();
-            CityCoreEpicFight.LOGGER.info("{} PNJ animé(s) pour Epic Fight", npcs.size());
+            CityCoreCompanion.LOGGER.info("{} PNJ animé(s) pour Epic Fight", npcs.size());
         }
     }
 
@@ -200,7 +225,7 @@ final class NpcAnimator {
             s.strafe = strafe;
             broadcast(npc, new SPUpdatePlayerInput(npc.getId(), forward, strafe));
             if (Settings.LOG.get()) {
-                CityCoreEpicFight.LOGGER.info("PNJ {} : {} (avant {}, côté {}, vitesse {})", npc.getGameProfile().getName(),
+                CityCoreCompanion.LOGGER.info("PNJ {} : {} (avant {}, côté {}, vitesse {})", npc.getGameProfile().getName(),
                         moving ? "marche" : "arrêt", forward, strafe, String.format("%.3f", speed));
             }
         }
@@ -236,7 +261,7 @@ final class NpcAnimator {
             setSharedFlag.invoke(npc, FLAG_SPRINTING, on);
         } catch (Throwable t) {
             sprintUnavailable = true;
-            CityCoreEpicFight.LOGGER.warn("Course des PNJ indisponible ({}) : ils marcheront seulement", t.toString());
+            CityCoreCompanion.LOGGER.warn("Course des PNJ indisponible ({}) : ils marcheront seulement", t.toString());
         }
     }
 
@@ -258,7 +283,7 @@ final class NpcAnimator {
         s.combo++;
         s.lastAttackTick = tick;
         broadcast(s.npc, new SPAnimatorControl(AbstractAnimatorControl.Action.PLAY, anim, s.npc.getId(), 0.0F, false));
-        if (Settings.LOG.get()) CityCoreEpicFight.LOGGER.info("PNJ {} : coup {}", s.npc.getGameProfile().getName(), s.combo);
+        if (Settings.LOG.get()) CityCoreCompanion.LOGGER.info("PNJ {} : coup {}", s.npc.getGameProfile().getName(), s.combo);
     }
 
     /** Tir : chaque joueur joue l'animation de tir de l'arme tenue (arc, arbalète, armes de mods). */
@@ -266,7 +291,7 @@ final class NpcAnimator {
         boolean crossbow = s.npc.getMainHandItem().getItem() instanceof net.minecraft.world.item.CrossbowItem;
         AssetAccessor<? extends StaticAnimation> fallback = crossbow ? Animations.BIPED_CROSSBOW_SHOT : Animations.BIPED_BOW_SHOT;
         broadcast(s.npc, new SPAnimatorControl(AbstractAnimatorControl.Action.SHOT, fallback, s.npc.getId(), 0.0F, false));
-        if (Settings.LOG.get()) CityCoreEpicFight.LOGGER.info("PNJ {} : tir", s.npc.getGameProfile().getName());
+        if (Settings.LOG.get()) CityCoreCompanion.LOGGER.info("PNJ {} : tir", s.npc.getGameProfile().getName());
     }
 
     /**
@@ -319,13 +344,13 @@ final class NpcAnimator {
                 }
                 EpicFightNetworkManager.sendToPlayer(new SPUpdatePlayerInput(s.npc.getId(), s.forward, s.strafe), viewer);
             } catch (Throwable t) {
-                CityCoreEpicFight.LOGGER.warn("Envoi à {} impossible : {}", viewer.getGameProfile().getName(), t.toString());
+                CityCoreCompanion.LOGGER.warn("Envoi à {} impossible : {}", viewer.getGameProfile().getName(), t.toString());
             }
         }
     }
 
     private void warnOnce(String kind, Throwable t) {
-        if (warned.add(kind)) CityCoreEpicFight.LOGGER.warn("Animation des PNJ ({}) impossible : {}", kind, t.toString());
+        if (warned.add(kind)) CityCoreCompanion.LOGGER.warn("Animation des PNJ ({}) impossible : {}", kind, t.toString());
     }
 
     /** Envoi à tous les joueurs qui voient le PNJ. */

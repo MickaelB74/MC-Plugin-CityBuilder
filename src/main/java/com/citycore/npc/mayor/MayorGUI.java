@@ -32,6 +32,8 @@ public class MayorGUI implements NPCGui {
     public static final int SLOT_EXPAND      = 6;
     public static final int SLOT_FOLLOW      = 8;
     public static final int SLOT_POPULATION  = 3;
+    /** Parcelles : revendiquer ou rendre celle où l'on se tient, voir les limites de la ville. */
+    public static final int SLOT_PARCELS     = 7;
 
     /** Besoins et satisfaction (phase 6) : bilan affiché dans le chat (menu classique) ; null = case absente. */
     private java.util.function.Supplier<List<String>> populationReport;
@@ -46,6 +48,8 @@ public class MayorGUI implements NPCGui {
     private final MayorEconomyGUI  economyGUI;
     private final MayorQuestGUI    questGUI;
     private final CityQuestManager cityQuestManager;
+    private final BuildingManager  buildingManager;
+    private final JavaPlugin       plugin;
     /** Écrans illustrés « Valmont » (null = menus classiques uniquement). */
     private com.citycore.ui.screens.MayorScreens themed;
 
@@ -65,6 +69,8 @@ public class MayorGUI implements NPCGui {
         this.economyGUI       = new MayorEconomyGUI(cityManager, economy, cityQuestManager);
         this.questGUI         = questGUI;
         this.cityQuestManager = cityQuestManager;
+        this.buildingManager  = buildingManager;
+        this.plugin           = plugin;
     }
 
     public MayorBuildingGUI getBuildingGUI()    { return buildingGUI; }
@@ -92,7 +98,8 @@ public class MayorGUI implements NPCGui {
                     int missing = price - cityManager.getCityCoins();
                     player.sendMessage("§c❌ Fonds insuffisants. Il manque §f"
                             + missing + " coins§c.");
-                    player.sendMessage("§7💡 §e/city deposit <montant>");
+                    player.sendMessage("§7💡 Déposez des coins dans la caisse : " + CityNPC.MAYOR.displayName
+                            + " §7→ §e« Trésor »§7.");
                 }
                 open(player);
             }
@@ -165,7 +172,7 @@ public class MayorGUI implements NPCGui {
         }
 
         // ── ÉCONOMIE ─────────────────────────────────────────────
-        inv.setItem(SLOT_ECONOMY, makeItem(Material.GOLD_INGOT, "§6💰 Économie",
+        inv.setItem(SLOT_ECONOMY, makeItem(Material.GOLD_INGOT, "§6💰 Trésor",
                 List.of(
                         "§7Caisse : §6" + cityManager.getCityCoins() + " coins",
                         "", "§eCliquez pour déposer"
@@ -186,6 +193,10 @@ public class MayorGUI implements NPCGui {
                                 : "§cFonds insuffisants"
                 )));
 
+        // ── PARCELLES ────────────────────────────────────────────
+        inv.setItem(SLOT_PARCELS, makeItem(Material.FILLED_MAP, "§e🗺 Parcelles de la ville",
+                parcelLore(player, city)));
+
         // ── FOLLOW ───────────────────────────────────────────────
         boolean following = npcManager.isFollowing(player, CityNPC.MAYOR);
         inv.setItem(SLOT_FOLLOW, makeItem(
@@ -199,6 +210,43 @@ public class MayorGUI implements NPCGui {
                 )));
 
         player.openInventory(inv);
+    }
+
+    /* =========================
+       PARCELLES (chunks de la ville)
+       ========================= */
+
+    /**
+     * Bulle des parcelles (menu classique et barre « Parcelles » de l'écran illustré) : compte,
+     * parcelle où se tient le joueur, gestes possibles.
+     */
+    public List<String> parcelLore(Player player, City city) {
+        List<String> lore = new ArrayList<>(List.of(
+                "§7Revendiquées : §f" + city.getClaimedChunks(),
+                "§7Emplacements : §f" + city.getMaxChunks(),
+                com.citycore.city.ParcelActions.statusHere(cityManager, player),
+                "",
+                "§eClic gauche §7: revendiquer la parcelle où vous êtes",
+                "§eClic droit §7: voir les limites de la ville (5 s)",
+                "§eMaj + clic droit §7: rendre la parcelle où vous êtes",
+                "",
+                "§8Plus loin ? Demandez à Alderic de vous",
+                "§8suivre, puis parlez-lui sur place."));
+        return lore;
+    }
+
+    /** Clic sur les parcelles : gauche = revendiquer, droit = limites, Maj + droit = rendre. */
+    public void handleParcelClick(Player player, org.bukkit.event.inventory.ClickType click) {
+        if (click.isRightClick() && click.isShiftClick()) {
+            com.citycore.city.ParcelActions.unclaimHere(cityManager, buildingManager, player);
+        } else if (click.isRightClick()) {
+            com.citycore.city.ParcelActions.showBorders(plugin, cityManager, player);
+            return; // le menu se ferme pour laisser voir les limites
+        } else {
+            com.citycore.city.ParcelActions.claimHere(cityManager, player);
+        }
+        // Rouvert au tick suivant : compte et état de la parcelle à jour
+        Bukkit.getScheduler().runTask(plugin, () -> { if (player.isOnline()) open(player); });
     }
 
     private ItemStack makeItem(Material mat, String name, List<String> lore) {

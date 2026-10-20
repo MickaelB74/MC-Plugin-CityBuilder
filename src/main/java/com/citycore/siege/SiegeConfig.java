@@ -18,7 +18,8 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Réglages des sièges (phase 4 du plan « Valmont vivante »), section {@code sieges} de config.yml :
  * palier minimal, rythme des vagues, nombre et type d'assaillants selon le palier de la ville et
- * les joueurs connectés, champion, récompense.
+ * les joueurs connectés, arrivée (durée, largeur du front, points d'entrée), escouades, champion,
+ * récompense.
  */
 public final class SiegeConfig {
 
@@ -32,6 +33,11 @@ public final class SiegeConfig {
     private int    pauseSeconds = 30;
     private int    durationMinutes = 20;
     private int    spawnDistance = 12;
+    private int    arrivalSeconds = 15;   // arrivée d'une vague, étalée dans le temps
+    private int    frontWidth = 40;       // largeur de la zone d'apparition
+    private int    entryPoints = 4;       // points d'entrée sur cette largeur
+    private int    squadMin = 4, squadMax = 8;
+    private int    maxPerTarget = 3;      // assaillants au contact d'un même défenseur
     private boolean playersWounded = true;
     private final TreeMap<Integer, Integer> waves = new TreeMap<>();
     private double base = 4, perTier = 1, perPlayer = 0.5;
@@ -57,6 +63,13 @@ public final class SiegeConfig {
         pauseSeconds    = Math.max(0, s.getInt("pause-vagues-secondes", 30));
         durationMinutes = Math.max(1, s.getInt("duree-minutes", 20));
         spawnDistance   = Math.max(4, Math.min(48, s.getInt("distance-apparition", 12)));
+        arrivalSeconds  = Math.max(0, Math.min(120, s.getInt("arrivee-secondes", 15)));
+        frontWidth      = Math.max(0, Math.min(96, s.getInt("largeur-front", 40)));
+        entryPoints     = Math.max(1, Math.min(8, s.getInt("points-entree", 4)));
+        ConfigurationSection sq = s.getConfigurationSection("escouades");
+        squadMin        = sq == null ? 4 : Math.max(1, Math.min(16, sq.getInt("min", 4)));
+        squadMax        = sq == null ? 8 : Math.max(squadMin, Math.min(16, sq.getInt("max", 8)));
+        maxPerTarget    = sq == null ? 3 : Math.max(0, sq.getInt("max-par-cible", 3));
         playersWounded  = s.getBoolean("joueurs-blesses", true);
 
         waves.clear();
@@ -137,6 +150,22 @@ public final class SiegeConfig {
     public int pauseSeconds()    { return pauseSeconds; }
     public long durationMs()     { return durationMinutes * 60_000L; }
     public int spawnDistance()   { return spawnDistance; }
+
+    /** Durée (ms) sur laquelle s'étale l'arrivée d'une vague, escouade après escouade (0 = d'un coup). */
+    public long arrivalMs()      { return arrivalSeconds * 1000L; }
+
+    /** Largeur (blocs) de la zone d'apparition, le long de la lisière attaquée. */
+    public int frontWidth()      { return frontWidth; }
+
+    /** Points d'entrée répartis sur la largeur du front. */
+    public int entryPoints()     { return entryPoints; }
+
+    /** Taille d'une escouade d'assaillants (meneur compris). */
+    public int squadMin()        { return squadMin; }
+    public int squadMax()        { return squadMax; }
+
+    /** Assaillants au contact d'un même défenseur au plus (0 = sans limite). */
+    public int maxPerTarget()    { return maxPerTarget; }
 
     /** Pendant un siège, les assaillants peuvent blesser les joueurs, même en ville. */
     public boolean playersWounded() { return playersWounded; }

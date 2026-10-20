@@ -28,7 +28,7 @@ public class CityQuestSelectionListener implements Listener {
         if (event.getCurrentItem() == null) return;
         if (event.getClickedInventory() != event.getView().getTopInventory()) return;
 
-        if (tracking) gui.handleClick(player, event.getCurrentItem());
+        if (tracking) gui.handleClick(player, event.getCurrentItem(), event.isRightClick());
         else gui.handleStoriesClick(player, event.getCurrentItem());
     }
 }

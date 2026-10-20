@@ -37,8 +37,10 @@ import java.util.Set;
  * Arbre en quatre lignes parallèles, chacune dans l'ordre de la trame :
  *  - les chapitres I à X (objectifs listés au survol, avancement « 3/7 ») ;
  *  - les survivants de Valmont ; les légendes de passage (bonus) ; les hauts faits.
- * Chaque personnage et chaque haut fait se place sous la colonne de son chapitre (deux
- * personnages du même chapitre l'un sous l'autre) : le dragon est sous le chapitre IX.
+ * Chaque personnage et chaque haut fait se place sous la colonne de son chapitre (plusieurs
+ * personnages du même chapitre l'un sous l'autre : trois légendes au chapitre X) : le dragon est
+ * sous le chapitre IX. La hauteur de chaque ligne suit le chapitre le plus fourni. La bulle d'une
+ * légende liée à un mod le nomme, et signale s'il manque au serveur.
  *
  * Pourquoi des lignes : Minecraft range les enfants d'un progrès dans un ensemble non ordonné,
  * dont l'ordre change à chaque démarrage. Une chaîne (un seul enfant par progrès) reste toujours
@@ -365,7 +367,8 @@ public class CityAdvancements implements Listener {
                             npcManager.resolveSkin(npc), (q.optional() ? "★ " : "") + name,
                             q.optional() ? "light_purple" : "green",
                             chapterLine + npc.function + " — " + (q.optional() ? "visiteur légendaire" : "survivant de Valmont")
-                                    + ".\nLe rencontrer, le ramener en ville, l'installer dans son bâtiment.",
+                                    + ".\nLe rencontrer, le ramener en ville, l'installer dans son bâtiment."
+                                    + modLine(npc),
                             q.optional() ? "goal" : "task", false), List.of(MET, IN_TOWN, SETTLED)));
                     if (q.optional()) lastLegend = k; else lastSurvivor = k;
                 } else if (ProgressionService.isFeat(q)) {
@@ -393,6 +396,27 @@ public class CityAdvancements implements Listener {
         return list;
     }
 
+    /**
+     * Mods liés à un personnage, pour la bulle de son progrès : « Lié au mod Tide », « Liée aux
+     * mods Wilder Nature et Farmer's Delight », « Enrichi par Iron's Spells 'n Spellbooks », avec
+     * la mention d'un mod requis absent du serveur (ni boutique ni quêtes).
+     */
+    private static String modLine(CityNPC npc) {
+        List<com.citycore.integration.ModIntegrations.Mod> required = com.citycore.integration.ModIntegrations.requiredMods(npc);
+        List<com.citycore.integration.ModIntegrations.Mod> optional = com.citycore.integration.ModIntegrations.optionalMods(npc);
+        StringBuilder sb = new StringBuilder();
+        if (!required.isEmpty()) {
+            boolean missing = required.stream().anyMatch(m -> !com.citycore.integration.ModIntegrations.present(m.id));
+            sb.append("\nLien avec ").append(required.size() > 1 ? "les mods " : "le mod ")
+                    .append(com.citycore.integration.ModIntegrations.names(required))
+                    .append(missing ? " — absent du serveur : ni boutique ni quêtes." : ".");
+        }
+        if (!optional.isEmpty()) {
+            sb.append("\nContenu en plus avec ").append(com.citycore.integration.ModIntegrations.names(optional)).append('.');
+        }
+        return sb.toString();
+    }
+
     /* =========================
        DISPOSITION FIXE
        ========================= */
@@ -405,8 +429,21 @@ public class CityAdvancements implements Listener {
      */
     private Map<NamespacedKey, float[]> layoutPositions() {
         Map<NamespacedKey, float[]> pos = new HashMap<>();
-        final float yChapters = 0, ySurvivors = 2, yLegends = 5, yFeats = 8;
-        pos.put(key("root"), new float[]{0, 4});
+        // Hauteur de chaque ligne : autant de rangées que le chapitre le plus fourni (le chapitre X
+        // compte trois légendes), puis une rangée vide avant la ligne suivante
+        int maxSurvivors = 1, maxLegends = 1;
+        for (CityTier tier : CityTier.values()) {
+            int s = 0, l = 0;
+            for (CityQuest q : tier.quests) {
+                if (!ProgressionService.isRecruit(q)) continue;
+                if (q.optional()) l++; else s++;
+            }
+            maxSurvivors = Math.max(maxSurvivors, s);
+            maxLegends = Math.max(maxLegends, l);
+        }
+        final float yChapters = 0, ySurvivors = 2;
+        final float yLegends = ySurvivors + maxSurvivors + 1, yFeats = yLegends + maxLegends + 1;
+        pos.put(key("root"), new float[]{0, Math.round(yFeats / 2)});
         pos.put(key(ROW_CHAPTERS), new float[]{1, yChapters});
         pos.put(key(ROW_SURVIVORS), new float[]{1, ySurvivors});
         pos.put(key(ROW_LEGENDS), new float[]{1, yLegends});

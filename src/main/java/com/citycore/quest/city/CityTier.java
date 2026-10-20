@@ -21,13 +21,20 @@ import static com.citycore.quest.city.CityQuest.*;
  * dragon — l'apogée. Épilogue (X) : Valmont redevient capitale ; hauts faits et légendes.
  *
  * Chaque chapitre retrouve des survivants (artisans dispersés) liés à la Nuit Noire, et accueille
- * parfois une légende de passage (quête bonus). Les identifiants des quêtes reprennent ceux de la
+ * des légendes de passage (quêtes bonus), dont huit liées à un mod du serveur (Robinson, Achab,
+ * Obélix, Musashi, Geppetto, Ragnar, Jeanne, Hercule) ; le chapitre IX n'en a aucune. Les identifiants des quêtes reprennent ceux de la
  * version en sept chapitres : la progression enregistrée est conservée (voir
  * {@link CityQuestManager#migrateTierScheme()}).
  *
  * Pour passer au palier suivant : toutes les quêtes non bonus terminées
  * + payer la charte (upgradeCost) depuis la caisse de la ville.
  * Récompense : rewardChunks emplacements de chunks offerts.
+ *
+ * Parcelles (barème du 21/10/2026, une grande ville) : 12, 24, 40, 60, 85, 110, 140 et 175 chunks
+ * à revendiquer des chapitres I à VIII, 300 pour le haut fait du chapitre X. Les emplacements
+ * offerts (10 à la fondation, puis 10 à 40 par charte) en couvrent la plus grande part ; le reste
+ * s'achète à bas prix chez Alderic (city-expand). Les villes plus anciennes reçoivent la différence
+ * (voir {@link CityQuestManager#migrateChunkScheme()}).
  * Coûts, récompenses et objectifs sont surchargeables dans config.yml (city-tiers, city-quests).
  */
 public enum CityTier {
@@ -41,11 +48,12 @@ public enum CityTier {
                     "§6Alderic §f: §oVingt hivers ont passé depuis que Valmont a brûlé. Je suis Alderic, son dernier intendant.",
                     "§6Alderic §f: §oCette charte est tout ce qui reste de notre ville. Avec elle, Valmont peut renaître, ici même.",
                     "§6Alderic §f: §oD'abord, délimitons le camp et dressons une palissade.",
-                    "§6Alderic §f: §oOn dit qu'un vieux charbonnier vit seul dans les bois. Il nous faut son bois et son savoir."
+                    "§6Alderic §f: §oOn dit qu'un vieux charbonnier vit seul dans les bois. Il nous faut son bois et son savoir.",
+                    "§6Alderic §f: §oDes pêcheurs parlent d'un homme vêtu de peaux, sur la plage. Il compte les jours en entailles sur un poteau..."
             ),
             List.of(
                     claim("t1_claim", "§7Planter les jalons",
-                            "Claimez §f{n} chunks §7pour délimiter le campement.", 7),
+                            "Claimez §f{n} chunks §7pour délimiter le campement.", 12),
                     recruit("t1_bastien", "§2Le charbonnier des bois",
                             "Trouvez §2Bastien §7en forêt, ramenez-le et installez-le dans un bâtiment.",
                             CityNPC.WOODCUTTER, 250,
@@ -55,20 +63,25 @@ public enum CityTier {
                             "Délimitez §f{n} bâtiments §7(maison commune, cabane du bûcheron…).", 2),
                     deliver("t1_palisade", "§7La palissade",
                             "Livrez §f{n} rondins §7(toutes essences) pour la palissade.",
-                            Material.OAK_LOG, MaterialGroups.LOGS, 192)
+                            Material.OAK_LOG, MaterialGroups.LOGS, 192),
+                    recruit("b1_robinson", "§a★ L'homme de l'île",
+                            "§8[Bonus] §7Un naufragé barbu vit seul sur la côte depuis vingt-huit ans. Ramenez-le au campement.",
+                            CityNPC.ROBINSON, 500,
+                            Biome.BEACH, Biome.STONY_SHORE).asOptional()
             ),
-            150, 6),
+            150, 10),
 
     TIER_2(2, "§aHameau", Material.WHEAT, "Chapitre II — Du pain pour l'hiver",
             List.of(
                     "§6Alderic §f: §oLe camp tient bon. Mais un toit ne nourrit personne, et l'hiver approche.",
                     "§6Alderic §f: §oBastien jure qu'une fermière survit seule dans les plaines, avec les dernières semences de Valmont.",
                     "§6Alderic §f: §oAvec du grain en réserve, nous serons un vrai hameau.",
-                    "§6Alderic §f: §oEt méfiez-vous des bois : un archer y détrousse les pillards... mais il paraît qu'il a bon cœur."
+                    "§6Alderic §f: §oEt méfiez-vous des bois : un archer y détrousse les pillards... mais il paraît qu'il a bon cœur.",
+                    "§6Alderic §f: §oUn vieil homme fixe la rivière depuis trois jours. Il jure qu'« il » est là, quelque part."
             ),
             List.of(
                     claim("t2_claim", "§aÉtendre les champs",
-                            "Claimez §f{n} chunks §7au total.", 16),
+                            "Claimez §f{n} chunks §7au total.", 24),
                     recruit("t2_helene", "§eLa fermière des plaines",
                             "Trouvez §eHélène§7, ramenez-la et installez-la dans une grange.",
                             CityNPC.FARMER, 350,
@@ -81,9 +94,13 @@ public enum CityTier {
                     recruit("t2_robin", "§2★ Le prince des voleurs",
                             "§8[Bonus] §7Un archer hors-la-loi protège les champs des pillards. Gagnez sa confiance.",
                             CityNPC.ROBIN, 400,
-                            Biome.FOREST, Biome.DARK_FOREST, Biome.OLD_GROWTH_BIRCH_FOREST).asOptional()
+                            Biome.FOREST, Biome.DARK_FOREST, Biome.OLD_GROWTH_BIRCH_FOREST).asOptional(),
+                    recruit("b2_achab", "§b★ Le vieux capitaine",
+                            "§8[Bonus] §7Un capitaine à la jambe d'ivoire pêche jour et nuit sur la rive. Il cherche un poisson que personne n'a jamais vu.",
+                            CityNPC.ACHAB, 600,
+                            Biome.RIVER, Biome.BEACH, Biome.STONY_SHORE).asOptional()
             ),
-            400, 6),
+            400, 12),
 
     TIER_3(3, "§2Village", Material.STONECUTTER, "Chapitre III — Les pierres et la rivière",
             List.of(
@@ -94,7 +111,7 @@ public enum CityTier {
             ),
             List.of(
                     claim("t3_claim", "§2Le village s'étend",
-                            "Claimez §f{n} chunks §7au total.", 24),
+                            "Claimez §f{n} chunks §7au total.", 40),
                     recruit("t2_brennan", "§7Le tailleur errant",
                             "Trouvez §7Brennan §7dans les collines et offrez-lui un atelier.",
                             CityNPC.STONEMASON, 350,
@@ -114,7 +131,7 @@ public enum CityTier {
                             CityNPC.JACKSPARROW, 600,
                             Biome.BEACH, Biome.STONY_SHORE).asOptional()
             ),
-            800, 8),
+            800, 15),
 
     /* =========================================================
        ACTE II — LES MÉTIERS, LES ROUTES ET LA GARDE
@@ -125,11 +142,13 @@ public enum CityTier {
                     "§6Alderic §f: §oLe village grandit. Il lui faut du charbon pour l'hiver et un lieu où se réchauffer le cœur.",
                     "§6Alderic §f: §oGodefroy, maître de la Fosse aux Corbeaux, était sous terre quand Valmont a brûlé. Il creuse encore, dans les montagnes.",
                     "§6Alderic §f: §oRosalie tenait le Chaudron Doré, la taverne où buvaient toutes les guildes. Retrouvons-la, et sa louche avec.",
-                    "§6Alderic §f: §oLes nuits sont dangereuses : sécurisons les abords avant tout."
+                    "§6Alderic §f: §oLes nuits sont dangereuses : sécurisons les abords avant tout.",
+                    "§6Alderic §f: §oUn colosse traverse les forêts avec un menhir sur le dos. Il dit qu'il n'est pas gros.",
+                    "§6Alderic §f: §oEt un étranger en robe de voyage a désarmé trois brigands avec un sabre de bois."
             ),
             List.of(
                     claim("t4_claim", "§6Le bourg s'étend",
-                            "Claimez §f{n} chunks §7au total.", 32),
+                            "Claimez §f{n} chunks §7au total.", 60),
                     recruit("t3_godefroy", "§8Le mineur de la Fosse",
                             "Trouvez §8Godefroy §7près des montagnes et offrez-lui une mine.",
                             CityNPC.MINER, 450,
@@ -149,9 +168,17 @@ public enum CityTier {
                             Material.STONE_BRICKS, CityNPC.STONEMASON, 2),
                     kill("t3_rounds", "§cLes abords sûrs",
                             "Éliminez §f{n} monstres §7(tous joueurs confondus).",
-                            Material.IRON_SWORD, null, 50)
+                            Material.IRON_SWORD, null, 50),
+                    recruit("b4_obelix", "§9★ Ils sont fous ces Valmontois",
+                            "§8[Bonus] §7Un géant moustachu porte un menhir sur le dos et poursuit des sangliers. Offrez-lui un festin.",
+                            CityNPC.OBELIX, 600,
+                            Biome.FOREST, Biome.DARK_FOREST, Biome.TAIGA).asOptional(),
+                    recruit("b4_musashi", "§c★ La voie du sabre",
+                            "§8[Bonus] §7Un rōnin au chapeau de paille défie les brigands des routes. Gagnez son respect.",
+                            CityNPC.MUSASHI, 700,
+                            Biome.BAMBOO_JUNGLE, Biome.CHERRY_GROVE, Biome.WINDSWEPT_HILLS, Biome.MEADOW).asOptional()
             ),
-            1500, 8),
+            1500, 18),
 
     TIER_5(5, "§bVille", Material.ANVIL, "Chapitre V — Le marteau et le métier",
             List.of(
@@ -159,11 +186,12 @@ public enum CityTier {
                     "§6Alderic §f: §oThorvald a forgé les portes de Valmont : elles ont tenu une heure face au dragon. Il dit que ce n'était pas assez.",
                     "§6Alderic §f: §oAgathe avait douze ans quand le grand étendard a brûlé. Apprentie des teinturiers, elle seule saurait le refaire.",
                     "§6Alderic §f: §oBrennan veut des remparts de pierre. « Cette fois, ils tiendront », répète-t-il.",
-                    "§6Alderic §f: §oUn aventurier au chapeau de feutre fouille les ruines du monde. Il paraît qu'il cherche un marché..."
+                    "§6Alderic §f: §oUn aventurier au chapeau de feutre fouille les ruines du monde. Il paraît qu'il cherche un marché...",
+                    "§6Alderic §f: §oUn vieil artisan sculpte des pantins au coin du feu, sur la route du sud. Il paraît que l'un d'eux s'est enfui."
             ),
             List.of(
                     claim("t5_claim", "§bLes faubourgs",
-                            "Claimez §f{n} chunks §7au total.", 42),
+                            "Claimez §f{n} chunks §7au total.", 85),
                     recruit("t4_thorvald", "§4Le forgeron du nord",
                             "Trouvez §4Thorvald §7dans les terres enneigées et offrez-lui une forge.",
                             CityNPC.BLACKSMITH, 550,
@@ -187,20 +215,25 @@ public enum CityTier {
                     recruit("t4_indiana", "§6★ L'archéologue",
                             "§8[Bonus] §7Un aventurier au chapeau de feutre fouille les ruines du monde. Attirez-le sur votre marché.",
                             CityNPC.INDIANA, 700,
-                            Biome.DESERT, Biome.SAVANNA, Biome.JUNGLE).asOptional()
+                            Biome.DESERT, Biome.SAVANNA, Biome.JUNGLE).asOptional(),
+                    recruit("b5_geppetto", "§6★ Le menuisier et sa marionnette",
+                            "§8[Bonus] §7Un vieil ébéniste cherche du bon bois... et une marionnette qui a pris la fuite.",
+                            CityNPC.GEPPETTO, 600,
+                            Biome.FOREST, Biome.BIRCH_FOREST, Biome.FLOWER_FOREST, Biome.MEADOW).asOptional()
             ),
-            2500, 10),
+            2500, 20),
 
     TIER_6(6, "§3Ville franche", Material.SHIELD, "Chapitre VI — Les routes et la garde",
             List.of(
                     "§6Alderic §f: §oNous voici ville franche ! Nos échevins sont élus, et l'impôt nous revient.",
                     "§6Alderic §f: §oEdmond, maître des écuries royales, a ouvert les stalles la Nuit Noire. Il suit les hardes sauvages dans la savane.",
                     "§6Alderic §f: §oRoland, sergent de la garde, a perdu toute sa compagnie cette nuit-là. Offrons-lui une milice, et une raison de rester.",
-                    "§6Alderic §f: §oLes pillards rançonnent nos marchands sur les routes. Il est temps de les chasser."
+                    "§6Alderic §f: §oLes pillards rançonnent nos marchands sur les routes. Il est temps de les chasser.",
+                    "§6Alderic §f: §oUn vieillard au grand chapeau pointu a été vu sur la route marchande. Les gardes disent qu'il fait des feux d'artifice."
             ),
             List.of(
                     claim("t6_claim", "§3La ville franche",
-                            "Claimez §f{n} chunks §7au total.", 52),
+                            "Claimez §f{n} chunks §7au total.", 110),
                     recruit("t4_edmond", "§6Le maître des écuries",
                             "Trouvez §6Edmond §7dans la savane et bâtissez-lui des écuries.",
                             CityNPC.STABLEMASTER, 550,
@@ -222,9 +255,14 @@ public enum CityTier {
                             Material.ANVIL, CityNPC.BLACKSMITH, 3),
                     npcLevel("t5_banners", "§dLes bannières de la ville",
                             "§dAgathe §7doit atteindre le rang §fApprentie §7: l'étendard de Valmont flotte à nouveau.",
-                            Material.WHITE_BANNER, CityNPC.WEAVER, 2)
+                            Material.WHITE_BANNER, CityNPC.WEAVER, 2),
+                    // Le voyageur des routes : identifiant conservé (progression déjà enregistrée)
+                    recruit("t6_gandalf", "§f★ Le magicien gris",
+                            "§8[Bonus] §7Un vieil homme en gris marche sur les routes, un bâton à la main. Offrez-lui une tour.",
+                            CityNPC.GANDALF, 700,
+                            Biome.PLAINS, Biome.SUNFLOWER_PLAINS, Biome.FOREST).asOptional()
             ),
-            4000, 12),
+            4000, 25),
 
     /* =========================================================
        ACTE III — LE SAVOIR, LA RÉVÉLATION, LA PORTE
@@ -235,11 +273,12 @@ public enum CityTier {
                     "§6Alderic §f: §oNotre renommée dépasse les Marches : nous voici cité ! Une cité doit soigner, et se souvenir.",
                     "§6Alderic §f: §oFrère Anselme a soigné nos survivants dans les ruines, puis s'est retiré à Saint-Clair. Bâtissons-lui une infirmerie.",
                     "§6Alderic §f: §oIsabeau, l'archiviste, a sauvé un coffre de registres. Elle cherche depuis vingt ans ce qui a causé la Nuit Noire.",
-                    "§6Alderic §f: §oUn inventeur tombé du ciel dans un éclair cherche un laboratoire... génie ou fou ?"
+                    "§6Alderic §f: §oUn inventeur tombé du ciel dans un éclair cherche un laboratoire... génie ou fou ?",
+                    "§6Alderic §f: §oUn navire à tête de dragon a été vu sur la côte. Son capitaine a demandé où se trouvait l'abbaye... Je n'aime pas ça."
             ),
             List.of(
                     claim("t7_claim", "§eLa cité",
-                            "Claimez §f{n} chunks §7au total.", 62),
+                            "Claimez §f{n} chunks §7au total.", 140),
                     recruit("t5_anselme", "§5L'ermite de Saint-Clair",
                             "Trouvez §5frère Anselme §7dans son ermitage et bâtissez une infirmerie.",
                             CityNPC.MONK, 650,
@@ -256,20 +295,24 @@ public enum CityTier {
                     recruit("t5_docbrown", "§e★ L'inventeur fou",
                             "§8[Bonus] §7Un savant tombé du ciel dans un éclair cherche un laboratoire.",
                             CityNPC.DOCBROWN, 750,
-                            Biome.MEADOW, Biome.CHERRY_GROVE, Biome.SUNFLOWER_PLAINS).asOptional()
+                            Biome.MEADOW, Biome.CHERRY_GROVE, Biome.SUNFLOWER_PLAINS).asOptional(),
+                    recruit("b7_ragnar", "§3★ Une voile carrée sur la rivière",
+                            "§8[Bonus] §7Un drakkar remonte la rivière. Son chef dit venir « visiter l'abbaye ». Convainquez-le de commercer plutôt que de piller.",
+                            CityNPC.RAGNAR, 800,
+                            Biome.SNOWY_BEACH, Biome.STONY_SHORE, Biome.BEACH).asOptional()
             ),
-            6000, 14),
+            6000, 28),
 
     TIER_8(8, "§dGrande cité", Material.BELL, "Chapitre VIII — L'or, le verre et le feu",
             List.of(
                     "§6Alderic §f: §oIsabeau a déchiffré les registres : la Nuit Noire est venue d'une Porte, ouverte avec des yeux de feu et de néant.",
                     "§6Alderic §f: §oLe feu de ces yeux vient des bâtons de blaze, au cœur des forteresses du Nether. Anselme sait les préparer.",
                     "§6Alderic §f: §oEt la cathédrale renaîtra : Léon porte au cou le dernier éclat de la rosace, Béatrice connaît les secrets du trésor.",
-                    "§6Alderic §f: §oUn vieux magicien gris rôde autour de nos murs. Il semble en savoir long sur cette Porte..."
+                    "§6Alderic §f: §oUne bannière blanche approche de la ville. À sa tête... une jeune fille en armure ? Les gardes n'en reviennent pas."
             ),
             List.of(
                     claim("t8_claim", "§dLa grande cité",
-                            "Claimez §f{n} chunks §7au total.", 74),
+                            "Claimez §f{n} chunks §7au total.", 175),
                     recruit("t6_leon", "§aLe verrier du désert",
                             "Trouvez §aLéon §7dans les dunes : la rosace de Valmont doit renaître.",
                             CityNPC.GLASSMAKER, 800,
@@ -292,12 +335,12 @@ public enum CityTier {
                     kill("t6_blazes", "§6Les gardiens de feu",
                             "Abattez §f{n} blazes §7dans les forteresses du Nether.",
                             Material.BLAZE_ROD, EntityType.BLAZE, 20),
-                    recruit("t6_gandalf", "§f★ Le magicien gris",
-                            "§8[Bonus] §7Un magicien errant connaît les secrets de la Porte. Offrez-lui une tour.",
-                            CityNPC.GANDALF, 900,
-                            Biome.WINDSWEPT_HILLS, Biome.MEADOW, Biome.GROVE).asOptional()
+                    recruit("b8_jeanne", "§e★ La Pucelle",
+                            "§8[Bonus] §7Une jeune femme en armure mène une compagnie vers la cathédrale. Elle dit entendre des voix. Offrez-lui un quartier général digne de ce nom.",
+                            CityNPC.JEANNE, 800,
+                            Biome.PLAINS, Biome.SUNFLOWER_PLAINS, Biome.FOREST).asOptional()
             ),
-            8500, 16),
+            8500, 32),
 
     TIER_9(9, "§5Citadelle", Material.ENDER_EYE, "Chapitre IX — La Porte du Néant",
             List.of(
@@ -323,7 +366,7 @@ public enum CityTier {
                             "Terrassez §fle dragon de l'Ender§7, celui qui a brûlé Valmont.",
                             Material.DRAGON_HEAD, EntityType.ENDER_DRAGON, 1)
             ),
-            12000, 20),
+            12000, 40),
 
     /* =========================================================
        ÉPILOGUE — LA NOUVELLE VALMONT
@@ -335,7 +378,8 @@ public enum CityTier {
                     "§6Alderic §f: §oLes chansons de Rosalie porteront vos noms pendant des siècles. Mais une capitale doit rester vigilante.",
                     "§6Alderic §f: §oD'anciens fléaux dorment encore : dans les profondeurs, sous les mers, dans les forteresses du Nether.",
                     "§6Alderic §f: §oUn chasseur de monstres aux cheveux blancs propose ses services... contre rémunération.",
-                    "§6Alderic §f: §oEt l'on parle d'un jeune Viking qui apprivoise les dragons. Après la Nuit Noire... j'ai peine à y croire."
+                    "§6Alderic §f: §oEt l'on parle d'un jeune Viking qui apprivoise les dragons. Après la Nuit Noire... j'ai peine à y croire.",
+                    "§6Alderic §f: §oUn géant en peau de lion a étranglé un ours à mains nues près des sommets. Il demande où sont les vrais monstres."
             ),
             List.of(
                     kill("t7_wither", "§8★ Le Fléau noir",
@@ -348,7 +392,7 @@ public enum CityTier {
                             "§8[Haut fait] §7Terrassez §f{n} gardiens des abysses§7.",
                             Material.PRISMARINE_SHARD, EntityType.ELDER_GUARDIAN, 3).asOptional(),
                     claim("t7_borders", "§a★ Les frontières du royaume",
-                            "§8[Haut fait] §7Claimez §f{n} chunks §7au total.", 120).asOptional(),
+                            "§8[Haut fait] §7Claimez §f{n} chunks §7au total.", 300).asOptional(),
                     npcLevel("t7_forge_master", "§4★ Maître forgeron",
                             "§8[Haut fait] §4Thorvald §7atteint le rang §fMaître§7.",
                             Material.NETHERITE_INGOT, CityNPC.BLACKSMITH, 5).asOptional(),
@@ -364,7 +408,11 @@ public enum CityTier {
                             "§8[Bonus] §7Un jeune Viking affirme qu'on peut apprivoiser les dragons. Trouvez-le sur les sommets glacés.",
                             CityNPC.HAROLD, 1100,
                             Biome.JAGGED_PEAKS, Biome.FROZEN_PEAKS, Biome.SNOWY_SLOPES, Biome.STONY_PEAKS,
-                            Biome.GROVE).asOptional()
+                            Biome.GROVE).asOptional(),
+                    recruit("b10_hercule", "§d★ Les travaux du héros",
+                            "§8[Bonus] §7Un colosse vêtu d'une peau de lion cherche des monstres dignes de lui. Valmont en a à revendre.",
+                            CityNPC.HERCULE, 1000,
+                            Biome.SAVANNA, Biome.SAVANNA_PLATEAU, Biome.WINDSWEPT_SAVANNA, Biome.WINDSWEPT_HILLS).asOptional()
             ),
             0, 0);
 

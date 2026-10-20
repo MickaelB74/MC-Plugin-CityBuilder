@@ -8,5 +8,51 @@ softdepend: [WorldEdit]
 commands:
   city:
     description: Gestion de la ville
-    usage: /city <create|claim|expand|deposit|info|map>
+    usage: /city (liste des commandes permises)
     aliases: [c]
+    permission: citycore.player
+
+# Droits (voir command/CityPermissions.java). Les joueurs passent par les habitants (Alderic, les
+# artisans, Roland) pour tout ce qu'ils savent faire ; la commande ne leur laisse que les consultations
+# et le confort. citycore.admin donne tout : une nouvelle sous-commande d'administration peut l'exiger.
+permissions:
+  citycore.player:
+    description: "Commandes de joueur : infos, bordures, progression, journal de quêtes, style des menus, consultations (habitants, garde, emplois, siège, événements), inspection des bâtiments"
+    default: true
+  citycore.admin:
+    description: "Tout CityCore : administration et actions de test (dont /city carte)"
+    default: op
+    children:
+      citycore.player: true
+      citycore.admin.ville: true
+      citycore.admin.batiments: true
+      citycore.admin.pnj: true
+      citycore.admin.joueurs: true
+      citycore.admin.eco: true
+      citycore.admin.habitants: true
+      citycore.admin.evenements: true
+      citycore.admin.proto: true
+  citycore.admin.ville:
+    description: "Fondation (create), parcelles (claim, unclaim), agrandissement (expand) et caisse (deposit) en commande, sans Alderic"
+    default: op
+  citycore.admin.batiments:
+    description: "Bâtiments en commande : liste, création, type, suppression (dont « all »), installation d'un artisan, hauteur"
+    default: op
+  citycore.admin.pnj:
+    description: "PNJ : apparition, niveau, suppression (/city npc)"
+    default: op
+  citycore.admin.joueurs:
+    description: "Métier et niveau des joueurs (/city job, /city player)"
+    default: op
+  citycore.admin.eco:
+    description: "Contrôle de l'économie des PNJ (/city eco check)"
+    default: op
+  citycore.admin.habitants:
+    description: "Habitants, emplois et garde : actions de test et rechargement des réglages"
+    default: op
+  citycore.admin.evenements:
+    description: "Sièges et calendrier des événements : lancer, arrêter, vague suivante, recharger"
+    default: op
+  citycore.admin.proto:
+    description: "Prototype de la phase 0 (/city proto) et ses messages de suivi"
+    default: op

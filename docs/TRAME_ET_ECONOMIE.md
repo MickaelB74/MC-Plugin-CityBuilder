@@ -44,16 +44,30 @@ Pour passer au palier suivant : toutes les quêtes **non bonus** terminées, pui
 
 | Niv. | Palier | Chapitre | Recrues (★ = bonus) | Quêtes principales | Charte | Chunks offerts |
 |---|---|---|---|---|---|---|
-| 1 | Campement | I — Les cendres et la charte | Bastien | 7 chunks, 2 bâtiments, livrer 192 rondins | 150 | +6 |
-| 2 | Hameau | II — Du pain pour l'hiver | Hélène, ★ Robin des Bois | 16 chunks, 4 bâtiments, réserve de 384 blé chez Hélène | 400 | +6 |
-| 3 | Village | III — Les pierres et la rivière | Brennan, Martin, ★ Jack Sparrow (mod Tax' Ocean Villager) | 24 chunks, 6 bâtiments, livrer 320 pierres | 800 | +8 |
-| 4 | Bourg | IV — La Fosse et le Chaudron | Godefroy, Rosalie | 32 chunks, 8 bâtiments, réserve de 256 charbon, Brennan Apprenti, 50 monstres | 1 500 | +8 |
-| 5 | Ville | V — Le marteau et le métier | Thorvald, Agathe, ★ Indiana Jones | 42 chunks, 10 bâtiments, 640 briques de pierre (remparts), 192 lingots de fer chez Thorvald, Godefroy Apprenti | 2 500 | +10 |
-| 6 | Ville franche | VI — Les routes et la garde | Edmond, Roland | 52 chunks, 12 bâtiments, 15 pillards, 150 monstres, Thorvald Compagnon, Agathe Apprentie | 4 000 | +12 |
-| 7 | Cité | VII — La foi et le savoir | Frère Anselme, Isabeau, ★ Doc Brown | 62 chunks, 14 bâtiments, 24 bibliothèques | 6 000 | +14 |
-| 8 | Grande cité | VIII — L'or, le verre et le feu | Léon, Béatrice, ★ Gandalf | 74 chunks, 16 bâtiments, 256 vitraux, 1 cloche, 128 lingots d'or chez Béatrice, 20 blazes | 8 500 | +16 |
-| 9 | Citadelle | IX — La Porte du Néant | — | 12 yeux de l'Ender, Thorvald Expert, Anselme Compagnon, Roland Compagnon, **l'Ender Dragon** (apogée) | 12 000 | +20 |
-| 10 | Capitale | X — La nouvelle Valmont | ★ Geralt, ★ Harold (mod Dragon Mounts) | Hauts faits (bonus) : Wither, Warden, 3 gardiens des abysses, 120 chunks, Thorvald et Béatrice Maîtres | — | — |
+| 1 | Campement | I — Les cendres et la charte | Bastien, ★ Robinson Crusoé (mod Tough As Nails) | 12 chunks, 2 bâtiments, livrer 192 rondins | 150 | +10 |
+| 2 | Hameau | II — Du pain pour l'hiver | Hélène, ★ Robin des Bois, ★ Capitaine Achab (mod Tide) | 24 chunks, 4 bâtiments, réserve de 384 blé chez Hélène | 400 | +12 |
+| 3 | Village | III — Les pierres et la rivière | Brennan, Martin, ★ Jack Sparrow (mod Tax' Ocean Villager) | 40 chunks, 6 bâtiments, livrer 320 pierres | 800 | +15 |
+| 4 | Bourg | IV — La Fosse et le Chaudron | Godefroy, Rosalie, ★ Obélix (mods Wilder Nature + Farmer's Delight), ★ Miyamoto Musashi (mod Epic Fight) | 60 chunks, 8 bâtiments, réserve de 256 charbon, Brennan Apprenti, 50 monstres | 1 500 | +18 |
+| 5 | Ville | V — Le marteau et le métier | Thorvald, Agathe, ★ Indiana Jones, ★ Geppetto (mods Handcrafted + Furniture) | 85 chunks, 10 bâtiments, 640 briques de pierre (remparts), 192 lingots de fer chez Thorvald, Godefroy Apprenti | 2 500 | +20 |
+| 6 | Ville franche | VI — Les routes et la garde | Edmond, Roland, ★ Gandalf (enrichi par Iron's Spells) | 110 chunks, 12 bâtiments, 15 pillards, 150 monstres, Thorvald Compagnon, Agathe Apprentie | 4 000 | +25 |
+| 7 | Cité | VII — La foi et le savoir | Frère Anselme, Isabeau, ★ Doc Brown, ★ Ragnar (mod Small Ships) | 140 chunks, 14 bâtiments, 24 bibliothèques | 6 000 | +28 |
+| 8 | Grande cité | VIII — L'or, le verre et le feu | Léon, Béatrice, ★ Jeanne d'Arc (mod Valarian Conquest) | 175 chunks, 16 bâtiments, 256 vitraux, 1 cloche, 128 lingots d'or chez Béatrice, 20 blazes | 8 500 | +32 |
+| 9 | Citadelle | IX — La Porte du Néant | — | 12 yeux de l'Ender, Thorvald Expert, Anselme Compagnon, Roland Compagnon, **l'Ender Dragon** (apogée) | 12 000 | +40 |
+| 10 | Capitale | X — La nouvelle Valmont | ★ Geralt, ★ Harold (mod Dragon Mounts), ★ Hercule (mod Mowzie's Mobs) | Hauts faits (bonus) : Wither, Warden, 3 gardiens des abysses, 300 chunks, Thorvald et Béatrice Maîtres | — | — |
+
+Gandalf a quitté le chapitre VIII pour le chapitre VI (le voyageur des routes) : sa quête garde
+son identifiant `t6_gandalf`, une ville qui l'a déjà recruté le garde. Les huit légendes liées aux
+mods ont des quêtes `b1_robinson`, `b2_achab`, `b4_obelix`, `b4_musashi`, `b5_geppetto`,
+`b7_ragnar`, `b8_jeanne`, `b10_hercule` : une ville déjà avancée les voit dans ses quêtes de la
+cité (les quêtes bonus des chapitres passés restent proposées).
+
+**Parcelles (barème « grande ville », 21/10/2026)** : 12, 24, 40, 60, 85, 110, 140 et 175 chunks
+à revendiquer des chapitres I à VIII (300 pour le haut fait), 10 emplacements offerts par Alderic à
+la fondation, puis 10 à 40 par charte (200 en tout). Le reste s'achète chez Alderic : 50 coins le
+premier, +3 % par achat, plafond 300 (36 achats, environ 3 200 coins, jusqu'au chapitre VIII). Une
+ville fondée avant ce barème reçoit une fois, au démarrage, les emplacements offerts qui lui
+manquent (cadeau d'Alderic et chartes déjà signées). Attention : tous les chunks revendiqués
+restent chargés tant qu'un joueur est connecté (`CityChunkLoader`).
 
 **Passage depuis l'ancienne trame en 7 chapitres** : au premier démarrage, le niveau enregistré
 est converti vers le chapitre équivalent (1→1, 2→2, 3→3, 4→5, 5→6, 6→8, 7→10). Les quêtes ont
@@ -65,8 +79,8 @@ Types de quêtes de ville :
   son biome : le pêcheur sur une plage, le forgeron dans la neige…), le ramener, l'installer
   dans un bâtiment. La quête se termine à l'installation (les 3 phases du PNJ).
 - **Livrer** des matériaux au chantier (clic gauche), ou les **réquisitionner** dans les stocks
-  des artisans (Maj + clic droit) : la caisse paie le prix de revente, les items sont
-  consommés par le chantier.
+  des artisans (Maj + clic droit) : le chantier puise gratuitement dans la réserve de la ville
+  (les plus gros stocks d'abord), les items sont consommés par le chantier.
 - **Réserve** : le stock d'un artisan doit atteindre un seuil (le grenier, l'arsenal, le trésor).
 - **Rang** : un artisan doit atteindre un niveau (on commerce avec lui).
 - **Chasse** : monstres tués par tous les joueurs (les boss comptent même sans tueur identifié).
@@ -85,15 +99,17 @@ La vue d'ensemble est **uniquement l'écran des progrès de Minecraft** (touche 
 - **Quatre lignes parallèles**, chacune dans l'ordre de la trame : les **chapitres** I à X
   (objectifs listés au survol), les **survivants de Valmont**, les **légendes de passage** (★) et
   les **hauts faits**. Chaque personnage et chaque haut fait se place sous la colonne de son
-  chapitre (deux personnages du même chapitre l'un sous l'autre) : le dragon est sous le
-  chapitre IX, les fléaux du royaume sous le chapitre X. Minecraft range les enfants d'un
+  chapitre (plusieurs personnages du même chapitre l'un sous l'autre : trois légendes au
+  chapitre X) : le dragon est sous le chapitre IX, les fléaux du royaume sous le chapitre X. La
+  hauteur de chaque ligne suit le chapitre le plus fourni. La bulle d'une légende liée à un mod
+  le nomme, et précise s'il manque au serveur (ni boutique ni quêtes). Minecraft range les enfants d'un
   progrès dans un ordre aléatoire : une ligne (chaque étape n'a qu'une suite) reste droite et
   ordonnée, et les positions sont fixées par le plugin. Elles sont réappliquées à chaque
   connexion et après chaque rechargement des données, car un autre composant du serveur peut
   recalculer la disposition de Minecraft (chargements de progrès observés à chaque connexion
   sur Youer). Si un serveur refuse ce placement, une ligne « Disposition fixe … indisponible »
   apparaît dans la console : seul l'ordre vertical des lignes est alors laissé à Minecraft.
-  Aperçu : `docs/ui-previews/arbre_progres.png` (43 étapes visibles, 17 colonnes sur 9 lignes).
+  Aperçu : `docs/ui-previews/arbre_progres.png` (51 étapes visibles, 17 colonnes sur 10 lignes).
 - **Tout est visible dès le départ** : Minecraft cache normalement les étapes éloignées ; le
   plugin ajoute au bout de chaque ligne un nœud invisible accordé à tous, ce qui rend toute la
   ligne visible.
@@ -139,26 +155,42 @@ Le maire **Alderic** reste le point d'entrée (quêtes de ville, caisse, agrandi
 ## 4. Personnages secondaires (légendes de passage)
 
 Recrutement **bonus**. Chacun ouvre un marché de niche que les principaux ne couvrent pas.
-Aucun PNJ principal ne dépend de leur stock (la progression ne les exige jamais).
+Aucun PNJ principal ne dépend de leur stock (la progression ne les exige jamais). Une légende
+peut racheter une ressource qu'un artisan rachète déjà (cuir, fer, laine…), toujours au même prix
+de référence : aucun écart à exploiter entre deux PNJ.
 
 | Personnage | Chap. | Niche | Particularité |
 |---|---|---|---|
-| **Robin des Bois** | II | Butin des pillards | Marchandises « de seconde main » moins chères mais en quantité limitée ; rachète les fioles inquiétantes |
+| **Robinson Crusoé** | I | Survie (mod Tough As Nails) | Rachète cactus, pastèque, baies, cuir, laines, feuilles ; vend eau purifiée, gourdes, jus, tenues de feuilles et de laine, thermomètre, épurateur, « Journal de Robinson ». Récits : eau purifiée, désert à midi avec une gourde, échange avec un villageois, nuit enneigée en tenue de laine, 28 fioles |
+| **Robin des Bois** | II | Butin des pillards | Marchandises « de seconde main » moins chères mais en quantité limitée ; rachète les fioles inquiétantes. Avec Wilder Nature : cerfs et venaison dans ses quêtes, tableau des primes et cape de fourrure, récit « Les cerfs du roi » |
+| **Capitaine Achab** | II | Pêche du mod Tide | Rachète les poissons de Tide (Martin garde les vanilla) ; vend appâts, fils, hameçons, flotteurs, cannes jusqu'à celle de Midas, harpons. Récits : rapporter truite, anguille des cavernes, cœlacanthe, espadon de feu, Deep Blue |
 | **Jack Sparrow** | III | Trésors de la mer et navires (mod Tax' Ocean Villager) | Nautiles, cœurs de la mer, prismarine ; tridents, « rhum de Tortuga », pavillon noir, disque et tricorne pirates du mod, et au rang 5 un **navire pirate** (objet du mod). Récits : aborder un navire pirate, contrebande avec un équipage, réquisitionner un vaisseau de la Marine, navire maudit au clair de lune, roi pirate illageois. Sans le mod : recrutable, installable, sans menu |
-| **Indiana Jones** | V | Archéologie et curiosités | Rachète tessons, disques, cornes, clés des épreuves, froglights ; vend plantes de ses expéditions, œuf de renifleur et « le carnet du Graal » |
+| **Obélix** | IV | Gibier et banquets (mods Wilder Nature **et** Farmer's Delight) | Rachète venaison, bison, dinde, porc, jambons ; vend couteaux, marmite, festins, « Menhir d'Obélix », « Potion magique ». Récits : sangliers, trophées de cerf et de bison, jambon laqué, « les chars romains » (ravageurs) |
+| **Miyamoto Musashi** | IV | Armes et combat (mod Epic Fight) | Rachète fer, bambou, ficelle, cuir, or ; vend bokken, tachis, uchigatana, épées longues, tenue du vagabond, livres de compétence, « Le Sabre de Musashi ». Récits : tuer arme du mod en main, défendre Valmont pendant un siège |
+| **Indiana Jones** | V | Archéologie et curiosités | Rachète tessons, disques, cornes, clés des épreuves, froglights ; vend plantes de ses expéditions, œuf de renifleur et « le carnet du Graal ». Avec Mo' Structures / ATi Structures : quatre récits en plus (Sphinx, pyramides, temples oubliés, monument souterrain) |
+| **Geppetto** | V | Bois et mobilier (mods Handcrafted **et** Furniture) | Rachète planches, bûches, cerisier, laines ; vend chaises, tables, commodes, canapés, horloges, lampes, télescope, « Pinocchio ». Récits : cerisier, chaises, maison meublée, horloge comtoise, le pantin |
 | **Doc Brown** | VII | Mécanismes (redstone) | Quartz, slime, poudre ; pistons, observateurs, TNT, fusées et les « ailes du Doc » (élytres, très rare) |
-| **Gandalf** | VIII | Magie & Néant | Perles de l'Ender, carapaces de shulker, échos ; livres enchantés, balises, totems |
+| **Gandalf** | VI | Magie (enrichi par Iron's Spells 'n Spellbooks) | Sans le mod : perles de l'Ender, carapaces de shulker, échos ; livres enchantés, balises, totems (objets de l'End aux rangs 4 et 5). Avec le mod : essences, mithril ; encres, parchemins de sort, grimoires, tenue du sorcier ; récits contre les mages et boss du mod (« Vous ne passerez pas ! ») |
+| **Ragnar** | VII | Navires (mod Small Ships) | Rachète épicéa, planches, laines, ficelle, fer, poudre ; vend cogue, voiles, boulets, canon, drakkar, galère, brick, « Le Dragon de Ragnar ». Récits à bord des navires du mod |
+| **Jeanne d'Arc** | VIII | Guerre (mod Valarian Conquest) | Rachète fer, cuir, flèches, poudre, or ; vend épées et boucliers des factions, armures templières, munitions et engins de siège. Récits : pillards, citoyenneté, troll, engin de siège, « le sacre de Reims » |
 | **Geralt de Riv** | X | Chasse aux monstres | Rachète les têtes de monstres ; potions de sorceleur ; contrats de boss |
 | **Harold** | X | Dragons (mod Dragon Mounts Remastered) | Rachète poisson, cuir, membranes ; vend selles, sifflets du mod, « le manuel du dragonnier », œuf de dragon vierge. Sans le mod : recrutable, installable, mais sans menu (voir `docs/INTEGRATION_MODS.md`) |
+| **Hercule** | X | Monstres légendaires (mod Mowzie's Mobs) | Rachète graines de Foliaath, dents de Naga, cristaux de glace, os, cuir ; vend fléchettes, sarbacane, tenue de géomancien, « Peau du lion de Némée », armes forgées, « La Massue d'Hercule ». Récits : les travaux (Foliaath, Umvuthana, Wroughtnaut, Frostmaw, Umvuthi) |
+
+Sans son mod (ou l'un de ses deux mods), une légende liée à un mod se recrute et s'installe, mais
+n'ouvre ni boutique, ni entrepôt, ni quêtes, ni récits. Détails, écarts avec le brief de conception
+et points à vérifier : `docs/INTEGRATION_MODS.md`.
 
 Chaque personnage (principal ou secondaire) a :
 
 - une biographie affichée dans ses menus et des dialogues de rencontre, d'arrivée,
   d'installation et de montée de rang (`{ville}` et `{joueur}` sont remplacés) ;
 - 5 récits (quêtes personnelles), un par rang, liés à son métier : biomes à explorer,
-  succès Minecraft (validés aussi s'ils sont déjà obtenus), pêche, élevage, artisanat, chasse.
-  Les 5 sont toujours affichés : ceux d'un rang pas encore atteint apparaissent verrouillés
-  (cadenas, titre illisible, rang requis), au lieu d'emplacements vides.
+  succès Minecraft (validés aussi s'ils sont déjà obtenus), pêche, élevage, artisanat, chasse,
+  objets à **rapporter** (remis depuis ses récits, ouverts dans son menu ; ni achetés ni pris en
+  réserve). Les 5 sont toujours affichés : ceux d'un rang pas encore atteint apparaissent
+  verrouillés (cadenas, titre illisible, rang requis), au lieu d'emplacements vides. Un mod
+  facultatif peut en ajouter (Robin, Indiana) : au-delà de 5, l'écran passe à 4 récits par page.
 
 ---
 
@@ -171,7 +203,10 @@ Chaque personnage (principal ou secondaire) a :
 2. **Offre et demande.** Prix plein tant que le stock est sous 40 % de la capacité, puis
    baisse linéaire jusqu'à 35 % du prix ; entrepôt plein = le PNJ n'achète plus. Une vente
    est calculée lot par lot (vendre beaucoup d'un coup fait baisser le prix au fil de la vente).
-3. **Revente du stock** (menu *Entrepôt*) au prix de rachat × 2.
+3. **Le stock est la réserve de la ville** (menu *Entrepôt*) : y déposer (*Vendre*) est payé,
+   s’y servir est gratuit (un lot, ou une pile avec Maj). Ce qu’on y prend est marqué non
+   revendable, comme tout ce qu’on fabrique, cuit, forge ou taille avec ; les employés des
+   artisans la remplissent.
 4. **Production depuis les stocks.** Les articles fabriqués consomment leurs ingrédients
    dans le stock du PNJ ou d'un autre artisan : sans fer chez Thorvald, pas d'armure ; sans blé
    chez Hélène, pas de pain chez Rosalie. Les raretés sans ingrédient ont un approvisionnement
@@ -197,14 +232,15 @@ Chaque personnage (principal ou secondaire) a :
 | 1 diamant | 12 coins |
 | Pioche en fer / en diamant (boutique) | 11 / 83 coins |
 | Enclume | 107 coins |
-| 1er emplacement de chunk acheté | 150 coins (+8 % par emplacement, plafond 2 500) |
-| Total des chartes jusqu'à la Capitale | 24 650 coins |
+| 1er emplacement de chunk acheté | 50 coins (+3 % par emplacement, plafond 300) |
+| Emplacements à acheter jusqu'au chapitre VIII | 36 (environ 3 200 coins), le reste est offert |
+| Total des chartes jusqu'à la Capitale | 35 850 coins |
 
 ### Exploits corrigés
 
 | Faille de la version de test | Correction |
 |---|---|
-| Récupération **gratuite** du stock + recraft (lingots → bloc → lingots) qui efface le marquage : argent infini | Le stock se rachète au prix de revente ; le contrôle d'arbitrage couvre les recettes |
+| Récupération **gratuite** du stock + recraft (lingots → bloc → lingots) qui efface le marquage : argent infini | Le marquage suit l'objet : tout ce qu'on fabrique, cuit, forge ou taille avec un objet marqué l'est aussi (`TagPropagation`). L'entrepôt est donc redevenu gratuit (réserve de la ville) |
 | Multiplicateur de stock de l'employé (vendre 64, stocker 96) : duplication d'items | Remplacé par +10 % / −15 % |
 | Cadeau du maire (+8 chunks, +100 coins) versé à **chaque** nouveau joueur | Une seule fois pour la ville |
 | Items achetés ou récupérés comptés dans les quêtes de collecte | Items marqués exclus |
@@ -233,7 +269,8 @@ contrôle sans aucune alerte avec les 1 290 recettes vanilla 1.21.1.
   de test, supprimez `plugins/CityCore/config.yml` pour obtenir la nouvelle version.
 - **Données de test** : les identifiants de quêtes et de PNJ ont changé ; repartez d'une base
   propre (supprimez `plugins/CityCore/database.db`) et des PNJ Citizens de test.
-- **Skins** : Alderic, Brennan, Jack Sparrow et Gandalf gardent leur skin. Pour les autres,
+- **Skins** : Alderic, Brennan, Jack Sparrow, Gandalf et les huit légendes liées aux mods ont
+  leur skin dans le plugin. Pour les autres,
   renseignez `npc-skins.<clé>.value` et `.signature` (générés par exemple sur mineskin.org),
   sans recompiler. Sans skin, le PNJ apparaît avec le skin par défaut.
 - **Réglages courants** : prix et capacités par PNJ (`<clé>.sell-prices`), articles

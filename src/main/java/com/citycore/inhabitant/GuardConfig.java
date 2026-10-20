@@ -15,7 +15,7 @@ import java.util.Map;
  * Réglages de la garde (phase 5 du plan « Valmont vivante »), section {@code soldats} de
  * config.yml : taille de la garde et formations simultanées selon le rang de Roland, rôles
  * (soldat, archer, sergent…) avec leur équipement, leurs points de vie et leur durée de formation,
- * vitesse de patrouille et distance de vue.
+ * vitesse de patrouille et distance de vue, groupes et mêlées pendant un siège.
  */
 public final class GuardConfig {
 
@@ -31,6 +31,8 @@ public final class GuardConfig {
     private float patrolSpeed = 0.6f;
     private double sight = 16;
     private double bowRange = 14;
+    private int   groupSize = 6;     // siège : gardes par groupe (un secteur du front chacun)
+    private int   maxPerTarget = 3;  // gardes au contact d'un même ennemi au plus
 
     public GuardConfig(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -50,6 +52,8 @@ public final class GuardConfig {
         patrolSpeed = (float) Math.max(0.2, Math.min(1.5, s.getDouble("vitesse-patrouille", 0.6)));
         sight       = Math.max(4, s.getDouble("vision", 16));
         bowRange    = Math.max(4, s.getDouble("portee-arc", 14));
+        groupSize   = Math.max(1, Math.min(50, s.getInt("groupe-taille", 6)));
+        maxPerTarget = Math.max(0, s.getInt("max-par-cible", 3));
 
         roles.clear();
         ConfigurationSection r = s.getConfigurationSection("roles");
@@ -111,4 +115,10 @@ public final class GuardConfig {
     public float  patrolSpeed()      { return patrolSpeed; }
     public double sight()            { return sight; }
     public double bowRange()         { return bowRange; }
+
+    /** Siège : gardes par groupe (chaque groupe tient un secteur du front, puis va à la rencontre d'une escouade). */
+    public int    groupSize()        { return groupSize; }
+
+    /** Gardes au contact d'un même ennemi au plus (0 = sans limite) ; les autres en choisissent un autre. */
+    public int    maxPerTarget()     { return maxPerTarget; }
 }

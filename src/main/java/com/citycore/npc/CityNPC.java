@@ -15,17 +15,22 @@ import java.util.Map;
  * se recrute au fil des chapitres de la ville (voir CityTier).
  *
  * Personnages secondaires : des figures légendaires attirées par la renommée de la cité
- * (Robin des Bois, Jack Sparrow, Indiana Jones, Doc Brown, Gandalf, Geralt, Harold). Leur
- * recrutement est une quête bonus.
+ * (Robin des Bois, Jack Sparrow, Indiana Jones, Doc Brown, Gandalf, Geralt, Harold, et les
+ * légendes liées aux mods : Robinson Crusoé, Capitaine Achab, Obélix, Miyamoto Musashi, Geppetto,
+ * Ragnar, Jeanne d'Arc, Hercule). Leur recrutement est une quête bonus.
  *
- * Personnages liés à un mod (requiredMod) : Harold a besoin de Dragon Mounts Remastered (serveur
- * hybride mods + plugins). Sans le mod, il se recrute et s'installe, puis explique qu'il n'a
- * rien à enseigner (dialogue mod_missing) au lieu d'ouvrir son menu.
+ * Personnages liés à un mod (dernier argument, voir {@link #requiredMods}) : Harold a besoin de
+ * Dragon Mounts Remastered (serveur hybride mods + plugins). Sans le mod, il se recrute et
+ * s'installe, puis explique qu'il n'a rien à enseigner (dialogue mod_missing) au lieu d'ouvrir son
+ * menu. Plusieurs mods peuvent être requis (« wildernature,farmersdelight » : Obélix) : il suffit
+ * qu'un seul manque. Un mod précédé de « + » est seulement facultatif (« +irons_spellbooks » :
+ * Gandalf) : l'habitant fonctionne sans lui, et gagne du contenu quand il est là.
  *
  * Dialogues : first_meeting (rencontre dans la nature), city_arrival (entrée en ville),
  * building_assign (installation), level_up (montée de rang) ; pour un personnage lié à un
  * mod : mod_missing (menu indisponible) et building_assign_unavailable (installation sans le
- * mod). {ville} et {joueur} sont remplacés à l'affichage.
+ * mod) ; pour un personnage enrichi par un mod facultatif : building_assign_mod (installation
+ * avec le mod). {ville} et {joueur} sont remplacés à l'affichage.
  *
  * Skins : value/signature Mojang. Laissés vides, ils peuvent être fournis dans config.yml
  * (npc-skins.<clé>.value / signature), par exemple depuis mineskin.org.
@@ -588,7 +593,8 @@ public enum CityNPC {
                             "§2Robin §f: §oLes pillards ont perdu gros cette semaine. Leurs pertes sont vos gains !"
                     )
             ),
-            PersonalQuestCatalog.robin()
+            PersonalQuestCatalog.robin(),
+            "+wildernature"   // contenu facultatif : cerfs, venaison, tableau des primes
     ),
 
     JACKSPARROW(
@@ -666,7 +672,8 @@ public enum CityNPC {
                             "§6Indy §f: §oUne nouvelle caisse d'expédition vient d'arriver. Ne demandez pas comment je l'ai récupérée."
                     )
             ),
-            PersonalQuestCatalog.indiana()
+            PersonalQuestCatalog.indiana(),
+            "+mostructures,+ati_structures"   // contenu facultatif : récits dans les structures des mods
     ),
 
     DOCBROWN(
@@ -720,7 +727,7 @@ public enum CityNPC {
                     "first_meeting", List.of(
                             "§fGandalf §7: §oTiens, tiens... un bâtisseur. Il en faut, en ces temps de cendres.",
                             "§fGandalf §7: §oJ'avais mis en garde les mages de Valmont contre la Porte. Ils ont ri, jusqu'à la Nuit Noire.",
-                            "§fGandalf §7: §oVotre archiviste fouille des registres dangereux. Il est temps que je veille sur votre cité."
+                            "§fGandalf §7: §oVos routes sont rouvertes, et les routes amènent toutes sortes de voyageurs. Il est temps que je veille sur votre cité."
                     ),
                     "city_arrival", List.of(
                             "§fGandalf §7: §oJe sens une grande destinée en ces murs... et une ombre qui guette depuis le Néant.",
@@ -730,11 +737,17 @@ public enum CityNPC {
                             "§fGandalf §7: §oUne tour de mage. Voilà qui me convient.",
                             "§fGandalf §7: §oApportez-moi perles de l'Ender et curiosités du Néant. En échange, je partage un peu de mon art."
                     ),
+                    // Avec Iron's Spells 'n Spellbooks : la magie des sorts
+                    "building_assign_mod", List.of(
+                            "§fGandalf §7: §oUne tour, enfin. Les sorts s'écrivent à l'encre, et l'encre se mérite.",
+                            "§fGandalf §7: §oApportez-moi l'essence des arcanes : je vous apprendrai à lire les parchemins."
+                    ),
                     "level_up", List.of(
                             "§fGandalf §7: §oVous avez gagné en sagesse. Il est temps de vous confier des savoirs plus anciens."
                     )
             ),
-            PersonalQuestCatalog.gandalf()
+            PersonalQuestCatalog.gandalf(),
+            "+irons_spellbooks"   // avec le mod : encres, parchemins, grimoires ; sans : magie vanilla
     ),
 
     GERALT(
@@ -814,7 +827,359 @@ public enum CityNPC {
             ),
             PersonalQuestCatalog.harold(),
             "dmr"
+    ),
+
+    /* =========================================================
+       LÉGENDES LIÉES AUX MODS (sans leur mod : recrutées et installées, sans commerce ni quêtes)
+       ========================================================= */
+
+    // Chapitre I — Tough As Nails (soif, température, eau purifiée)
+    ROBINSON(
+            "citycore_robinson",
+            "§aRobinson Crusoé",
+            "Naufragé",
+            "robinson",
+            "ewogICJ0aW1lc3RhbXAiIDogMTc0NjU3OTI2MjI0OSwKICAicHJvZmlsZUlkIiA6ICJkYzA5MjA4MTM2ZDg0Y2Y5OWIwMzFmMGI1NzM4OTdmNSIsCiAgInByb2ZpbGVOYW1lIiA6ICJLRUlUSF8wMzAyIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlL2EyYjlhNTcyNjQ1MTRhYTRiZWEyNDMxMGU5MDJkNWE0MGNmNGM0MmZjZWZjMWRjODQzODk0Njg3NDNhMzg5ZGIiLAogICAgICAibWV0YWRhdGEiIDogewogICAgICAgICJtb2RlbCIgOiAic2xpbSIKICAgICAgfQogICAgfQogIH0KfQ==",
+            "tMX0wEHd4zrfNsq/bc2IAHhUWp4UvcoCdngGTsxZabq7S71gNbdqyxkZl/sksRCpVEwv0ExtnuKd+bGn1u81fJ1h1cnM2snJ3fi7/gIlnl2gmF5Oy4eZv1gv00tQAvfsME2Acs9UhpkxmcVsiODm3KrnqrkAFgigkRpCb5vnUDtXbXay1+K9c19362Xkt+SCmcPaQFFMMu5fzM8+LmU/CACuXBXbM/ctfs1XH9X5hVRQ7klDKW167ISidADmnHL8bvKwB/yp+fuxrPuCojz5LATuBowiv83JSU9roYB1gGFDuVfpMEbvHcMc1ANMnCPhleLb2EUdYvyqmcgbxnqFjsI3dP8Ol3zyzBD36CRfqX1zuHLhOcdxLo2CeEEfVUa14f3wYE+UNxIObjRHrFNTTBx0dTFNo3jisRnKCuM4J+ZkxYiiyo2wFCSTmvRmh694llshV5WvxfumJBHZBGGl73gsXUBQhEZjmcblSr64giA9INCvgfz1Pom01z3z0Aqr8Qy/+/NgU12pVueS+OdyqUKTYIY+29Nea9RM3x3/8c/H0agEBVYDpBdeHAIRUjoXXqhcVrT8f3FYEaxM2tHQAEnhA9/UAt4lS6snvqBaKGu+FWi/lN9KdPxz0kH1z/DTXTJyL4cEANw7MfPyksqFdaTfGPcuw7zDvX6aC+puz8U=",
+            List.of(
+                    "Naufragé pendant vingt-huit ans",
+                    "sur une île déserte. Il sait tirer",
+                    "de l'eau potable d'un désert et",
+                    "se tenir chaud dans la neige."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§aRobinson §f: §oUn visage ! Un vrai ! Pardonnez-moi, je n'ai parlé qu'à un perroquet depuis des années.",
+                            "§aRobinson §f: §oDe l'eau qui ne rend pas malade, un abri contre le soleil et le froid : voilà tout ce que j'ai appris.",
+                            "§aRobinson §f: §oVotre campement en aura besoin. Je prends mon poteau à encoches et je vous suis."
+                    ),
+                    "city_arrival", List.of(
+                            "§aRobinson §f: §oDes toits ! Des voisins ! Je vais devoir réapprendre à dire bonjour.",
+                            "§aRobinson §f: §oUne cabane au bord de l'eau me suffira. Et un poteau, pour compter les jours."
+                    ),
+                    "building_assign", List.of(
+                            "§aRobinson §f: §oUne cabane, un chaudron, un feu. Je suis riche.",
+                            "§aRobinson §f: §oApportez-moi ce que la nature donne, je vous apprendrai à survivre."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§aRobinson §f: §oUne cabane, un chaudron, un feu... Mais ici, l'eau est pure et le temps est doux.",
+                            "§aRobinson §f: §oJe n'ai rien à vous apprendre... profitez-en."
+                    ),
+                    "mod_missing", List.of(
+                            "§aRobinson §f: §oIci, l'eau est pure et le temps est doux. Je n'ai rien à vous apprendre...",
+                            "§aRobinson §f: §o...profitez-en. Moi, je continue de compter les jours."
+                    ),
+                    "level_up", List.of(
+                            "§aRobinson §f: §oVous apprenez vite. Sur mon île, il m'a fallu des années pour comprendre ça."
+                    )
+            ),
+            PersonalQuestCatalog.robinson(),
+            "toughasnails"
+    ),
+
+    // Chapitre II — Tide (poissons du mod, pêche en grotte, dans la lave, dans l'End)
+    ACHAB(
+            "citycore_achab",
+            "§bCapitaine Achab",
+            "Chasseur du grand poisson",
+            "achab",
+            "ewogICJ0aW1lc3RhbXAiIDogMTcxNDE5NjY5NzA3MiwKICAicHJvZmlsZUlkIiA6ICJmOTEyM2ZjOGQzMzg0OWMwOWFlMzk5YjQ2NDljZDRjZSIsCiAgInByb2ZpbGVOYW1lIiA6ICJab2VfX01heSIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS8zZTEzZDNmZDNhYTZmY2JhZGFkNDIyZDNmMGQ0Y2MwMDBlODk4YTY3YmY5MWI3ZjVlZTYzNTVjZWRkMmUyOGZiIgogICAgfQogIH0KfQ==",
+            "f/Lo+ov8bF4ipVQONGnNG56h/6QSEDN8zhbVc8y9iA6EYce0TO61umtjYo1RIscONJfxZ+o9vJM+ZN8jlh8mblSy3zlqk9EEmODzHLCKjOagQe0EP24cxTpuZ8bZv2dcUim3Blx3S6shvsthy15ibx997bg9Q9OMZz4BcC0Nq3pzngN09txvzwal65BKDrsJqfM+vFys0bW6QHrHPqxmYRBelh5+92KqlhWAqTvrbEwAgikAYJgXNJF2UGFn6ZF9PVBkqSleAmqQK/d5Y8k3sb75YphHWVslcj2LB4xOOMVc3rPvF5a8iU96RR9DvqB/gM8QvBPwf77B2byCPzitbBHatUeW7MXHu+I0wjo3x88HXN7IUIvu9SEFu26pJz8nqT8q1BooNFh4JFb7FDI7lVfNY9Sp1wngHrjBByHrVsURvUwVVK8/NwXAnE1XGs0CPkSqoYslTQ+vJH1POn60bJF7R6VesCMxlTmywhhbSkJqHgCgYZSYNHuJqZiARDMn0Ke2XXIro7GRSf3p/DjZegVsvZcgJvr70DNeW8EK5vgvO/ehox1bmUzE0S8KkmqQ7n+rDJI6UE0toXsI0PE8zLWzUbTDr4/dQb+Ha/7Uy7py/d8KCodFtfTzWd4t9qchYfmPZwJ5RyFRRppZgwC8Q8vW0oiDtDzdWRc1kAkL5EI=",
+            List.of(
+                    "Il a perdu une jambe, un navire",
+                    "et son équipage pour un seul",
+                    "poisson. Il compte bien perdre",
+                    "encore un peu."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§bAchab §f: §oAppelez-moi Achab.",
+                            "§bAchab §f: §oCes eaux cachent des bêtes que vos pêcheurs ne soupçonnent pas. Je les pêcherai toutes, jusqu'à la plus grande.",
+                            "§bAchab §f: §oVotre hameau a une rivière ? Alors j'y jetterai ma ligne. Menez-moi."
+                    ),
+                    "city_arrival", List.of(
+                            "§bAchab §f: §oUne rivière, des pêcheurs... et des eaux qui cachent leur jeu.",
+                            "§bAchab §f: §oDonnez-moi un ponton face au courant. Je ne quitterai pas l'eau des yeux."
+                    ),
+                    "building_assign", List.of(
+                            "§bAchab §f: §oUn ponton, un tonneau, une ligne.",
+                            "§bAchab §f: §oRapportez-moi tout ce qui frétille d'étrange : je paie, et je paie bien."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§bAchab §f: §oDes morues. Des saumons. Toujours les mêmes.",
+                            "§bAchab §f: §oCes eaux sont mortes... ou elles se taisent."
+                    ),
+                    "mod_missing", List.of(
+                            "§bAchab §f: §oJ'ai vidé la rivière trois fois. Des morues, des saumons, rien d'autre.",
+                            "§bAchab §f: §oCes eaux se taisent. Tant qu'elles se tairont, je n'ai rien à acheter."
+                    ),
+                    "level_up", List.of(
+                            "§bAchab §f: §oLes eaux parlent enfin. J'ai de meilleures lignes pour vous, et de meilleurs hameçons."
+                    )
+            ),
+            PersonalQuestCatalog.achab(),
+            "tide"
+    ),
+
+    // Chapitre IV — Wilder Nature et Farmer's Delight (gibier, banquets) : les deux mods requis
+    OBELIX(
+            "citycore_obelix",
+            "§9Obélix",
+            "Livreur de menhirs",
+            "obelix",
+            "ewogICJ0aW1lc3RhbXAiIDogMTc1OTYyMTkyODUxNiwKICAicHJvZmlsZUlkIiA6ICJmZDlhMmNhNGNhMWM0YTkwYWEyODkyNThkYmM3MmFiNSIsCiAgInByb2ZpbGVOYW1lIiA6ICJJRnJhbmtvWCIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS9hYTgxNjkxMjVjNTk3NzgwNGIwMzZlNmJjMTAyYjQ4NzhmN2UxM2RmZTEzMTA1M2JjMzI1NzRkYmE0OWNhM2Q0IgogICAgfQogIH0KfQ==",
+            "QoKcnfEBTcw/3on8ZZ7z5FTt0R/Ra7k+KgTuUw6FIX7YWDKwQA0cc5PT6eVc3XHQRq+ljPQSj8fG6uS7JIjzlRnyA44tnjzQqu2yJ8remKe9cnsNrHapoAMOWV5k6u4KyZxSwH9cDqJiwkN5ajx8Q6mFDd3WQKIdBO7IApOafAh9Xv3zea/DvNtF2xygNrusESoym85zDAQKP7iD3jBaOuRUacS/OMO9jSGhIc8eJXTL9E5FoSWZBTmjbpCTyFpyx5WSxAP1zeey9mogDgpEgChHcoKEXviJGOb7/JwaAToLlVbFsi3N/kvSQzf+wuVLWq7K2g7r+EPQKDjD+4vtJ1ysF+y86Ew0U+I5XQzVdNzxMxdtUV7Xwjq9B+s5JyQIls9LZqjyFpWd94c7Sa90pA5iyULKXPavodOME5gub8pXrk4lUrt1sqtFlrTz21+T1yJBUBOR0b8f9lerN2tlahLN4VS4lmBxfpqWU7FmTh2V3zy2AAoNCu07+NgDAfBuBGFrOm08KMPw0sqnIVxdekKnvzF/4zSROiq17OYEBdC7WnbxcU5sNBPwrcNkNcAMNMPFJ+qk7wcmdW/Df4G0QD945RhOFIQYv00jpGJaZdaCrBMmkMag013f+N+9630wEcFWA85Yu/J8YV5prbB0U8a93qcntFuJnrCcOjMotew=",
+            List.of(
+                    "Livreur de menhirs, chasseur de",
+                    "sangliers, mangeur de sangliers.",
+                    "Tombé dans la marmite quand",
+                    "il était petit."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§9Obélix §f: §oJe ne suis pas gros ! Je suis... enveloppé de muscles.",
+                            "§9Obélix §f: §oIl paraît que votre taverne sert des sangliers ? Alors j'en suis. Et je porte mon menhir moi-même."
+                    ),
+                    "city_arrival", List.of(
+                            "§9Obélix §f: §oÇa sent la soupe, ici ! Une taverne ? Très bien, très bien.",
+                            "§9Obélix §f: §oOù est-ce que je pose mon menhir ? Il me faut une hutte, et une grande broche."
+                    ),
+                    "building_assign", List.of(
+                            "§9Obélix §f: §oUne hutte, un feu, une broche.",
+                            "§9Obélix §f: §oRamenez-moi du gibier, je vous prépare un banquet."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§9Obélix §f: §oPas un sanglier dans ces bois. Pas un !",
+                            "§9Obélix §f: §oIls sont fous, ces Valmontois."
+                    ),
+                    "mod_missing", List.of(
+                            "§9Obélix §f: §oPas de sangliers, pas de marmite, pas de banquet. Pas un !",
+                            "§9Obélix §f: §oJe reste pour la soupe de la taverne. Mais je n'ai rien à vous vendre."
+                    ),
+                    "level_up", List.of(
+                            "§9Obélix §f: §oUn banquet par jour, ça creuse ! J'ai de nouveaux festins pour vous."
+                    )
+            ),
+            PersonalQuestCatalog.obelix(),
+            "wildernature,farmersdelight"
+    ),
+
+    // Chapitre IV — Epic Fight (armes, tenue du vagabond, livres de compétences)
+    MUSASHI(
+            "citycore_musashi",
+            "§cMiyamoto Musashi",
+            "Rōnin",
+            "musashi",
+            "ewogICJ0aW1lc3RhbXAiIDogMTc4NDEwMDQ3MTQ0OCwKICAicHJvZmlsZUlkIiA6ICI3OTI0MDQ0N2ViNTk0ZDBkOTVmY2E3YmJiMWZiMjVhNSIsCiAgInByb2ZpbGVOYW1lIiA6ICJqdW5pb3JraW9iciIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS81MGE0YmI5NWMzZmY1NDdkNzNhMGM1YTdmNzRhN2E5M2I0NTA4OGI3NGY5YTgyMzZhNjU1NDU2OGRkOTNjNmE4IgogICAgfQogIH0KfQ==",
+            "uKXt41xa2gfhm5EDPJ9e3va6GkLEB73VLby/Nl3DSx+4XCLL8hbj04D5ZJyhm4KZnG7W6XhFyno+hjI6LbPFnI7F9aQrf3uyOFcNSt0iPp8tUAqco3h0DXMaEt8Qy2xbw7YYCrec0ToEcW0pSy9irXYA5vdmDoFf3A+tw40T5rXWktWI0003HssukUszxdxzRIRg0N4X1cjiK6/ErtLud1zC+KXHx5rrZZi45ouiwj8XyBzo/1QsSB3jyc0R/bHDJh+R8i4yabkHTXY0gxdXcAhz5/tg4WgpqUH34N62i76n6e87Se1IUnReTnAH5cU3ZsRhNwQ00JA0ICfu/n5KpfGOkll+4yzguGfsPOoMrzXW9WbkSA8Ua4e7oULgsnGY5uxaQj5jN1IVFFw/oWo9pxYBldhVBZln5GKBpCJLDfcOVZN+bwRuYYzerJ88tBY/AzJ/YeiPy/XGt9OdzHzAfIuSbkjzSivBwWU9qbpFS+5i0fuJPWppaNdRs7Sb0iCLiBeQC6+dt6sGDt7R7RhgNlXYpjJBGR8AaaVJ6UCQpTNPunrFkNfVT4HnxP6LWNTO9iiOjtNfVtoDo8s0iQhtz0aY7m8FUOskyDPpyjwZgVikdPMBO/Q1ehJ9ro5BgO3bntGPj0bwxEfWmN92jo5SXZtMJ5eVaURgvBZcC6+2Ixc=",
+            List.of(
+                    "Soixante duels, aucune défaite.",
+                    "Il dit qu'on ne gagne pas avec",
+                    "le sabre, mais avec le regard."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§cMusashi §f: §oJe ne cherche ni maître ni seigneur. Je cherche un adversaire digne.",
+                            "§cMusashi §f: §oVotre bourg sera bientôt assiégé. Je peux apprendre à vos gens à tenir une lame. Montrez-moi le chemin."
+                    ),
+                    "city_arrival", List.of(
+                            "§cMusashi §f: §oUn bourg qui s'arme. Bien. Le danger approche, je le sens.",
+                            "§cMusashi §f: §oIl me faut un sol plat, une cible, et du silence."
+                    ),
+                    "building_assign", List.of(
+                            "§cMusashi §f: §oUn dojo. Le sol est droit, la cible est juste.",
+                            "§cMusashi §f: §oCommençons. Apportez-moi du fer : vos lames viendront de là."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§cMusashi §f: §oVos lames sont lourdes et vos gestes sont lents.",
+                            "§cMusashi §f: §oIci, je n'ai rien à enseigner."
+                    ),
+                    "mod_missing", List.of(
+                            "§cMusashi §f: §oVos lames sont lourdes, vos gestes sont lents, et vous ne savez ni parer ni esquiver.",
+                            "§cMusashi §f: §oIci, je n'ai rien à enseigner. Je médite."
+                    ),
+                    "level_up", List.of(
+                            "§cMusashi §f: §oVotre regard a changé. Vous êtes prêt pour de meilleures lames."
+                    )
+            ),
+            PersonalQuestCatalog.musashi(),
+            "epicfight"
+    ),
+
+    // Chapitre V — Handcrafted et Furniture (mobilier) : les deux mods requis
+    GEPPETTO(
+            "citycore_geppetto",
+            "§6Geppetto",
+            "Maître ébéniste",
+            "geppetto",
+            "ewogICJ0aW1lc3RhbXAiIDogMTYyMTMwMDU0MTAxMCwKICAicHJvZmlsZUlkIiA6ICI5OTdjZjFlMmY1NGQ0YzEyOWY2ZjU5ZTVlNjU1YjZmNyIsCiAgInByb2ZpbGVOYW1lIiA6ICJpbzEyIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzRhNzQyZmIyMzhmNjMwNThmNGFhYjUyOTNkODZhOWY0ZjkxYTY5NzI3NDAxMTczZDlmNjAyM2NkZDg1ODRhZDAiCiAgICB9CiAgfQp9",
+            "dGaUPTGp9lC/uyyA6Ejby0fBfkvb4smyeg7tXF8qNhrA2ISCkkWmABq4GTW8H1bfejx+vhqmru0L8VmXdvdjXDcdLhLYktYufgayg1feYU3AjFn6rneTAWKbjYRmIf83gW/xUEf1pFNQVN+xy6wQC0VPf6zFE8KD/qmJSkz+480oH4RX0rIg9FsKGG0l3/0zOtPmHZRnrMdYwyhIfrcMrTaEdvvrzoaN/2T+vMYcqf7t5mJye8Z9ScwonqBU33taCKVX9C9+AvdlYLXoAMHAonMskjAp1Okt+gcYz7nFGZ7HOS5f/gxF+EYQ4Skhp7QUvTmy5SPxsn04ukEzzkV98Mu30/cyx+ISobhYGKBShrv7UkgJ/pOrW6SsKxgcjE42J3J2ixrcxE3KfZ1QEGMtmrNUxhRwSD8qg2AbSvMRbUzv78uXgoWp74zdhYn9J2VTHm8vsILfqD7AtnhiQBgKKrIpdEYhSkTLyScxQkwzQdL/rjiplkADI5clbDBsMB5Cs1Epylway8Vr9lSLJVXfx/jIx9LDgKMJ2zEqeORlBNcjau9nMcSFUV+SzQo/8RtB1Ow/upLSwbEHFTLkULHDaroqcJL8Qf1gBmK9tg81cWCRKW1EGAlyiL6ft0sIDqV8BLZxkExLnFMa390QoYQ9f22qi6Ys3rpECHc5IkGqA3w=",
+            List.of(
+                    "Il a taillé un pantin dans une",
+                    "bûche qui parlait. Depuis, il",
+                    "cherche son fils de bois sur",
+                    "toutes les routes."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§6Geppetto §f: §oVous n'auriez pas vu un petit pantin au nez un peu... long ?",
+                            "§6Geppetto §f: §oUne ville qui se rebâtit a besoin de chaises, de tables, de lits. Je sais faire tout cela.",
+                            "§6Geppetto §f: §oEmmenez-moi. Si mon garçon passe par votre ville, je veux y être."
+                    ),
+                    "city_arrival", List.of(
+                            "§6Geppetto §f: §oQue de maisons vides ! Elles ont besoin de chaises, de tables, de lits...",
+                            "§6Geppetto §f: §oUn établi, de bons copeaux, et je vous meuble toute la ville."
+                    ),
+                    "building_assign", List.of(
+                            "§6Geppetto §f: §oUn établi, des copeaux, l'odeur du bois. Je suis chez moi.",
+                            "§6Geppetto §f: §oApportez-moi du bon bois : je vous ferai des meubles dignes d'un roi."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§6Geppetto §f: §oMes gabarits... mes outils fins... tout est resté en route.",
+                            "§6Geppetto §f: §oJe ne peux faire que des bancs grossiers."
+                    ),
+                    "mod_missing", List.of(
+                            "§6Geppetto §f: §oSans mes gabarits ni mes outils fins, je ne fais que des bancs grossiers.",
+                            "§6Geppetto §f: §oRien que je puisse vous vendre, hélas. Je guette la route, au cas où mon garçon passerait."
+                    ),
+                    "level_up", List.of(
+                            "§6Geppetto §f: §oMes mains retrouvent leur adresse. Regardez ce que je sais faire, maintenant."
+                    )
+            ),
+            PersonalQuestCatalog.geppetto(),
+            "handcrafted,furniture"
+    ),
+
+    // Chapitre VII — Small Ships (navires à construire et à piloter, canons)
+    RAGNAR(
+            "citycore_ragnar",
+            "§3Ragnar",
+            "Roi des mers du Nord",
+            "ragnar",
+            "ewogICJ0aW1lc3RhbXAiIDogMTYyMTQwMDk1NjUzNiwKICAicHJvZmlsZUlkIiA6ICJmMGIzYmRkMjEwNDg0Y2VlYjZhNTQyYmZiOGEyNTdiMiIsCiAgInByb2ZpbGVOYW1lIiA6ICJBbm9uaW1ZVFQiLAogICJzaWduYXR1cmVSZXF1aXJlZCIgOiB0cnVlLAogICJ0ZXh0dXJlcyIgOiB7CiAgICAiU0tJTiIgOiB7CiAgICAgICJ1cmwiIDogImh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOTUwOGRhMWY0YWUzMDcyNjRkN2E3NDRiNDA3MmY2MzdlMjljNjdmM2E4MDgyNjZiYWM5Y2IyMTAyNmJlNTI3ZiIKICAgIH0KICB9Cn0=",
+            "Lg7egxyHudUWMpIEZIb7V6TtkmNF11Sr5oM1l85vXp+V1J1g9pkM+GM4iio/W6kEy+x/k/oM3pru7jQWXAgWFX2JWNtuvA0CtD69nlOnuLUxQYOwXCrAZe/iiEbp20emr1u8g+u0hCizaL9MZ8ZyJxeN7/ZBZT4FqtLdm+mzhqyZ0k2+vpyhuLsbG6EyDMfn/rKW3NlG9b/xQKekCG2r+J2s9Ep7FllcionhlEKXahXZ/ymI4ru6tjdLglpIeYQgyPD6o3fgUhQDudljBhm3cNBGSaQ0P2M4IM9uhqDnenGWbo4wm7RhKz5VUijy/FdmPFTKOy6MsE9VWAdS/Mosq6jvjXEXRCkzwhzMN2ZNUXY1H4XG2wWD+mJ4C0e2aZhxIzUjMH87ptG9N8RN9cd5kLxBULsSsQ8DUsWVv5iDXOCfIrGXzZ3124g3oyqTWgLA6QtfEgcKcOs1Pf3KTZMHWjfl5UYeQgvIbWT/YVE7y1TN3sZJGqU0kyXijlFJg5uv71W4yP+l+F1H7QRatBJykJ8ezmgqsKesBjxstOWJrAwbY4jV6Fw3TJWRHv8iml2RtziU3SODQpzGaIDIG4OTMt9Kvf4Ov4OeQ4awowAaF3tEMpB0avDB/fiCYVAGOfAGcklGUgIt4h1dRwKvh7hpZmmQ1h/mEJDElZgLz+94TJk=",
+            List.of(
+                    "Fermier devenu roi, il a navigué",
+                    "vers l'ouest quand tous disaient",
+                    "qu'il n'y avait rien.",
+                    "Il y avait quelque chose."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§3Ragnar §f: §oLes dieux m'ont mené jusqu'ici. Et une abbaye, paraît-il.",
+                            "§3Ragnar §f: §oCalmez-vous. Je préfère commercer. Enfin... aujourd'hui.",
+                            "§3Ragnar §f: §oConstruisez-moi un chantier et je vous apprendrai à bâtir des navires dignes de ce nom."
+                    ),
+                    "city_arrival", List.of(
+                            "§3Ragnar §f: §oUne abbaye, des greniers pleins... Hm. Je suis venu commercer, j'ai dit.",
+                            "§3Ragnar §f: §oIl me faut un chantier au bord de l'eau. Mes navires ne naîtront pas dans un champ."
+                    ),
+                    "building_assign", List.of(
+                            "§3Ragnar §f: §oUn chantier, de l'épicéa, de la laine pour les voiles.",
+                            "§3Ragnar §f: §oAvec ça, Valmont aura une flotte."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§3Ragnar §f: §oVos barques ne tiendraient pas une vague.",
+                            "§3Ragnar §f: §oSans vrais navires, je n'ai rien à vendre."
+                    ),
+                    "mod_missing", List.of(
+                            "§3Ragnar §f: §oVos barques ne tiendraient pas une vague, et personne ici ne sait bâtir une coque.",
+                            "§3Ragnar §f: §oSans vrais navires, je n'ai rien à vendre. Je garde l'abbaye à l'œil... pour la protéger."
+                    ),
+                    "level_up", List.of(
+                            "§3Ragnar §f: §oLes dieux sourient à Valmont ! Mon chantier peut bâtir de plus grands navires."
+                    )
+            ),
+            PersonalQuestCatalog.ragnar(),
+            "smallships"
+    ),
+
+    // Chapitre VIII — Valarian Conquest (factions, chevaliers, engins de siège)
+    JEANNE(
+            "citycore_jeanne",
+            "§eJeanne d'Arc",
+            "Cheffe de guerre",
+            "jeanne",
+            "ewogICJ0aW1lc3RhbXAiIDogMTcxODA1NTM5NjI2MCwKICAicHJvZmlsZUlkIiA6ICJhN2E4YWY1NTk0ZGQ0OTJjYWViNjc1NzUzMzRlNmM0OCIsCiAgInByb2ZpbGVOYW1lIiA6ICJpdHNUcmFjZXJvdXRlIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzJkNTBlNmEwMDBlYTFiYjdhODJjZDk4YTIxNjI4YjdlOWI1NmQ4MTVlMTU2YzdjNTExMWUxYjgyMGUyODg1MyIsCiAgICAgICJtZXRhZGF0YSIgOiB7CiAgICAgICAgIm1vZGVsIiA6ICJzbGltIgogICAgICB9CiAgICB9CiAgfQp9",
+            "Bfn7dkQWbt/R0GWrdGytNZ3RrQ/5/OaPV3DFemevkeG5cdsIInjPH10OELAOeCRXGKxPxj91gY78TMj3bqIg5mu+GtN8e6L1H0n+rAg6romOv0N9Y+iSXJMi9oJfgvfYk1X0bAa4XSMf8YP6xfluht/gYA/fGAD6fBrsbWsrxHQebY5WSoLUEursiAC7OykbEpNBIs3hFUHDxSeswve0krMk9tw0kYucnFlNDCrNi3+xTZ/9zCXpgKKW9yRUMJd35kNfMiSpXEUK8/YkjGbJv/+t8SSNNbRk8R/rzTONt/07Qi2t6Qy9qPt7s8NGG6GMuMCDnHBX9bMHQhEgWtvtc9Im/rTbmspPJLLyDJbrmLu5ypZABBBFrmKZejupjhFC5qRFS+AXt9FwbpxOfGMaNgrQRYiM0PgrdMDLmPrPkaIvj0jYSqfi8FX7YYhk8wlL+NrgPrf+bNhAh1O8/fJc93TcDh7wZcQjSWgDIGksGbhlSzSNWrG1rmJY+FuPfwTlQ/dlcjmF1HDjvf0mRdzdtJyRot90Ue3LFefT9DYDkCMMHWnRwqJeqDiYsxtR8fSV/dMxVYM6v+4roLf8TgEuJC3y0y9Tx9r233Pof4f+TJKg4QQbMsEyIMq6MI+SbTUABfmcB73dAZzCXiZXENkWdJabPiUgR8ia8aQO8sJmC8A=",
+            List.of(
+                    "Bergère devenue cheffe de guerre,",
+                    "elle a délivré une ville assiégée",
+                    "et fait sacrer un roi.",
+                    "Elle n'a jamais reculé."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§eJeanne §f: §oOn m'a dit qu'une cité se relevait ici, et qu'on l'assiégeait. Me voici.",
+                            "§eJeanne §f: §oBâtissez-moi un quartier général : je ferai de vos gardes une armée."
+                    ),
+                    "city_arrival", List.of(
+                            "§eJeanne §f: §oDes murs, une garde, des bannières : Valmont a du cœur.",
+                            "§eJeanne §f: §oDonnez-moi un quartier général. Les assiégeants vont apprendre à nous craindre."
+                    ),
+                    "building_assign", List.of(
+                            "§eJeanne §f: §oDes cartes, des bannières, une enclume. Valmont ne tombera pas.",
+                            "§eJeanne §f: §oApportez-moi du fer : je ferai de vos gardes une armée."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§eJeanne §f: §oNi catapultes, ni chevaliers, ni royaumes en guerre... Le pays est en paix.",
+                            "§eJeanne §f: §oJe reste, mais je n'ai rien à vous vendre."
+                    ),
+                    "mod_missing", List.of(
+                            "§eJeanne §f: §oLes royaumes ne se battent plus, et personne ne fabrique de catapultes.",
+                            "§eJeanne §f: §oJe veille sur Valmont. Mais je n'ai rien à vous vendre."
+                    ),
+                    "level_up", List.of(
+                            "§eJeanne §f: §oVos gardes tiennent la ligne. Je peux armer de vrais chevaliers, maintenant."
+                    )
+            ),
+            PersonalQuestCatalog.jeanne(),
+            "valarian_conquest"
+    ),
+
+    // Chapitre X — Mowzie's Mobs (créatures et boss légendaires)
+    HERCULE(
+            "citycore_hercule",
+            "§dHercule",
+            "Demi-dieu",
+            "hercule",
+            "ewogICJ0aW1lc3RhbXAiIDogMTYyMjUyMDA0Nzg0MSwKICAicHJvZmlsZUlkIiA6ICJkZGVkNTZlMWVmOGI0MGZlOGFkMTYyOTIwZjdhZWNkYSIsCiAgInByb2ZpbGVOYW1lIiA6ICJEaXNjb3JkQXBwIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzlkYmFkYzdmOGViMTg4ODhlZmNkYWU3ZTBkYjRjZjMwZmYyOGJkNTg4NTM0ZjRiYjA0MmQ1YmM2YmRjNGRmZWYiCiAgICB9CiAgfQp9",
+            "QhR/bKHq2tO+Y20QESmjnowP2m2TWX6RSz2PLFMa7sxoN7m8bd81ekCNJLrxmThb6Cu9kQSK0v9m6pjVT3qpRZuOPlP+1+vpperGkOCSuhqX8KlRIvbZxW4ex2phdmbA5gMeNFalWBj5l4Ts+qX1rJbA/CB5cPuvu5J9s1Vfmbl3U+ApPrOq2Hk1KTFc4M9Nh2TcDidlKgCD0Pqnvf9ZmBZsfAM1ha+xisWZ7ibSpeMviS+M4cETvMKibkPmxekvCRTzz+tc547RzGtx8lVJSXSznrGfTGis3CqXUuXI489jOK9LRaQLWwQdumpQQss20/9Ihe5y8HBgrZhld/aKh6uVreXqmarp3j3M7gqOzzZ5sXbcSS9h8Mxjcwr+M25nvZW0DySI6guefkXkVYjvuWZX+mFtGLU/a8FYZRXzX4uEYp4A1IVUvmxX69iZ8Dd2UPuJtnaz/hf2bObHAkvCRqw0v22iW4Vqmm8KwBxW5ZsRN52u7AVtVkTR1mEyIrLaaFdBdtmnLCxStXMMw/ROcuU7HSWA/X1KJTbCU6q7RHVpZf3vfCcwY4WGuXsS5ILKWaSJ6dJ2gJNHqqIc0GYt/9jDs54YQdhjfCpqUgbADOY4wYQDCdg6qCWY3tlZQWc6RUxVatYKw6IcZCWVEw/dN+dHTi0yNTJQmjawKVEPQvA=",
+            List.of(
+                    "Fils d'un dieu, il a accompli",
+                    "douze travaux pour expier une",
+                    "faute. Il en cherche",
+                    "un treizième."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§dHercule §f: §oOn m'a parlé d'une cité qui a vaincu un dragon. Impressionnant. Pour des mortels.",
+                            "§dHercule §f: §oMontrez-moi vos monstres. Les plus gros."
+                    ),
+                    "city_arrival", List.of(
+                            "§dHercule §f: §oC'est donc ça, la cité qui a vaincu un dragon ? Elle est... petite.",
+                            "§dHercule §f: §oConstruisez-moi une palestre. Je m'entraînerai en attendant des monstres dignes de ce nom."
+                    ),
+                    "building_assign", List.of(
+                            "§dHercule §f: §oUne palestre !",
+                            "§dHercule §f: §oRapportez-moi les trophées de vos chasses : je saurai qui est digne."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§dHercule §f: §oDes zombies, des araignées... Ce ne sont pas des monstres,",
+                            "§dHercule §f: §oce sont des échauffements."
+                    ),
+                    "mod_missing", List.of(
+                            "§dHercule §f: §oDes zombies, des araignées... Ce ne sont pas des monstres, ce sont des échauffements.",
+                            "§dHercule §f: §oRevenez quand vous aurez de vrais monstres à me montrer."
+                    ),
+                    "level_up", List.of(
+                            "§dHercule §f: §oPas mal, pour des mortels. Voici des armes dignes d'un héros."
+                    )
+            ),
+            PersonalQuestCatalog.hercule(),
+            "mowziesmobs"
     );
+
 
     /* =========================
        CHAMPS
@@ -831,8 +1196,10 @@ public enum CityNPC {
     public final List<String> backstory;
     public final Map<String, List<String>> dialogues;
     public final Map<Integer, List<NPCPersonalQuest>> personalQuestsByLevel;
-    /** Mod dont dépend l'habitant (identifiant, ex : "dmr"), null pour le jeu de base. */
-    public final String requiredMod;
+    /** Mods dont dépend l'habitant (identifiants, ex : "dmr") ; vide pour le jeu de base. */
+    public final List<String> requiredMods;
+    /** Mods qui ajoutent du contenu à l'habitant sans lui être nécessaires (Gandalf, Robin…). */
+    public final List<String> optionalMods;
 
     /* =========================
        CONSTRUCTEUR
@@ -852,8 +1219,17 @@ public enum CityNPC {
             List<String> backstory,
             Map<String, List<String>> dialogues,
             Map<Integer, List<NPCPersonalQuest>> personalQuestsByLevel,
-            String requiredMod) {
-        this.requiredMod           = requiredMod;
+            String mods) {
+        List<String> required = new java.util.ArrayList<>(), optional = new java.util.ArrayList<>();
+        if (mods != null) {
+            for (String m : mods.split(",")) {
+                String id = m.trim();
+                if (id.startsWith("+")) optional.add(id.substring(1).trim());
+                else if (!id.isEmpty()) required.add(id);
+            }
+        }
+        this.requiredMods          = List.copyOf(required);
+        this.optionalMods          = List.copyOf(optional);
         this.tag                   = tag;
         this.displayName           = displayName;
         this.function              = function;
@@ -874,6 +1250,7 @@ public enum CityNPC {
                 .filter(e -> e.getKey() <= npcLevel)
                 .sorted(Map.Entry.comparingByKey())
                 .flatMap(e -> e.getValue().stream())
+                .filter(NPCPersonalQuest::offered)
                 .toList();
     }
 
@@ -887,7 +1264,8 @@ public enum CityNPC {
     public List<RankedQuest> getAllPersonalQuests() {
         return personalQuestsByLevel.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
-                .flatMap(e -> e.getValue().stream().map(q -> new RankedQuest(e.getKey(), q)))
+                .flatMap(e -> e.getValue().stream().filter(NPCPersonalQuest::offered)
+                        .map(q -> new RankedQuest(e.getKey(), q)))
                 .toList();
     }
 
@@ -902,6 +1280,7 @@ public enum CityNPC {
         return !personalQuestsByLevel.isEmpty();
     }
 
+    /** Récit par identifiant (même réservé à un mod absent : une progression déjà enregistrée se relit). */
     public NPCPersonalQuest getPersonalQuestById(String id) {
         return personalQuestsByLevel.values().stream()
                 .flatMap(List::stream)

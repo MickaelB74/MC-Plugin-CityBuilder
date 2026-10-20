@@ -58,6 +58,17 @@ public class DatabaseManager {
             )
         """);
 
+        // Préférences des joueurs (affichage du suivi des quêtes, style des menus…), voir PlayerPrefs.
+        // Remplacent les réglages rangés jusqu'ici dans les données du joueur (repris à sa connexion).
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS player_prefs (
+                uuid   TEXT NOT NULL,
+                pref   TEXT NOT NULL,
+                value  TEXT NOT NULL,
+                PRIMARY KEY (uuid, pref)
+            )
+        """);
+
         stmt.execute("""
             CREATE TABLE IF NOT EXISTS claimed_chunks (
                 world TEXT NOT NULL,

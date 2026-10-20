@@ -59,6 +59,14 @@ public final class UiPortraits {
         BACKDROPS.put(CityNPC.GANDALF, "pf_chapelle");
         BACKDROPS.put(CityNPC.GERALT, "pf_route");
         BACKDROPS.put(CityNPC.HAROLD, "pf_dragon");
+        BACKDROPS.put(CityNPC.ROBINSON, "pf_port");
+        BACKDROPS.put(CityNPC.ACHAB, "pf_port");
+        BACKDROPS.put(CityNPC.OBELIX, "pf_taverne");
+        BACKDROPS.put(CityNPC.MUSASHI, "pf_route");
+        BACKDROPS.put(CityNPC.GEPPETTO, "pf_atelier");
+        BACKDROPS.put(CityNPC.RAGNAR, "pf_port");
+        BACKDROPS.put(CityNPC.JEANNE, "pf_mairie");
+        BACKDROPS.put(CityNPC.HERCULE, "pf_route");
     }
 
     private final JavaPlugin  plugin;

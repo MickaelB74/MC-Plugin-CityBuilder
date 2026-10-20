@@ -5,8 +5,11 @@ import com.citycore.building.BuildingManager;
 import com.citycore.building.BuildingType;
 import com.citycore.city.CityManager;
 import com.citycore.economy.MarketService;
+import com.citycore.inhabitant.Engagements;
 import com.citycore.inhabitant.InhabitantManager;
 import com.citycore.inhabitant.SiegeFront;
+import com.citycore.npc.SafeNavigation;
+import com.citycore.util.GroundFinder;
 import com.citycore.npc.CityNPC;
 import com.citycore.npc.NPCDataManager;
 import com.citycore.npc.NPCState;
@@ -50,9 +53,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -74,6 +79,12 @@ import java.util.function.IntSupplier;
  * contact, archers en retrait) ; à la fin du siège, elle rentre en ville et reprend ses rondes.
  * Aucun bloc n'est touché dans la ville et les joueurs y restent invulnérables.
  *
+ * Champ de bataille : chaque vague arrive progressivement (sieges.arrivee-secondes), par petites
+ * escouades (Squad) réparties sur plusieurs points d'entrée le long du front (sieges.largeur-front,
+ * sieges.points-entree). Chaque escouade avance sur sa propre voie, en formation derrière son
+ * meneur ; pas plus de sieges.escouades.max-par-cible assaillants au contact d'un même défenseur.
+ * La garde, répartie en groupes, va à la rencontre des escouades les plus proches de son secteur.
+ *
  * Victoire : toutes les vagues repoussées dans le temps imparti → récompense dans la caisse et XP
  * pour Roland. Défaite (temps écoulé) : les assaillants se retirent sans rien rapporter.
  * Les assaillants ne sont jamais enregistrés avec le monde : un redémarrage en plein siège ne
@@ -87,6 +98,9 @@ public final class SiegeManager implements Listener {
 
     /** Côté attaqué : apparition (hors de la ville), ralliement et postes de la garde (dans la ville). */
     private record Side(Location spawn, Location rally, String direction, SiegeFront front) {}
+
+    /** Arrivée prévue d'un assaillant : quand, avec quelle escouade (champion, porte-étendard). */
+    private record Arrival(long due, Squad squad, boolean champion, boolean standard) {}
 
     private final JavaPlugin        plugin;
     private final CityManager       city;
@@ -112,11 +126,17 @@ public final class SiegeManager implements Listener {
     private String championName;
     private boolean championAlive;
     private BossBar bar;
-    private BukkitTask task;
+    private BukkitTask task, arrivalTask;
     private final Map<UUID, Mob> alive = new LinkedHashMap<>();
+    private final Deque<Arrival> arrivals = new ArrayDeque<>();   // assaillants de la vague encore en route (par date)
+    private final List<Squad> squads = new ArrayList<>();         // escouades de la vague (de gauche à droite)
+    private final Map<UUID, Squad> packOf = new HashMap<>();      // monstre → son escouade
+    private final Engagements tally = new Engagements();          // monstres au contact de chaque défenseur
     private final Map<String, Integer> playerKills = new HashMap<>();
     private int guardKills, civiliansLost, guardsLost;
     private java.util.function.BiConsumer<Boolean, Integer> resultListener; // (victoire, palier) : sécurité (phase 6)
+    private List<Building> buildingList = List.of(); // bâtiments (zones à éviter), relus au plus toutes les 5 s
+    private long buildingsReadAt;
 
     public SiegeManager(JavaPlugin plugin, CityManager city, BuildingManager buildings, InhabitantManager inhabitants,
                         NPCDataManager npcData, MarketService market, IntSupplier cityLevel) {
@@ -134,8 +154,8 @@ public final class SiegeManager implements Listener {
         // La garde prend position sur le front ; elle combat aussi les soldats ennemis
         inhabitants.setSiegeFront(() -> running() && side != null ? side.front() : null);
         inhabitants.setHostileNpc(army::isSoldier);
-        // Vague en cours : la garde sort de la ville combattre les assaillants
-        inhabitants.setSiegeAssault(() -> phase == Phase.WAVE, this::attackerBodies);
+        // Vague en cours : la garde sort de la ville, par groupes, à la rencontre des escouades
+        inhabitants.setSiegeAssault(() -> phase == Phase.WAVE, this::bands);
         inhabitants.setDeathListener((inh, wasGuard) -> {
             if (!running()) return;
             if (wasGuard) guardsLost++; else civiliansLost++;
@@ -193,6 +213,11 @@ public final class SiegeManager implements Listener {
         return running() && config.playersWounded() && (isAttacker(damager) || army.isSoldier(damager));
     }
 
+    /** Assaillant d'un siège en cours : monstre d'une vague ou soldat de l'armée ennemie (récits de Musashi). */
+    public boolean isSiegeEnemy(Entity e) {
+        return running() && (isAttacker(e) || army.isSoldier(e));
+    }
+
     /** Monstre marqué comme assaillant d'un siège. */
     public boolean isAttacker(Entity e) {
         return e.getPersistentDataContainer().has(key, PersistentDataType.BYTE);
@@ -239,6 +264,9 @@ public final class SiegeManager implements Listener {
         totalWaves = config.waves(tier);
         wave = waveTotal = pendingRespawn = sideFailures = 0;
         alive.clear();
+        arrivals.clear();
+        squads.clear();
+        packOf.clear();
         playerKills.clear();
         guardKills = civiliansLost = guardsLost = 0;
         championId = null;
@@ -266,6 +294,7 @@ public final class SiegeManager implements Listener {
         }
         lastCountdown = -1;
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+        arrivalTask = Bukkit.getScheduler().runTaskTimer(plugin, this::spawnArrivals, 5L, 5L); // arrivées en filet
         plugin.getLogger().info("Siège lancé : " + kind.key + (faction != null ? " (" + faction.name() + ")" : "")
                 + ", palier " + tier + ", " + totalWaves + " vagues.");
         return null;
@@ -287,6 +316,7 @@ public final class SiegeManager implements Listener {
         for (Mob m : alive.values()) m.remove();
         alive.clear();
         army.clear();
+        arrivals.clear(); // ceux qui étaient encore en route ne viendront pas
         pendingRespawn = 0;
         waveCleared(System.currentTimeMillis());
         return true;
@@ -327,9 +357,9 @@ public final class SiegeManager implements Listener {
         if (running()) updateBar(now);
     }
 
-    /** Assaillants encore à abattre dans la vague (monstres, soldats, et ceux à faire réapparaître). */
+    /** Assaillants encore à abattre dans la vague (présents, encore en route, et ceux à faire réapparaître). */
     private int left() {
-        return alive.size() + army.alive() + pendingRespawn;
+        return alive.size() + army.alive() + arrivals.size() + pendingRespawn;
     }
 
     private void startWave() {
@@ -345,30 +375,142 @@ public final class SiegeManager implements Listener {
         wave++;
         int count = config.attackers(tier, Bukkit.getOnlinePlayers().size());
         boolean last = wave == totalWaves;
-        for (int i = 0; i < count; i++) spawnOne(false, kind == SiegeConfig.Kind.BANNIERE && i == 0);
-        if (last) spawnOne(true, false);
-        waveTotal = alive.size() + army.alive();
+        String champion = last ? plannedChampion() : null;
+        planArrivals(count, champion != null);
+        waveTotal = alive.size() + army.alive() + arrivals.size();
         phase = Phase.WAVE;
         String units = kind == SiegeConfig.Kind.BANNIERE ? "soldats" : "assaillants";
         Bukkit.broadcastMessage("§c⚔ Vague " + wave + "/" + totalWaves + " : §f" + waveTotal + " " + units + " §carrivent par "
-                + side.direction() + " !" + (last && championAlive ? " §4" + championName + " §cles mène." : ""));
+                + side.direction() + (squads.size() > 1 ? ", §7en " + squads.size() + " escouades sur tout le front§c" : "")
+                + " !" + (champion != null ? " §4" + champion + " §cferme la marche." : ""));
         for (Player p : Bukkit.getOnlinePlayers()) {
             p.sendTitle("", "§cVague " + wave + "/" + totalWaves + " §7— par " + side.direction(), 5, 40, 10);
         }
         lastCountdown = -1;
+        spawnArrivals(); // la première escouade arrive tout de suite
     }
 
-    /** Un assaillant du type du siège ; champion : celui de la dernière vague (s'il y en a un à ce palier). */
-    private void spawnOne(boolean champion, boolean standard) {
+    /** Nom du champion de la dernière vague à ce palier (armée ou monstres), ou null. */
+    private String plannedChampion() {
+        if (kind == SiegeConfig.Kind.BANNIERE) {
+            SiegeConfig.Unit u = config.armyChampion(tier);
+            return u != null ? u.name() : null;
+        }
+        SiegeConfig.Champion c = config.champion(tier);
+        return c != null ? c.name() : null;
+    }
+
+    /**
+     * Plan d'arrivée d'une vague : les count assaillants sont répartis en escouades de
+     * sieges.escouades.min à max, chacune affectée à un point d'entrée (réparties sur toute la
+     * largeur du front), et leurs apparitions étalées sur sieges.arrivee-secondes : les escouades
+     * du centre d'abord, puis celles des ailes, quelques soldats à la fois. Le porte-étendard
+     * ouvre la première escouade ; le champion (champion vrai) mène la dernière.
+     */
+    private void planArrivals(int count, boolean champion) {
+        arrivals.clear();
+        squads.clear();
+        packOf.clear();
+        SiegeFront f = side.front();
+        List<Location> entries = f.entries().isEmpty() ? List.of(side.spawn()) : f.entries();
+        int avg = Math.max(1, (config.squadMin() + config.squadMax()) / 2);
+        int n = Math.max((int) Math.round((double) count / avg), (int) Math.ceil((double) count / config.squadMax()));
+        n = Math.max(1, Math.min(n, count));
+        // Escouades de gauche à droite : chacune son point d'entrée, réparties sur toute la largeur
+        for (int j = 0; j < n; j++) {
+            int e = (int) ((j + 0.5) * entries.size() / n); // plus d'escouades que d'entrées : elles se partagent les entrées, en ordre
+            Location entry = entries.get(Math.max(0, Math.min(entries.size() - 1, e)));
+            squads.add(new Squad(j, entry, goalsFor(entry)));
+        }
+        // Ordre d'arrivée : du centre vers les ailes
+        List<Squad> order = new ArrayList<>(squads);
+        order.sort(Comparator.comparingDouble(s -> Math.abs(f.lateral(s.entry))));
+        long now = System.currentTimeMillis(), window = config.arrivalMs();
+        long spacing = window / n;                                         // entre deux escouades
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        int base = count / n, extra = count % n;
+        for (int k = 0; k < n; k++) {
+            Squad sq = order.get(k);
+            int size = base + (k < extra ? 1 : 0) + (champion && k == n - 1 ? 1 : 0);
+            long start = now + k * spacing + (k == 0 || spacing < 3 ? 0 : rnd.nextLong(spacing / 3));
+            long gap = window == 0 ? 0 : Math.max(250, Math.min(900, spacing / Math.max(1, size)));
+            int bearer = champion && n == 1 ? 1 : 0; // une seule escouade : le porte-étendard suit le champion
+            for (int m = 0; m < size; m++) {
+                boolean leadsLast = champion && k == n - 1 && m == 0;                  // le champion mène la dernière
+                boolean standard = kind == SiegeConfig.Kind.BANNIERE && k == 0 && m == bearer;
+                arrivals.add(new Arrival(start + m * gap, sq, leadsLast, standard));
+            }
+        }
+        List<Arrival> sorted = new ArrayList<>(arrivals);
+        sorted.sort(Comparator.comparingLong(Arrival::due));
+        arrivals.clear();
+        arrivals.addAll(sorted);
+    }
+
+    /**
+     * Objectifs d'une escouade venue par entry : percer la lisière en face de son entrée (une
+     * douzaine de blocs dans la ville), puis avancer vers le cœur de la ville en gardant une
+     * partie de son décalage (les escouades ne convergent pas toutes au même point), enfin la
+     * mairie. Points au sol, hors des bâtiments ; ceux qui ne conviennent pas sont sautés.
+     */
+    private List<Location> goalsFor(Location entry) {
+        SiegeFront f = side.front();
+        double lat = f.lateral(entry);
+        Vector inward = f.rally().toVector().subtract(f.enemy().toVector()).setY(0);
+        if (inward.lengthSquared() < 1e-4) inward = new Vector(0, 0, 0); else inward.normalize();
+        List<Location> goals = new ArrayList<>();
+        Location lane = f.rally().clone().add(f.across().clone().multiply(lat));
+        Location breach = cityGround(lane.clone().add(inward.clone().multiply(4)), f.rally().getBlockY());
+        if (breach != null) goals.add(breach);
+        Location end = hall != null ? hall : f.rally().clone().add(inward.clone().multiply(24));
+        Location from = breach != null ? breach : lane;
+        Location toward = end.clone().add(f.across().clone().multiply(lat * 0.4));
+        Location heart = cityGround(from.clone().add(toward.toVector().subtract(from.toVector()).multiply(0.5)),
+                (from.getBlockY() + end.getBlockY()) / 2);
+        if (heart != null) goals.add(heart);
+        if (hall != null) goals.add(hall);
+        return goals;
+    }
+
+    /** Point au sol près de at (à peu près à la hauteur y), hors des bâtiments, chunk chargé ; null sinon. */
+    private Location cityGround(Location at, int y) {
+        World w = at.getWorld();
+        for (int[] d : new int[][]{{0, 0}, {2, 0}, {-2, 0}, {0, 2}, {0, -2}, {3, 3}, {-3, -3}}) {
+            int x = at.getBlockX() + d[0], z = at.getBlockZ() + d[1];
+            if (!w.isChunkLoaded(x >> 4, z >> 4) || insideBuilding(w.getName(), x, z)) continue;
+            Location g = GroundFinder.standAt(w, x, y, z);
+            if (g == null) g = GroundFinder.groundAt(w, x, z); // relief : le sol naturel de la colonne
+            if (g != null && !insideBuilding(w.getName(), g.getBlockX(), g.getBlockZ())) return g;
+        }
+        return null;
+    }
+
+    /** Arrivées dues (toutes les 5 ticks) : quelques assaillants à la fois, à leur point d'entrée. */
+    private void spawnArrivals() {
+        if (phase != Phase.WAVE) return;
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < 4 && !arrivals.isEmpty() && arrivals.peekFirst().due() <= now; i++) {
+            Arrival a = arrivals.pollFirst();
+            spawnOne(a.squad(), a.champion(), a.standard());
+        }
+    }
+
+    /**
+     * Un assaillant du type du siège, au point d'entrée de son escouade (squad null : au point
+     * d'apparition central) ; champion : celui de la dernière vague (s'il y en a un à ce palier).
+     */
+    private void spawnOne(Squad squad, boolean champion, boolean standard) {
         if (side == null) return;
-        Location at = spotNear(side.spawn(), 6);
-        if (at == null) at = side.spawn();
+        Location base = squad != null && SafeNavigation.isLoaded(squad.entry) ? squad.entry : side.spawn();
+        Location at = spotNear(base, 3);
+        if (at == null) at = base;
         if (kind == SiegeConfig.Kind.BANNIERE) {
             SiegeConfig.Unit unit = champion ? config.armyChampion(tier) : config.randomUnit(tier);
             if (unit == null) return;
-            if (army.spawn(unit, at, faction, champion, standard) != null && champion) {
+            if (army.spawn(unit, at, faction, champion, standard, squad) != null && champion) {
                 championName = unit.name();
                 championAlive = true;
+                championEnters(at);
             }
             return;
         }
@@ -382,14 +524,24 @@ public final class SiegeManager implements Listener {
             return;
         }
         alive.put(m.getUniqueId(), m);
+        if (squad != null) packOf.put(m.getUniqueId(), squad);
         if (champ != null) {
             championId = m.getUniqueId();
             championName = champ.name();
             championAlive = true;
+            championEnters(at);
         }
     }
 
+    /** Moment clé : le champion entre dans la bataille (annonce et cor de guerre venu de lui). */
+    private void championEnters(Location at) {
+        Bukkit.broadcastMessage("§4⚔ " + championName + " §centre dans la bataille" + (side != null ? " par " + side.direction() : "") + " !");
+        SiegeSounds.warHorn(at, kind == SiegeConfig.Kind.BANNIERE);
+    }
+
     private void waveCleared(long now) {
+        squads.clear();
+        packOf.clear();
         if (wave >= totalWaves) {
             end(Result.VICTORY, true);
             return;
@@ -405,9 +557,15 @@ public final class SiegeManager implements Listener {
     private void end(Result result, boolean announce) {
         if (task != null) task.cancel();
         task = null;
+        if (arrivalTask != null) arrivalTask.cancel();
+        arrivalTask = null;
         for (Mob m : alive.values()) if (m.isValid()) m.remove();
         alive.clear();
         army.clear();
+        arrivals.clear();
+        squads.clear();
+        packOf.clear();
+        tally.clear();
         for (World w : Bukkit.getWorlds()) {
             for (Entity e : w.getEntities()) if (isAttacker(e)) e.remove(); // transformés, égarés
         }
@@ -534,64 +692,142 @@ public final class SiegeManager implements Listener {
             if (!m.isValid()) { pendingRespawn++; return true; }
             return false;
         });
+        packOf.keySet().retainAll(alive.keySet());
         pendingRespawn += army.prune();
     }
 
+    /** Assaillants disparus (chunk déchargé) : ils reviennent par le point d'entrée d'une escouade de la vague. */
     private void respawnPending() {
         for (int i = 0; i < 5 && pendingRespawn > 0; i++) {
             pendingRespawn--;
-            spawnOne(false, false);
+            spawnOne(squads.isEmpty() ? null : squads.get(ThreadLocalRandom.current().nextInt(squads.size())), false, false);
         }
     }
 
     /**
-     * Cibles des monstres (toutes les 2 s) : l'habitant ou le garde le plus proche (48 blocs), et
-     * ils avancent vers lui tant qu'ils ne sont pas à portée (les pillards et les sorcières, qui
-     * ne se déplacent pas d'eux-mêmes vers une cible lointaine, restaient plantés) ; sans cible,
-     * ils marchent sur la mairie (ou le côté attaqué) par étapes au sol.
+     * Cibles des monstres (chaque seconde), par meutes (escouades) : chacun choisit un habitant ou
+     * un garde proche (32 blocs), de préférence près de sa meute, que pas plus de
+     * sieges.escouades.max-par-cible monstres n'attaquent déjà au contact, et avance vers lui tant
+     * qu'il n'est pas à portée (les pillards et les sorcières, qui ne se déplacent pas d'eux-mêmes
+     * vers une cible lointaine, restaient plantés). Sans cible, le meneur marche vers l'objectif
+     * de sa meute (par étapes au sol) et les autres tiennent leur place derrière lui.
      */
     private void retarget() {
         List<LivingEntity> defenders = inhabitants.defenders();
-        Location goal = hall != null ? hall : side != null ? side.rally() : null;
+        Location fallback = hall != null ? hall : side != null ? side.rally() : null;
+        long now = System.currentTimeMillis();
+        // Un passage : monstres regroupés par meute, mêlées en cours recomptées
+        Map<Squad, List<Mob>> packs = new LinkedHashMap<>();
+        tally.clear();
         for (Mob m : alive.values()) {
+            if (!m.isValid()) continue;
+            Squad sq = packOf.get(m.getUniqueId());
+            if (sq != null) packs.computeIfAbsent(sq, k -> new ArrayList<>()).add(m);
+            LivingEntity t = m.getTarget();
+            if (!ranged(m) && t != null && t.isValid() && !t.isDead()) tally.add(t);
+        }
+        Map<UUID, Integer> slots = new HashMap<>();
+        for (Map.Entry<Squad, List<Mob>> e : packs.entrySet()) {
+            Mob lead = null;
+            for (Mob m : e.getValue()) if (leadership(m) > leadership(lead)) lead = m;
+            int melee = 0, far = 0;
+            for (Mob m : e.getValue()) slots.put(m.getUniqueId(), m == lead ? -1 : ranged(m) ? far++ : melee++);
+            e.getKey().survey(e.getValue(), lead, b -> ((Mob) b).getTarget() == null);
+        }
+        int cap = config.maxPerTarget();
+        for (Mob m : alive.values()) {
+            if (!m.isValid()) continue;
+            Squad sq = packOf.get(m.getUniqueId());
+            int slot = slots.getOrDefault(m.getUniqueId(), -1);
             if (ranged(m) && !claims.isClaimed(m.getLocation())) {
-                // Tireur hors de la ville (squelette, pillard…) : il y entre d'abord, comme tous les
-                // assaillants, au lieu de tirer de loin depuis la lisière
+                // Tireur hors de la ville (squelette, pillard…) : il y entre d'abord avec sa meute, comme
+                // tous les assaillants, au lieu de tirer de loin depuis la lisière
                 if (m.getTarget() != null) m.setTarget(null);
-                if (goal == null || !goal.getWorld().equals(m.getWorld())) continue;
-                Location step = stepToward(m.getLocation(), goal, 24);
-                if (step != null) m.getPathfinder().moveTo(step, 1.0);
+                advance(m, sq, slot, fallback, now);
                 continue;
             }
             LivingEntity t = m.getTarget();
-            boolean keep = t != null && t.isValid() && !t.isDead() && t.getWorld().equals(m.getWorld())
-                    && t.getLocation().distanceSquared(m.getLocation()) < 48 * 48;
-            if (!keep) {
-                t = null;
-                double bestDist = 48 * 48;
-                for (LivingEntity d : defenders) {
-                    if (!d.getWorld().equals(m.getWorld())) continue;
-                    double dist = d.getLocation().distanceSquared(m.getLocation());
-                    if (dist < bestDist) { bestDist = dist; t = d; }
+            boolean valid = t != null && t.isValid() && !t.isDead() && t.getWorld().equals(m.getWorld())
+                    && t.getLocation().distanceSquared(m.getLocation()) < 32 * 32;
+            boolean due = Math.floorMod(m.getUniqueId().hashCode() + ticks, 2) == 0; // choix revu toutes les 2 s
+            boolean player = t instanceof Player p && !p.hasMetadata("NPC");          // un joueur qu'il a pris à partie : il le garde
+            if (!valid || (!player && (due || (!ranged(m) && !tally.acceptable(t, cap))))) {
+                LivingEntity pick = tally.pick(m.getLocation(), defenders, 32, ranged(m) ? 0 : cap, t,
+                        sq != null ? sq.center() : null, 16);
+                if (pick != t) {
+                    if (!ranged(m)) tally.swap(t != null && t.isValid() && !t.isDead() ? t : null, pick);
+                    m.setTarget(pick); // null : il rejoint sa meute (le jeu peut lui en redonner une)
                 }
-                if (t != null) m.setTarget(t);
+                t = pick;
             }
             if (t != null) {
                 double reach = ranged(m) ? 10 : 2.5;
                 if (m.getLocation().distance(t.getLocation()) > reach || !m.hasLineOfSight(t)) m.getPathfinder().moveTo(t, 1.0);
                 continue;
             }
-            if (goal == null || !goal.getWorld().equals(m.getWorld())) continue;
-            Location step = stepToward(m.getLocation(), goal, 24);
-            if (step != null && step.distanceSquared(m.getLocation()) > 9) m.getPathfinder().moveTo(step, 1.0);
+            advance(m, sq, slot, fallback, now);
         }
     }
 
-    /** Assaillants présents (monstres et soldats) : cibles de la garde pendant l'assaut. */
-    private List<LivingEntity> attackerBodies() {
-        List<LivingEntity> list = new ArrayList<>(alive.values());
-        list.addAll(army.bodies());
-        return list;
+    /** Aptitude d'un monstre à mener sa meute : le champion, sinon un combattant au contact, sinon un tireur. */
+    private int leadership(Mob m) {
+        if (m == null) return -1;
+        return m.getUniqueId().equals(championId) ? 3 : ranged(m) ? 1 : 2;
+    }
+
+    /**
+     * Monstre sans cible : le meneur (ou un monstre isolé) marche vers l'objectif de sa meute par
+     * étapes au sol, en attendant un instant ses traînards ; les autres tiennent leur place dans
+     * la formation (Squad.slot), sans relancer leur chemin tant que leur place bouge peu.
+     */
+    private void advance(Mob m, Squad sq, int slot, Location fallback, long now) {
+        if (sq != null && sq.leader != null && sq.leader != m && sq.leader.isValid()) {
+            Location place = sq.slot(Math.max(0, slot), ranged(m));
+            if (place == null) place = sq.leader.getLocation();
+            if (!place.getWorld().equals(m.getWorld())) return;
+            double d2 = place.distanceSquared(m.getLocation());
+            if (d2 <= 2.5 * 2.5) return;
+            com.destroystokyo.paper.entity.Pathfinder.PathResult path = m.getPathfinder().getCurrentPath();
+            Location end = path != null ? path.getFinalPoint() : null;
+            if (end != null && end.getWorld().equals(place.getWorld()) && end.distanceSquared(place) < 3 * 3) return;
+            m.getPathfinder().moveTo(place, d2 > 8 * 8 ? 1.2 : 1.0); // en retard : il presse le pas
+            return;
+        }
+        if (sq != null && sq.size() > 1 && sq.shouldWait(now)) { m.getPathfinder().stopPathfinding(); return; }
+        Location goal = sq != null ? sq.goal(m.getLocation()) : null;
+        if (goal == null) goal = fallback;
+        if (goal == null || !goal.getWorld().equals(m.getWorld())) return;
+        Location step = stepToward(m.getLocation(), goal, 24);
+        if (step != null && step.distanceSquared(m.getLocation()) > 9) {
+            m.getPathfinder().moveTo(step, sq != null && sq.size() > 1 ? 0.85 : 1.0);
+        }
+    }
+
+    /**
+     * Escouades présentes (monstres ou soldats), pour la garde : membres vivants et centre de
+     * chacune. Les assaillants sans escouade forment un groupe à part (numéro -1).
+     */
+    private List<SiegeFront.Band> bands() {
+        Map<Squad, List<LivingEntity>> by = new LinkedHashMap<>();
+        for (Mob m : alive.values()) {
+            if (m.isValid() && !m.isDead()) by.computeIfAbsent(packOf.get(m.getUniqueId()), k -> new ArrayList<>()).add(m);
+        }
+        army.collect(by);
+        List<SiegeFront.Band> out = new ArrayList<>(by.size());
+        for (Map.Entry<Squad, List<LivingEntity>> e : by.entrySet()) {
+            List<LivingEntity> members = e.getValue();
+            double x = 0, y = 0, z = 0;
+            for (LivingEntity b : members) {
+                Location l = b.getLocation();
+                x += l.getX();
+                y += l.getY();
+                z += l.getZ();
+            }
+            int n = members.size();
+            out.add(new SiegeFront.Band(e.getKey() == null ? -1 : e.getKey().id,
+                    new Location(members.get(0).getWorld(), x / n, y / n, z / n), members));
+        }
+        return out;
     }
 
     /** Monstre qui attaque à distance : il s'arrête à portée de tir. */
@@ -677,30 +913,68 @@ public final class SiegeManager implements Listener {
             if (spawn == null || claimed.contains(chunkKey(spawn.getBlockX() >> 4, spawn.getBlockZ() >> 4))) continue;
             Location rally = EnemyArmy.ground(w, e[0] * 16 + 8, e[1] * 16 + 8);
             if (rally == null) rally = new Location(w, e[0] * 16 + 8.5, w.getHighestBlockYAt(e[0] * 16 + 8, e[1] * 16 + 8) + 1, e[1] * 16 + 8.5);
-            SiegeFront front = buildFront(w, claimed, e[0], e[1], e[2], e[3], rally, spawn);
+            List<Location> entries = entryPoints(w, claimed, new Location(w, bx + 0.5, spawn.getY(), bz + 0.5), e[2], e[3], spawn);
+            SiegeFront front = buildFront(w, claimed, e[0], e[1], e[2], e[3], rally, spawn, entries);
             return new Side(spawn, rally, compass(spawn.getX() - centerX, spawn.getZ() - centerZ), front);
         }
         return null;
     }
 
     /**
-     * Postes de la garde le long du bord attaqué (ce chunk et ses voisins de lisière, un de chaque
-     * côté) : au contact à 2 et 4 blocs de la lisière, archers à 7 et 9 blocs, un poste tous les 2
-     * blocs, au sol, hors des bâtiments ; chaque rangée du centre vers les ailes.
+     * Points d'entrée des assaillants : sieges.points-entree points répartis sur sieges.largeur-front
+     * blocs le long de la lisière attaquée, de part et d'autre de center (hors de la ville).
+     * Chacun au sol (GroundFinder : ni eau, ni lave, ni cime d'arbre), dans un chunk chargé et non
+     * revendiqué : un point qui tombe dans la ville (lisière en escalier) est repoussé vers
+     * l'extérieur, un point introuvable est sauté. De gauche à droite le long du front ; au moins
+     * fallback s'il n'y en a aucun.
      */
-    private SiegeFront buildFront(World w, Set<Long> claimed, int cx, int cz, int dx, int dz, Location rally, Location enemy) {
+    private List<Location> entryPoints(World w, Set<Long> claimed, Location center, int dx, int dz, Location fallback) {
+        int n = config.entryPoints();
+        double width = config.frontWidth();
+        int px = dz != 0 ? 1 : 0, pz = dx != 0 ? 1 : 0; // la largeur longe la lisière
+        List<Location> out = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            double t = n == 1 ? 0 : -width / 2 + width * i / (n - 1);
+            Location found = null;
+            for (int push = 0; push <= 16 && found == null; push += 4) {
+                int x = (int) Math.floor(center.getX() + px * t + dx * push);
+                int z = (int) Math.floor(center.getZ() + pz * t + dz * push);
+                if (!w.isChunkLoaded(x >> 4, z >> 4) || claimed.contains(chunkKey(x >> 4, z >> 4))) continue;
+                found = spotNear(new Location(w, x, 0, z), 3);
+            }
+            if (found == null || claimed.contains(chunkKey(found.getBlockX() >> 4, found.getBlockZ() >> 4))) continue;
+            boolean close = false;
+            for (Location o : out) close |= o.distanceSquared(found) < 5 * 5;
+            if (!close) out.add(found);
+        }
+        if (out.isEmpty()) out.add(fallback);
+        return out;
+    }
+
+    /**
+     * Postes de la garde le long du bord attaqué (ce chunk et ses voisins de lisière de part et
+     * d'autre, assez pour couvrir sieges.largeur-front) : au contact à 2 et 4 blocs de la lisière,
+     * archers à 7 et 9 blocs, un poste tous les 2 blocs, au sol, hors des bâtiments ; chaque rangée
+     * du centre vers les ailes.
+     */
+    private SiegeFront buildFront(World w, Set<Long> claimed, int cx, int cz, int dx, int dz, Location rally, Location enemy,
+                                  List<Location> entries) {
         int px = dz != 0 ? 1 : 0, pz = dx != 0 ? 1 : 0; // la ligne longe la lisière
+        int reach = Math.max(1, (int) Math.ceil((config.frontWidth() / 2.0 - 8) / 16.0));
         List<int[]> line = new ArrayList<>();
         line.add(new int[]{cx, cz});
         for (int sgn : new int[]{-1, 1}) {
-            int nx = cx + sgn * px, nz = cz + sgn * pz;
-            if (claimed.contains(chunkKey(nx, nz)) && !claimed.contains(chunkKey(nx + dx, nz + dz))) line.add(new int[]{nx, nz});
+            for (int k = 1; k <= reach; k++) { // chunks de lisière contigus, tournés du même côté
+                int nx = cx + sgn * k * px, nz = cz + sgn * k * pz;
+                if (!claimed.contains(chunkKey(nx, nz)) || claimed.contains(chunkKey(nx + dx, nz + dz))) break;
+                line.add(new int[]{nx, nz});
+            }
         }
         List<Location> melee = new ArrayList<>(row(w, line, dx, dz, 2, rally));
         melee.addAll(row(w, line, dx, dz, 4, rally));
         List<Location> ranged = new ArrayList<>(row(w, line, dx, dz, 7, rally));
         ranged.addAll(row(w, line, dx, dz, 9, rally));
-        return new SiegeFront(rally, enemy, List.copyOf(melee), List.copyOf(ranged));
+        return new SiegeFront(rally, enemy, List.copyOf(melee), List.copyOf(ranged), new Vector(px, 0, pz), List.copyOf(entries));
     }
 
     /** Une rangée de postes à depth blocs de la lisière, du centre (rally) vers les ailes. */
@@ -727,22 +1001,31 @@ public final class SiegeManager implements Listener {
         return out;
     }
 
+    /** Point (x, z) dans la zone d'un bâtiment (liste relue au plus toutes les 5 s : c'est une requête en base). */
     private boolean insideBuilding(String world, int x, int z) {
-        for (Building b : buildings.getAllBuildings()) {
+        long now = System.currentTimeMillis();
+        if (now - buildingsReadAt > 5000) {
+            buildingList = buildings.getAllBuildings();
+            buildingsReadAt = now;
+        }
+        for (Building b : buildingList) {
             if (b.world().equals(world) && x >= b.x1() && x <= b.x2() && z >= b.z1() && z <= b.z2()) return true;
         }
         return false;
     }
 
-    /** Point au sol, hors de l'eau et de la lave, à moins de radius blocs de center (chunks chargés). */
-    private static Location spotNear(Location center, int radius) {
+    /**
+     * Point au sol sûr (GroundFinder : ni eau, ni lave, ni cime d'arbre), hors de la ville, à moins
+     * de radius blocs de center (chunks chargés) ; null si rien ne convient en quelques essais.
+     */
+    private Location spotNear(Location center, int radius) {
         World w = center.getWorld();
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         for (int attempt = 0; attempt < 10; attempt++) {
             int x = center.getBlockX() + (attempt == 0 ? 0 : rnd.nextInt(-radius, radius + 1));
             int z = center.getBlockZ() + (attempt == 0 ? 0 : rnd.nextInt(-radius, radius + 1));
-            if (!w.isChunkLoaded(x >> 4, z >> 4)) continue;
-            Location l = EnemyArmy.ground(w, x, z);
+            if (!w.isChunkLoaded(x >> 4, z >> 4) || claims.isClaimed(w, x >> 4, z >> 4)) continue;
+            Location l = GroundFinder.groundAt(w, x, z);
             if (l != null) return l;
         }
         return null;
@@ -852,8 +1135,12 @@ public final class SiegeManager implements Listener {
                 + " §7; abattus par la garde : §f" + guardKills + " §7; pertes : §f" + civiliansLost + " habitant(s), "
                 + guardsLost + " garde(s)");
         if (side != null) {
-            lines.add("§7Front : §f" + side.front().melee().size() + " §7postes au contact, §f"
+            lines.add("§7Front : §f" + side.front().entries().size() + " §7point(s) d'entrée sur §f" + config.frontWidth()
+                    + " §7blocs ; §f" + side.front().melee().size() + " §7postes au contact, §f"
                     + side.front().ranged().size() + " §7postes d'archers");
+        }
+        if (phase == Phase.WAVE && !squads.isEmpty()) {
+            lines.add("§7Escouades : §f" + squads.size() + (arrivals.isEmpty() ? "" : " §7; encore en route : §f" + arrivals.size()));
         }
         return lines;
     }
@@ -902,10 +1189,14 @@ public final class SiegeManager implements Listener {
     public void onTransform(EntityTransformEvent event) {
         if (!isAttacker(event.getEntity())) return;
         alive.remove(event.getEntity().getUniqueId());
+        Squad pack = packOf.remove(event.getEntity().getUniqueId()); // il reste dans sa meute
         for (Entity e : event.getTransformedEntities()) {
             e.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
             e.setPersistent(false);
-            if (running() && e instanceof Mob m) alive.put(m.getUniqueId(), m);
+            if (running() && e instanceof Mob m) {
+                alive.put(m.getUniqueId(), m);
+                if (pack != null) packOf.put(m.getUniqueId(), pack);
+            }
         }
     }
 

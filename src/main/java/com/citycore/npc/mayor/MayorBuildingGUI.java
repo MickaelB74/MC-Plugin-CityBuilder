@@ -35,6 +35,16 @@ public class MayorBuildingGUI {
         this.themed = themed;
     }
 
+    /** Création et changement de type (choix dans le chat sans le pack), inspection détaillée. */
+    private com.citycore.building.BuildingCreation  creation;
+    private com.citycore.building.BuildingInspector inspector;
+
+    public void setCreation(com.citycore.building.BuildingCreation creation,
+                            com.citycore.building.BuildingInspector inspector) {
+        this.creation  = creation;
+        this.inspector = inspector;
+    }
+
     public MayorBuildingGUI(BuildingManager buildingManager, JavaPlugin plugin) {
         this.buildingManager = buildingManager;
         this.plugin          = plugin;
@@ -65,8 +75,9 @@ public class MayorBuildingGUI {
                             b.heightLine(),
                             "§7NPC   : " + npcDisplayName(b),
                             "",
-                            "§eCliquez pour voir les bordures",
-                            "§8Type : /city build type " + b.name() + " <type>"
+                            "§eClic gauche §7: voir les bordures",
+                            "§eClic droit §7: changer le type",
+                            "§eMaj + clic §7: inspection détaillée"
                     )
             ));
         }
@@ -138,11 +149,20 @@ public class MayorBuildingGUI {
     /**
      * @return true si géré, false = retour menu maire
      */
-    public boolean handleMainClick(Player player, int slot) {
+    public boolean handleMainClick(Player player, int slot, org.bukkit.event.inventory.ClickType click) {
         // ── Clic sur un bâtiment de la liste (slots 0 à 26) ──────
+        // Gauche : bordures ; droit : changer le type (boutons dans le chat) ; Maj : inspection
         if (slot < 27) {
             List<Building> buildings = buildingManager.getAllBuildings();
-            if (slot < buildings.size()) showBorders(player, buildings.get(slot));
+            if (slot >= buildings.size()) return true;
+            Building b = buildings.get(slot);
+            if (click.isShiftClick()) {
+                inspect(player, b);
+            } else if (click.isRightClick() && creation != null) {
+                plugin.getServer().getScheduler().runTask(plugin, () -> creation.beginRetype(player, b));
+            } else {
+                showBorders(player, b);
+            }
             return true;
         }
 
@@ -177,7 +197,20 @@ public class MayorBuildingGUI {
      * Lancé au tick suivant : le menu classique appelle ceci pendant un événement de clic.
      */
     public void promptAdd(Player player) {
-        plugin.getServer().getScheduler().runTask(plugin, () -> player.performCommand("city build new"));
+        // Directement (et non par /city build new, réservée aux administrateurs)
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (creation != null) creation.begin(player);
+        });
+    }
+
+    /** Inspection détaillée d'un bâtiment dans le chat (même rapport que /city build inspect). */
+    public void inspect(Player player, Building b) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            player.closeInventory();
+            if (inspector == null) return;
+            com.citycore.building.Inspection insp = inspector.recheck(b.id(), player);
+            if (insp != null) com.citycore.building.BuildingInspector.report(player, insp);
+        });
     }
 
     /**

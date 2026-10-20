@@ -153,6 +153,17 @@ public class NPCPersonalQuestGUI {
 
         if (completed) {
             lore.add("§a✔ Complétée !");
+        } else if (quest.isDelivery()) {
+            // « Rapporter… » : ce qu'il faut remettre, et ce que le joueur a déjà sur lui
+            org.bukkit.entity.Player player = Bukkit.getPlayer(uuid);
+            lore.add("§7À rapporter à " + npc.displayName + " §7:");
+            lore.addAll(quest.delivery().lore(player));
+            lore.add("§8Objets achetés ou pris en réserve : refusés.");
+            if (questManager.isActive(uuid, npc, quest.id())) {
+                lore.add("");
+                lore.add(player != null && quest.delivery().has(player)
+                        ? "§a▶ Cliquez pour les remettre" : "§e⏳ Revenez quand vous les aurez");
+            }
         } else if (progress > 0) {
             lore.add(buildProgressBar(progress, target)
                     + " §f" + progress + "§7/§f" + target);

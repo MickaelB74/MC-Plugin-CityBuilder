@@ -4,8 +4,8 @@ import org.bukkit.entity.LivingEntity;
 
 /**
  * Gestes de combat des PNJ (gardes, soldats ennemis) : le bras bouge comme dans Minecraft, et une
- * étiquette d'entité signale le geste au mod serveur « CityCore — Epic Fight »
- * (companions/citycore-epicfight), qui la retire au tick suivant et joue l'animation d'Epic Fight
+ * étiquette d'entité signale le geste au mod serveur « CityCore — Compagnon », module Epic Fight
+ * (companions/citycore-companion), qui la retire au tick suivant et joue l'animation d'Epic Fight
  * correspondante (enchaînement de l'arme tenue, tir de l'arc ou de l'arbalète).
  *
  * Sans ce mod, l'étiquette reste posée sans effet (une seule par geste : jamais d'accumulation).

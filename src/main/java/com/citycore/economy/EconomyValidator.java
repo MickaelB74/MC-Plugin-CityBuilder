@@ -15,12 +15,15 @@ import java.util.*;
  * Contrôle anti-arbitrage, exécuté au démarrage (et via /city eco check).
  *
  * Pour chaque matériau qu'un PNJ rachète, on calcule le coût minimal pour l'obtenir
- * en achetant chez les PNJ (stock, boutique) puis en le craftant / cuisant / taillant
+ * en achetant chez les PNJ (boutique) puis en le craftant / cuisant / taillant
  * avec les vraies recettes du serveur. Si ce coût est inférieur au prix de rachat
  * (bonus d'employé compris, réduction d'employé comprise), un joueur pourrait
  * acheter → transformer → revendre avec profit : on le signale.
  *
  * Même contrôle pour les récompenses des quêtes de collecte.
+ *
+ * L'entrepôt n'entre pas dans le calcul : on s'y sert gratuitement, mais ce qu'on y prend (et tout
+ * ce qu'on en fabrique, voir {@link TagPropagation}) reste marqué non revendable.
  */
 public class EconomyValidator {
 
@@ -53,14 +56,10 @@ public class EconomyValidator {
             }
         }
 
-        // ── 2. Coût d'achat minimum (PNJ → joueur), réduction d'employé incluse ──
+        // ── 2. Coût d'achat minimum en boutique (PNJ → joueur), réduction d'employé incluse ──
         Map<Material, Double> cost = new EnumMap<>(Material.class);
         for (Map.Entry<CityNPC, VillagerConfig> e : market.configs().entrySet()) {
             VillagerConfig c = e.getValue();
-            for (Map.Entry<Material, SellPrice> sp : c.getSellPrices().entrySet()) {
-                double unit = (double) market.resaleLotPrice(sp.getValue(), true) / sp.getValue().quantity();
-                cost.merge(sp.getKey(), unit, Math::min);
-            }
             for (ShopItem item : c.getAllShopItems()) {
                 checkShopItem(c, item, warnings);
                 if (item.isSpecial()) continue; // enchanté / potion / livre : item différent

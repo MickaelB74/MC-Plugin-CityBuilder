@@ -1,4 +1,4 @@
-package com.citycore.epicfight;
+package com.citycore.companion.epicfight;
 
 /**
  * Traduit un déplacement réel en « touches » au sens de Minecraft : avancer / reculer

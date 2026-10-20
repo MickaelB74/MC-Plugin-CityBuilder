@@ -1,8 +1,12 @@
 package com.citycore.economy;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Tag;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Groupes de matériaux réutilisables.
@@ -53,13 +57,102 @@ public final class MaterialGroups {
     }
 
     /**
-     * Résout un jeton de config : "IRON_INGOT" ou "#LOGS".
+     * Résout un jeton de config : "IRON_INGOT", "#LOGS", ou toute écriture de {@link #resolveAny}.
      * @return l'ensemble des matériaux, ou null si invalide
      */
     public static Set<Material> resolve(String token) {
-        if (token.startsWith("#")) return get(token.substring(1));
-        Material mat = Material.matchMaterial(token);
-        return mat == null ? null : EnumSet.of(mat);
+        Set<Material> mats = resolveAny(token);
+        return mats.isEmpty() ? null : mats;
+    }
+
+    /**
+     * Résout une liste de jetons séparés par des virgules, dans l'ordre (le premier matériau sert
+     * d'icône et de représentant) :
+     * <ul>
+     *   <li>« IRON_INGOT », « minecraft:iron_ingot » ou « tide:carp » : un objet (vanilla ou mod) ;</li>
+     *   <li>« #LOGS » : groupe du plugin (voir {@link #get}) ;</li>
+     *   <li>« #wool », « #minecraft:planks », « #c:ingots » : tag d'objets, sinon de blocs ;</li>
+     *   <li>« handcrafted:*_chair », « furniture:lamp_* » : motif sur la clé (« * » = n'importe quoi) ;</li>
+     *   <li>« -valarian_conquest:nomad_citizenship » : retire ce qui suit le « - » de l'ensemble.</li>
+     * </ul>
+     * Pour un groupe, un tag ou un motif, le chêne et le blanc passent en tête (icône lisible).
+     *
+     * @return ensemble ordonné, vide si rien n'est reconnu (mod absent, faute de frappe)
+     */
+    public static Set<Material> resolveAny(String tokens) {
+        Set<Material> out = new LinkedHashSet<>(); // pas d'EnumSet : matériaux de mods ajoutés à chaud
+        Set<Material> removed = new HashSet<>();
+        if (tokens == null) return out;
+        for (String raw : tokens.split(",")) {
+            String token = raw.trim();
+            if (token.isEmpty()) continue;
+            boolean remove = token.startsWith("-");
+            if (remove) token = token.substring(1).trim();
+            Set<Material> mats = single(token);
+            (remove ? removed : out).addAll(mats);
+        }
+        out.removeAll(removed);
+        return out;
+    }
+
+    /** Familles déjà résolues (non vides) : les motifs parcourent tous les matériaux du serveur. */
+    private static final Map<String, Set<Material>> CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Comme {@link #resolveAny}, gardé en mémoire une fois résolu (récits évalués à chaque coup ou
+     * déplacement). Un résultat vide n'est pas gardé : les tags arrivent avec le chargement du serveur.
+     */
+    public static Set<Material> cached(String tokens) {
+        Set<Material> hit = CACHE.get(tokens);
+        if (hit != null) return hit;
+        Set<Material> mats = Collections.unmodifiableSet(resolveAny(tokens));
+        if (!mats.isEmpty()) CACHE.put(tokens, mats);
+        return mats;
+    }
+
+    /** Un jeton de {@link #resolveAny}, sans virgule ni « - ». */
+    private static Set<Material> single(String token) {
+        if (token.startsWith("#")) {
+            String name = token.substring(1);
+            Set<Material> group = name.contains(":") ? null : get(name);
+            if (group != null) return sorted(group);
+            NamespacedKey key = NamespacedKey.fromString(name.toLowerCase(Locale.ROOT));
+            if (key == null) return Set.of();
+            try {
+                Tag<Material> tag = Bukkit.getTag(Tag.REGISTRY_ITEMS, key, Material.class);
+                if (tag == null || tag.getValues().isEmpty()) tag = Bukkit.getTag(Tag.REGISTRY_BLOCKS, key, Material.class);
+                return tag == null ? Set.of() : sorted(tag.getValues());
+            } catch (RuntimeException | LinkageError e) {
+                return Set.of(); // tags indisponibles (serveur en démarrage)
+            }
+        }
+        if (token.contains("*")) {
+            String pattern = token.toLowerCase(Locale.ROOT);
+            if (!pattern.contains(":")) pattern = "minecraft:" + pattern;
+            Pattern regex = Pattern.compile(Pattern.quote(pattern).replace("*", "\\E[a-z0-9_./-]*\\Q"));
+            List<Material> found = new ArrayList<>();
+            for (Material m : Material.values()) {
+                NamespacedKey key = com.citycore.integration.ItemIds.keyOf(m);
+                if (key != null && m.isItem() && regex.matcher(key.toString()).matches()) found.add(m);
+            }
+            return sorted(found);
+        }
+        Material mat = com.citycore.integration.ItemIds.resolve(token);
+        return mat == null ? Set.of() : Set.of(mat);
+    }
+
+    /** Ordre stable des membres d'un groupe : chêne et blanc d'abord, puis l'ordre alphabétique des clés. */
+    private static Set<Material> sorted(Collection<Material> mats) {
+        List<Material> list = new ArrayList<>(mats);
+        list.sort(Comparator.comparingInt(MaterialGroups::rank).thenComparing(Material::name));
+        return new LinkedHashSet<>(list);
+    }
+
+    private static int rank(Material m) {
+        NamespacedKey key = com.citycore.integration.ItemIds.keyOf(m);
+        String path = key != null ? key.getKey() : m.name().toLowerCase(Locale.ROOT);
+        if (path.startsWith("oak_") || path.startsWith("white_") || path.endsWith("_white")) return 0;
+        return 1;
     }
 
     private static Set<Material> glass() {

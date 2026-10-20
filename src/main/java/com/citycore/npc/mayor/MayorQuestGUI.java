@@ -149,9 +149,7 @@ public class MayorQuestGUI {
                 CityQuestManager.Requisition quote = questManager.requisition(quest, false);
                 if (quote.available() > 0) {
                     lore.add("§eShift + clic droit §7: réquisitionner");
-                    lore.add("§8  " + quote.available() + " en stock chez les artisans");
-                    lore.add("§8  " + quote.taken() + " finançables : §6" + quote.cost()
-                            + " coins §8(caisse)");
+                    lore.add("§8  " + quote.available() + " en réserve chez les artisans (gratuit)");
                 } else {
                     lore.add("§8Aucun stock d'artisan à réquisitionner.");
                 }
@@ -286,10 +284,9 @@ public class MayorQuestGUI {
                     CityQuestManager.Requisition r = questManager.requisition(quest, true);
                     if (r.taken() > 0) {
                         player.sendMessage("§a✅ Réquisition : §f" + r.taken()
-                                + " §aunités prises dans les stocks des artisans pour §6"
-                                + r.cost() + " coins §a(caisse).");
+                                + " §aunités prises dans les réserves des artisans.");
                     } else {
-                        player.sendMessage("§c❌ Rien à réquisitionner (stocks vides ou caisse insuffisante).");
+                        player.sendMessage("§c❌ Rien à réquisitionner (réserves vides).");
                     }
                 } else {
                     int delivered = questManager.deliver(player, quest);
@@ -312,7 +309,7 @@ public class MayorQuestGUI {
             case MAX_LEVEL  -> { }
             case INCOMPLETE -> player.sendMessage("§c❌ Complétez d'abord toutes les quêtes !");
             case NO_FUNDS   -> player.sendMessage("§c❌ La caisse ne peut pas payer la charte ("
-                    + questManager.upgradeCost(tier) + " coins). §7💡 §e/city deposit <montant>");
+                    + questManager.upgradeCost(tier) + " coins). §7💡 Déposez des coins au §e« Trésor » §7d'Alderic.");
             case SUCCESS    -> {
                 CityTier next = tier.next();
                 player.closeInventory();

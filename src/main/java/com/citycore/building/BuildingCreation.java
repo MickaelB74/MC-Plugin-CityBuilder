@@ -15,8 +15,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 /**
@@ -50,12 +52,27 @@ public class BuildingCreation {
             Map.entry("robin", "Repaire"), Map.entry("jacksparrow", "Capitainerie"),
             Map.entry("indiana", "Cabinet_de_curiosites"), Map.entry("docbrown", "Laboratoire"),
             Map.entry("gandalf", "Tour_du_mage"), Map.entry("geralt", "Antre_du_sorceleur"),
-            Map.entry("harold", "Nid_de_dragon"));
+            Map.entry("harold", "Nid_de_dragon"), Map.entry("robinson", "Cabane_du_naufrage"),
+            Map.entry("achab", "Baleiniere"), Map.entry("obelix", "Hutte_gauloise"),
+            Map.entry("musashi", "Dojo"), Map.entry("geppetto", "Echoppe_d_ebeniste"),
+            Map.entry("ragnar", "Chantier_naval"), Map.entry("jeanne", "Quartier_general"),
+            Map.entry("hercule", "Palestre"));
 
     private final BuildingManager    buildings;
     private final BuildingSession    session;
     private final Predicate<CityNPC> found;
     private TypeChooser chooser;
+
+    /**
+     * Choix ouverts dans le chat (joueur sans le pack) : leurs boutons relancent /city build new
+     * ou /city build type, réservées aux administrateurs ; un joueur peut les utiliser tant que le
+     * choix qu'Alderic lui a proposé est ouvert (5 minutes). building = null : création.
+     */
+    private record ChatChoice(String building, long until) {}
+
+    private static final long CHAT_CHOICE_MS = 5 * 60_000L;
+
+    private final Map<UUID, ChatChoice> chatChoices = new HashMap<>();
 
     /**
      * @param found un personnage a-t-il été trouvé (rencontré, arrivé ou installé) ? Seuls
@@ -136,6 +153,7 @@ public class BuildingCreation {
     public void choose(Player player, String name, BuildingType type, CityNPC owner) {
         name = cleanName(name);
         if (!checkName(player, name) || !checkType(player, type, owner, -1)) return;
+        chatChoices.remove(player.getUniqueId()); // type et nom choisis : le choix du chat est clos
         session.clear(player.getUniqueId());
         session.setPending(player.getUniqueId(), name, type, owner != null ? owner.tag : null);
 
@@ -206,6 +224,7 @@ public class BuildingCreation {
             return false;
         }
         buildings.setType(b.id(), type, owner != null ? owner.tag : null);
+        chatChoices.remove(player.getUniqueId());
         player.sendMessage("§a✅ §e" + b.name() + " §a: " + label(type, owner) + "§a.");
         reportInspection(player, b.name()); // nouvelles exigences : nouveau niveau
         return true;
@@ -269,8 +288,43 @@ public class BuildingCreation {
        CHOIX DANS LE CHAT (joueur sans le pack)
        ========================= */
 
+    /**
+     * Changement de type depuis la liste classique d'Alderic (clic droit) : boutons dans le chat,
+     * comme pour une création. (Avec le pack, c'est l'écran illustré qui s'en charge.)
+     */
+    public void beginRetype(Player player, Building b) {
+        player.closeInventory();
+        sendChatChoices(player, b);
+    }
+
+    /** Un choix du chat proposé par Alderic est-il ouvert pour ce bâtiment (null : une création) ? */
+    public boolean hasChatChoice(Player player, String building) {
+        ChatChoice choice = chatChoices.get(player.getUniqueId());
+        if (choice == null) return false;
+        if (System.currentTimeMillis() > choice.until()) {
+            chatChoices.remove(player.getUniqueId());
+            return false;
+        }
+        return building == null ? choice.building() == null
+                : choice.building() != null && choice.building().equalsIgnoreCase(building);
+    }
+
     private void sendChatChoices(Player player) {
-        player.sendMessage("§6🏗 Quel bâtiment construire ? §7(cliquez)");
+        sendChatChoices(player, null);
+    }
+
+    /** Boutons du chat : type (et artisan d'un atelier) d'un nouveau bâtiment, ou d'un bâtiment existant. */
+    private void sendChatChoices(Player player, Building existing) {
+        chatChoices.put(player.getUniqueId(), new ChatChoice(existing == null ? null : existing.name(),
+                System.currentTimeMillis() + CHAT_CHOICE_MS));
+        String command = existing == null ? "/city build new " : "/city build type " + existing.name() + " ";
+        if (existing == null) {
+            player.sendMessage("§6🏗 Quel bâtiment construire ? §7(cliquez)");
+        } else {
+            CityNPC current = existing.reservedFor() == null ? null : CityNPC.fromTag(existing.reservedFor());
+            player.sendMessage("§6🏗 Nouveau type de §e" + existing.name() + " §6? §7(cliquez ; actuel : "
+                    + label(existing.type(), current) + "§7)");
+        }
         TextComponent types = new TextComponent("  ");
         BuildingRequirements req = requirements();
         for (BuildingType type : BuildingType.choosable()) {
@@ -283,7 +337,7 @@ public class BuildingCreation {
                 hover.addAll(lines.isEmpty() ? List.of("aucun") : lines);
             }
             types.addExtra(button(type.color + "[" + label + "]", ClickEvent.Action.RUN_COMMAND,
-                    "/city build new " + type.key(), hover));
+                    command + type.key(), hover));
             types.addExtra(" ");
         }
         player.spigot().sendMessage(types);
@@ -299,7 +353,7 @@ public class BuildingCreation {
                 hover.addAll(BuildingRequirements.lore(req.specFor(npc)));
             }
             artisans.addExtra(button("§6[" + ChatColor.stripColor(npc.displayName) + "]", ClickEvent.Action.RUN_COMMAND,
-                    "/city build new atelier " + npc.skinId, hover));
+                    command + BuildingType.ATELIER.key() + " " + npc.skinId, hover));
             artisans.addExtra(" ");
         }
         if (locked > 0) artisans.addExtra(new TextComponent(TextComponent.fromLegacyText(
@@ -365,8 +419,22 @@ public class BuildingCreation {
 
     /** Artisans qui peuvent avoir un atelier (tous sauf le maire), dans l'ordre de la trame. */
     public static List<CityNPC> artisans() {
-        List<CityNPC> list = new ArrayList<>(Arrays.asList(CityNPC.values()));
-        list.remove(CityNPC.MAYOR);
+        // Ordre de la trame : les survivants chapitre par chapitre, puis les légendes de même
+        // (les légendes liées aux mods sont déclarées après les autres dans CityNPC)
+        List<CityNPC> survivors = new ArrayList<>(), legends = new ArrayList<>();
+        for (com.citycore.quest.city.CityTier tier : com.citycore.quest.city.CityTier.values()) {
+            for (com.citycore.quest.city.CityQuest q : tier.quests) {
+                CityNPC npc = q.targetNpc();
+                if (q.type() != com.citycore.quest.city.CityQuestType.FIND_NPC || npc == null
+                        || survivors.contains(npc) || legends.contains(npc)) continue;
+                (q.optional() ? legends : survivors).add(npc);
+            }
+        }
+        List<CityNPC> list = new ArrayList<>(survivors);
+        list.addAll(legends);
+        for (CityNPC npc : CityNPC.values()) {
+            if (npc != CityNPC.MAYOR && !list.contains(npc)) list.add(npc); // sans quête de recrutement
+        }
         return list;
     }
 

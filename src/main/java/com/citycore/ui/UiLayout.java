@@ -72,6 +72,20 @@ public final class UiLayout {
     // 5 lignes : le panneau de la cité a gagné « Satisfaction » (phase 6) ; celui du joueur en garde 4
     public static final int TAB_OFFSET = 6, TAB_ROWS = 5, TAB_GAP = 72, TAB_EXTRA_LINES = 1;
 
+    // Suivi des quêtes « accroché » à la liste des joueurs : panneau « Quêtes » sous celui de la cité
+    // (même colonne, 4 px sous sa hauteur maximale de TAB_ROWS lignes). Il ne cache ni les joueurs au
+    // centre ni les panneaux, et reste loin de la minicarte (coin haut-droit). En 1080p à l'échelle 4
+    // (479 x 252) : x de 83 à 167, y de 69 à 164 avec 10 lignes ; en 426 x 240 : x de 57 à 141.
+    public static final int TAB_QUEST_TOP = HUD_TOP_H + HUD_ROW_H * TAB_ROWS + HUD_BOTTOM_H + 4;
+    public static final int TAB_QUEST_ROWS = 10;
+
+    // Où sont-ils ? (/city locate) : carte des colonnes 3 à 8, rangées 1 à 4 (cadre de 108 x 72),
+    // intérieur de 106 x 70 px en cases de 2 px ; plaque des coordonnées en rangée 5 (deux lignes
+    // de petite police). Les cases de la carte restées vides laissent voir le parchemin du fond.
+    public static final int LOC_MAP_X = sx(3) + 1, LOC_MAP_Y = sy(1) + 1;
+    public static final int LOC_CELL = 2, LOC_MAP_COLS = 53, LOC_MAP_ROWS = 35;
+    public static final int LOC_LINE1_Y = sy(5) + 1, LOC_LINE2_Y = sy(5) + 9, LOC_PAGE_Y = sy(5) + 5;
+
     /** Déclare au registre toutes les combinaisons image / hauteur utilisées par les écrans. */
     public static void declare(UiAtlas a) {
         for (String bg : new String[]{"bg_character", "bg_grid", "bg_quests", "bg_personal",
@@ -127,13 +141,23 @@ public final class UiLayout {
         // HUD compact : panneau des quêtes (barre de boss) et panneaux du Tab
         declareHudStack(a, QP_TOP, QP_OFFSET, HUD_MAX_ROWS);
         declareHudStack(a, 0, TAB_OFFSET, TAB_ROWS);
+        declareHudStack(a, TAB_QUEST_TOP, TAB_OFFSET, TAB_QUEST_ROWS); // suivi accroché à la liste (Tab)
 
         // Journal de quêtes (/city quests) : onglets « Suivi » et « Récits »
         a.background("bg_tracking");
         a.background("bg_journal");
         for (String s : new String[]{"tab_suivi_on", "tab_suivi_off", "tab_recits_on", "tab_recits_off"}) a.sprite(s, row0);
         for (String s : new String[]{"pos_bord", "pos_gauche", "pos_pres", "sel54"}) a.sprite(s, sy(4));
-        for (String s : new String[]{"hud_on", "hud_off", "track_all"}) a.sprite(s, row5);
+        // Affichage du suivi : visible, accroché à la liste des joueurs, masqué ; tout suivre
+        for (String s : new String[]{"hud_on", "hud_tab", "hud_off", "track_all"}) a.sprite(s, row5);
+
+        // Où sont-ils ? (/city locate) : bouton « vue d'ensemble », pixels de la carte, plaque
+        a.background("bg_locate");
+        a.sprite("ic_map", row0);
+        int[] mapRows = new int[LOC_MAP_ROWS];
+        for (int k = 0; k < LOC_MAP_ROWS; k++) mapRows[k] = LOC_MAP_Y + LOC_CELL * k;
+        a.sprite("px2", mapRows);
+        a.smallText(LOC_LINE1_Y, LOC_LINE2_Y, LOC_PAGE_Y);
 
         // Textes : ombrés (bandeau, plaques, barres) et plats (lignes de parchemin)
         a.shadowText(NAME_Y, rowText(0), rowText(1), rowText(2), rowText(3), rowText(4), BAR_TEXT_Y, rowText(5));

@@ -23,13 +23,14 @@ Aperçus : `docs/ui-previews/*.png` (agrandis 3 fois).
 | La garde (Roland) | Liste commune à tous les joueurs : gardes (anneau violet), recrues en formation (ambre, temps restant), habitants à former (vert ; gris s'il n'y a plus de place), têtes au skin de chacun ; pied de page « GARDE x/y · FORMATION a/b » ; clic sur un habitant → Rôle ; Maj + clic droit sur un garde ou une recrue → retour à la vie civile |
 | Rôle d'une recrue | Rôles de `soldats.roles` (combat, vie, durée de formation, équipement) ; cadenas sur ceux d'un rang de Roland pas encore atteint ; un clic lance la formation |
 | Vendre / Entrepôt / Boutique | Grille 9 × 4 avec pagination, cadres de couleur (prix plein, prix réduit, entrepôt plein, rupture, cadenas pour les articles d'un rang supérieur), bourse du joueur |
-| Quêtes d'un artisan | Cartes « principale » et « spéciale » : récompense ou temps de repos, objectifs avec progression, bouton Accepter / Valider / En cours / En repos, accès aux récits |
+| Quêtes d'un artisan | Cartes « principale » et « spéciale » : récompense ou temps de repos, objectifs avec progression, bouton Accepter / Valider / En cours / En repos, accès aux récits ; un clic sur le ruban « Quêtes » ouvre le journal de quêtes (suivi et affichage du suivi) |
 | Récits (quêtes personnelles) | Les cinq récits, un par rang : progression et état (accompli, en cours, à accepter) ; ceux d'un rang pas encore atteint sont verrouillés (cadenas, titre illisible, rang requis) |
 | Alderic (maire) | Accueil (palier, parcelles, quêtes, bâtiments, trésor, agrandir), quêtes de la cité avec récit et charte, bâtiments (liste rangée par type, clic droit pour changer le type, suppression), trésor (caisse, bourse, dépôt) ; un clic sur son portrait ouvre « Population » |
 | Population (clic sur le portrait d'Alderic) | Rangée 1 : nourriture, sécurité, santé, confort (anneau vert ≥ 70 %, ambre ≥ 40 %, rouge en dessous, gris = artisan pas installé), satisfaction, arrivées, impôt de l'aube, départs ; rangée 2 : habitants, places, gardes, recrues, deuils ; rangées 3-4 : chaque habitation (niveau, habitants, confort) ; pied de page « SATISFACTION 72 % · 16 HABITANTS ». Menu classique : case « Population » (bilan dans le chat) |
 | Panneau Tab de la cité | Palier, Habitants, **Satisfaction** (barre et pourcentage, phase 6), Trésor, Parcelles |
-| Journal de quêtes (`/city quests`), onglet « Suivi » | Habitants ayant une quête en cours (anneau vert = suivi, gris = masqué), position du panneau (Bord, Marge, Près), panneau affiché / masqué, « Tous » pour tout suivre. Aperçu : `docs/ui-previews/quetes_suivies.png` |
+| Journal de quêtes (ruban « Quêtes » d'un habitant, ou `/city quests`), onglet « Suivi » | Habitants ayant une quête en cours (anneau vert = suivi, gris = masqué), position du panneau (Bord, Marge, Près), affichage du suivi **Visible / Accroché / Masqué** (clic gauche = suivant, clic droit = précédent), « Tous » pour tout suivre. Aperçu : `docs/ui-previews/quetes_suivies.png` |
 | Journal de quêtes, onglet « Récits » (`/city quests recits`) | Tous les personnages à récits, dans l'ordre de la trame : survivants (rangées 1 et 2), légendes (rangée 3). Cadenas = pas encore à Valmont ; anneau doré = récit à accepter, ambre = récit en cours, vert = à jour, gris = en ville sans atelier, rouge = mod absent. La bulle liste ses cinq récits (✔ accompli, ● en cours avec avancement, ! à accepter, cadenas et rang requis). Un clic sur un personnage installé ouvre l'écran de ses récits (le même que chez lui, retour vers le journal). Rangée 4 : bilan (à accepter, en cours) ; rangée 5 : récits accomplis, tous personnages. Aperçu : `docs/ui-previews/journal_recits.png` |
+| Où sont-ils ? (`/city locate [personnage]`, alias `/c ou`) | À gauche, les personnages par pages de 12 : découverts d’abord (rencontrés par un joueur, arrivés ou installés ; anneau vert = position connue, doré = personnage choisi), puis cadenas pour ceux que personne n’a encore rencontrés. À droite, une carte vue du ciel dessinée par le plugin (couleurs des cartes du jeu, relief ombré ; parchemin = zone non chargée) : limites de Valmont en or, habitants en rouge, personnage choisi en jaune, vous en blanc. Un clic sur un personnage centre la carte sur lui (1 case = 2 blocs) ; clic gauche / droit sur la carte = zoom avant / arrière ; bouton « carte » de l’en-tête = vue d’ensemble de la ville. Plaque du bas : nom, distance (ou monde), coordonnées X · Y · Z. Sans le pack : la liste et les coordonnées dans le chat. Aperçu : `docs/ui-previews/localiser.png` |
 
 Toute la logique reste celle des menus classiques (prix, stocks, XP, messages) : les nouveaux
 écrans appellent exactement les mêmes actions.
@@ -47,6 +48,9 @@ en petites capitales, barre de progression fine sous les objectifs.
   - Les panneaux sont placés à 72 pixels d'interface de part et d'autre du centre : au-delà de
     20 joueurs connectés (liste sur plusieurs colonnes) ou avec des pseudos très longs, la liste
     peut passer sous les panneaux.
+  - Suivi des quêtes **accroché** : le panneau « Quêtes » (mêmes lignes que celui de gauche,
+    10 lignes au plus) s'affiche sous celui de la cité, dans la même colonne ; il apparaît et
+    disparaît avec la liste. Sans le pack, ses lignes s'affichent sous la liste des joueurs.
 - **Panneau « Quêtes »** (remplace le tableau de droite) : à gauche de l'écran, 84 pixels de large.
   Une ligne par habitant, puis ses objectifs avec leur barre ; « ★ Voir … ! » quand une quête est
   prête à valider ; 12 lignes au plus. Aperçu : `docs/ui-previews/hud_quetes.png`.
@@ -57,15 +61,32 @@ en petites capitales, barre de progression fine sous les objectifs.
     serveur ne connaît pas la taille de l'écran du joueur, d'où ce choix manuel.
   - Minecraft ne prévient pas le serveur quand un joueur ouvre son inventaire : le panneau est donc
     affiché en permanence (comme l'ancien tableau), et l'inventaire l'assombrit comme le reste.
-  - `/city quests` ouvre le journal de quêtes (onglet « Suivi ») ; `/city quests toggle` masque ou
-    réaffiche le panneau ; `/city quests recits` ouvre directement l'onglet « Récits ». Ces réglages
-    (habitants suivis, position, affichage) sont gardés après une déconnexion ou un redémarrage.
-    Sans le pack, le tableau de droite reste affiché et le journal classique est utilisé (têtes à
-    cliquer, livre « Récits des habitants » en bas, même grille des personnages).
+  - Trois affichages du suivi, au choix de chaque joueur dans le journal de quêtes : **Visible**
+    (ce panneau, réglage par défaut), **Accroché** (rien en permanence à l'écran : le suivi
+    s'affiche avec la liste des joueurs, touche Tab, voir plus haut) et **Masqué**. Le serveur ne
+    sait pas quand Tab est enfoncé : en mode accroché, la liste est renvoyée dès que le suivi change.
+  - Le journal de quêtes s'ouvre en cliquant sur le ruban « Quêtes » de l'écran des quêtes d'un
+    habitant (menu classique : carte « Journal de quêtes » à gauche), ou avec `/city quests`.
+    Raccourcis : `/city quests toggle` fait défiler les trois affichages (`/city quests toggle
+    accroche` en choisit un) ; `/city quests recits` ouvre directement l'onglet « Récits ».
+  - Ces réglages (affichage, habitants suivis, position, ainsi que le style des menus `/city ui`)
+    sont les **préférences du joueur** : rangées dans la base (`database.db`, table
+    `player_prefs`) et écrites aussitôt, elles sont gardées après une déconnexion, un redémarrage
+    ou un arrêt brutal. Les anciens réglages rangés dans les données du joueur sont repris à sa
+    première connexion (un panneau masqué reste masqué).
+    Sans le pack, le tableau de droite remplace le panneau et le journal classique est utilisé
+    (têtes à cliquer, affichage du suivi en bas à gauche, livre « Récits des habitants » en bas).
   - Technique : il est dessiné dans le titre d'une barre de boss blanche dont le pack rend la barre
     invisible. Les barres de boss **blanches** d'autres plugins perdent donc leur barre (leur titre
     reste affiché) ; les barres des boss du jeu (dragon, Wither, raids) ne sont pas concernées, mais
     elles s'affichent sous la barre invisible du panneau (19 pixels plus bas qu'à l'habitude).
+
+Hors du pack de ressources : les **parcelles de la ville sur la carte JourneyMap** (plein écran
+et minicarte) — chaque parcelle teintée d'or (#F1CF5E), contour extérieur de la ville, quadrillage
+fin des chunks, nom de la ville, bulle au survol avec les parcelles et les habitants. Envoyées par
+le serveur (plugin + module JourneyMap du mod `citycore_companion`) dès qu'une parcelle est
+revendiquée ou rendue ; réglages dans la section `carte`, état avec `/city carte` (admin).
+Détails et installation : `docs/INTEGRATION_MODS.md`, « Mod compagnon ».
 
 ## Fonctionnement
 

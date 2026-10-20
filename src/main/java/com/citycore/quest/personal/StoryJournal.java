@@ -161,13 +161,16 @@ public final class StoryJournal {
         if (e.tier() != null) lore.add("§8" + e.tier().chapter);
         if (e.legend()) lore.add("§8Légende de passage (quête bonus)");
         lore.add("");
-        ModIntegrations.Mod mod = ModIntegrations.requiredBy(e.npc());
+        List<ModIntegrations.Mod> mods = ModIntegrations.requiredMods(e.npc());
+        List<ModIntegrations.Mod> extras = ModIntegrations.optionalMods(e.npc());
         switch (e.status()) {
             case LOCKED -> {
                 lore.add("§7Pas encore à Valmont.");
                 lore.add("§7Ses récits s'ouvrent dès son installation.");
                 lore.add("§8" + e.total() + " récits à découvrir");
-                if (mod != null) lore.add("§8Personnage du mod " + mod.displayName);
+                if (!mods.isEmpty()) lore.add("§8Personnage " + (mods.size() > 1 ? "des mods " : "du mod ")
+                        + ModIntegrations.names(mods));
+                if (!extras.isEmpty()) lore.add("§8Enrichi par " + ModIntegrations.names(extras));
             }
             case IN_TOWN -> {
                 lore.add("§eEn ville, sans atelier.");
@@ -175,7 +178,8 @@ public final class StoryJournal {
                 lore.add("§7installation dans un bâtiment.");
             }
             case MOD_MISSING -> {
-                lore.add("§cMod absent : " + (mod == null ? "?" : mod.displayName));
+                lore.add("§c" + (mods.size() > 1 ? "Mods requis : " : "Mod absent : ")
+                        + (mods.isEmpty() ? "?" : ModIntegrations.names(mods)));
                 lore.add("§7Ses récits sont indisponibles");
                 lore.add("§7sur ce serveur.");
             }

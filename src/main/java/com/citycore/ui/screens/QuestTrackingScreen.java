@@ -18,13 +18,15 @@ import static com.citycore.ui.UiLayout.*;
 /**
  * Journal de quêtes illustré (/city quests), en deux onglets :
  *
- * « Suivi » : quels habitants apparaissent dans le panneau des quêtes, où le panneau se place,
- * et s'il est affiché. Rangées 1 à 3 : un habitant ayant une quête en cours par case (anneau
- * vert = suivi, gris = masqué) ; rangée 4 : trois positions du panneau ; rangée 5 : affiché /
- * masqué, tout suivre.
+ * « Suivi » : quels habitants apparaissent dans le suivi des quêtes, où le panneau se place,
+ * et où le suivi s'affiche. Rangées 1 à 3 : un habitant ayant une quête en cours par case (anneau
+ * vert = suivi, gris = masqué) ; rangée 4 : trois positions du panneau ; rangée 5 : mode
+ * d'affichage (visible, accroché à la liste des joueurs, masqué ; gardé dans les préférences du
+ * joueur), tout suivre.
  *
  * « Récits » : les récits (quêtes personnelles) de chaque personnage. Rangées 1 et 2 : les
- * survivants, rangée 3 : les légendes, dans l'ordre des chapitres. Cadenas = pas encore à
+ * survivants, rangée 3 : les légendes, dans l'ordre des chapitres (plus de 9 légendes : 8 par
+ * page, la dernière case de la rangée passe à la page suivante). Cadenas = pas encore à
  * Valmont ; anneau doré = récit à accepter, ambre = en cours, vert = à jour, rouge = mod absent.
  * Un clic sur un personnage installé ouvre l'écran de ses récits (retour vers le journal).
  * Rangée 4 : bilan ; rangée 5 : barre des récits accomplis.
@@ -86,7 +88,7 @@ public final class QuestTrackingScreen {
             c.sprite(onTracking ? "tab_recits_off" : "tab_recits_on", sx(3), sy(0));
             zone(0, 0, 3, 1, "§6📋 Suivi des quêtes", onTracking
                             ? List.of("§7Onglet ouvert.")
-                            : List.of("§7Quêtes affichées dans le panneau,", "§7sa position et son affichage.",
+                            : List.of("§7Quêtes suivies, position du panneau", "§7et affichage du suivi.",
                             "", "§e▶ Cliquez pour ouvrir"),
                     onTracking ? null : t -> tracking(player));
             zone(3, 0, 4, 1, "§5✦ Récits des habitants", onTracking
@@ -114,29 +116,40 @@ public final class QuestTrackingScreen {
             tabs(c, true);
             info(c, 7, "§6📋 Suivi des quêtes", List.of(
                     "§7Cliquez sur un habitant pour afficher",
-                    "§7ou masquer ses quêtes dans le panneau.",
+                    "§7ou masquer ses quêtes dans le suivi.",
                     "", "§7En bas : position du panneau,",
-                    "§7affichage, et tout suivre d'un coup.",
-                    "", "§8/city quests toggle : afficher / masquer",
+                    "§7affichage du suivi (visible, accroché",
+                    "§7à la liste des joueurs, masqué),",
+                    "§7et tout suivre d'un coup.",
+                    "", "§8/city quests toggle : changer l'affichage",
                     "§8/city quests recits : onglet Récits"));
             close(c);
 
             npcs(c);
             positions(c);
-
-            // Affiché / masqué
-            boolean hidden = hud.isHidden(player);
-            c.sprite(hidden ? "hud_off" : "hud_on", sx(0), sy(5));
-            List<String> shownLore = hidden
-                    ? List.of("§7Les quêtes en cours ne s'affichent pas.", "", "§a▶ Cliquez pour l'afficher")
-                    : List.of("§7Les quêtes suivies s'affichent", "§7à gauche de l'écran.", "", "§e▶ Cliquez pour le masquer");
-            zone(0, 5, 6, 1, hidden ? "§7✘ Panneau masqué" : "§a✔ Panneau affiché", shownLore,
-                    t -> { hud.setHidden(player, !hidden); open(); });
+            mode(c);
 
             // Tout suivre
             c.sprite("track_all", sx(6), sy(5));
             zone(6, 5, 3, 1, "§9✔ Tout suivre", List.of("§7Affiche de nouveau les quêtes", "§7de tous les habitants."),
                     t -> { hud.trackAll(player); open(); });
+        }
+
+        /**
+         * Mode d'affichage du suivi (cases 0 à 5 de la rangée 5) : visible, accroché à la liste des
+         * joueurs (Tab), masqué. Clic gauche = mode suivant, clic droit = précédent.
+         */
+        private void mode(UiCanvas c) {
+            QuestHUD.Mode current = hud.mode(player);
+            c.sprite(switch (current) {
+                case VISIBLE  -> "hud_on";
+                case ACCROCHE -> "hud_tab";
+                case MASQUE   -> "hud_off";
+            }, sx(0), sy(5));
+            zone(0, 5, 6, 1, QuestHUD.modeTitle(current), QuestHUD.modeLore(current, true, true), t -> {
+                hud.setMode(player, t.isRightClick() ? current.previous() : current.next());
+                open();
+            });
         }
 
         /** Habitants ayant une quête en cours : tête + anneau d'état, clic = suivre / masquer. */
@@ -156,7 +169,7 @@ public final class QuestTrackingScreen {
                 String name = plain(npc.displayName);
                 c.sprite(tracked ? "ring_green" : "ring_gray", sx(col), sy(row));
                 List<String> lore = List.of("§7" + npc.function, "",
-                        tracked ? "§a● Suivi §7— affiché dans le panneau" : "§8○ Masqué §7— absent du panneau",
+                        tracked ? "§a● Suivi §7— affiché dans le suivi" : "§8○ Masqué §7— absent du suivi",
                         tracked ? "§e▶ Cliquez pour masquer" : "§a▶ Cliquez pour suivre");
                 item(col, row, UiItems.head(npcManager.resolveSkin(npc), npc.tag,
                                 (tracked ? "§a✔ " : "§7✘ ") + "§f" + name, lore),
@@ -177,6 +190,8 @@ public final class QuestTrackingScreen {
                 int index = k;
                 c.sprite(sprites[k], sx(3 * k), sy(4));
                 List<String> lore = new java.util.ArrayList<>(details.get(k));
+                lore.add("§8Panneau du suivi visible (le suivi accroché");
+                lore.add("§8se place sous le panneau de la cité, Tab).");
                 lore.add("");
                 lore.add(k == current ? "§a✔ Position actuelle" : "§e▶ Cliquez pour choisir");
                 zone(3 * k, 4, 3, 1, names[k], lore, k == current ? null : t -> {
@@ -194,8 +209,16 @@ public final class QuestTrackingScreen {
 
     private final class Stories extends JournalMenu {
 
+        /** Page des légendes (rangée 3), quand elles ne tiennent pas sur une rangée. */
+        private final int legendPage;
+
         Stories(Player p) {
+            this(p, 0);
+        }
+
+        Stories(Player p, int legendPage) {
             super(p);
+            this.legendPage = legendPage;
         }
 
         @Override
@@ -218,11 +241,33 @@ public final class QuestTrackingScreen {
 
             List<StoryJournal.Entry> entries = journal.entries(player.getUniqueId());
             int survivors = (int) entries.stream().filter(e -> !e.legend()).count();
+            int legends = entries.size() - survivors;
             int legendStart = (survivors + 8) / 9 * 9; // les légendes commencent une rangée plus bas
+            // Plus de légendes que de cases sur la rangée : 8 par page, la 9e case change de page
+            int legendRoom = CELLS - legendStart;
+            boolean paged = legends > legendRoom;
+            int perPage = paged ? legendRoom - 1 : legendRoom;
+            int pages = paged ? (legends + perPage - 1) / perPage : 1;
+            int page = Math.floorMod(legendPage, pages);
             int s = 0, l = 0;
             for (StoryJournal.Entry e : entries) {
-                int index = e.legend() ? legendStart + l++ : s++;
-                if (index < CELLS) cell(c, e, index % 9, 1 + index / 9);
+                if (!e.legend()) {
+                    int index = s++;
+                    if (index < legendStart) cell(c, e, index % 9, 1 + index / 9);
+                    continue;
+                }
+                int rank = l++ - page * perPage;
+                if (rank < 0 || rank >= perPage) continue;
+                int index = legendStart + rank;
+                cell(c, e, index % 9, 1 + index / 9);
+            }
+            if (paged) {
+                int index = CELLS - 1;
+                int next = (page + 1) % pages;
+                c.sprite("ic_next", sx(index % 9), sy(1 + index / 9));
+                zone(index % 9, 1 + index / 9, 1, 1, "§7Autres légendes ▶ §8(" + (page + 1) + "/" + pages + ")",
+                        List.of("§7" + legends + " légendes de passage :", "§7cliquez pour voir la page " + (next + 1) + "."),
+                        t -> kit.show(new Stories(player, next)));
             }
             summary(c, entries);
         }

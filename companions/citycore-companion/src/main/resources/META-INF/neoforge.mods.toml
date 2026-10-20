@@ -1,0 +1,47 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "All rights reserved"
+
+[[mods]]
+modId = "citycore_companion"
+version = "${version}"
+displayName = "CityCore — Compagnon"
+description = '''
+Mod compagnon du plugin CityCore, côté serveur. Avec Epic Fight : les PNJ (artisans, habitants,
+gardes, armées ennemies) reçoivent ses animations (marche, course, coups, tirs). Avec JourneyMap :
+les parcelles de la ville s'affichent sur la carte des joueurs. Rien à installer chez les joueurs
+en plus de ces mods.
+'''
+# Mod du serveur seulement : un client qui ne l'a pas peut se connecter
+displayTest = "IGNORE_SERVER_VERSION"
+
+[[dependencies.citycore_companion]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.citycore_companion]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.21.2)"
+ordering = "NONE"
+side = "BOTH"
+
+# Epic Fight facultatif : sans lui, le module des animations reste éteint (le serveur démarre quand même)
+[[dependencies.citycore_companion]]
+modId = "epicfight"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+# JourneyMap facultatif : sans lui, le module de la carte reste éteint (le serveur démarre quand même)
+# Superpositions envoyées par le serveur : JourneyMap 6.0.5 ou plus
+[[dependencies.citycore_companion]]
+modId = "journeymap"
+type = "optional"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"

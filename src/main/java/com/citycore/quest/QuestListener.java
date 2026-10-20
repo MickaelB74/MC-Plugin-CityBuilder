@@ -119,7 +119,7 @@ public class QuestListener implements Listener {
 
         for (QuestObjective obj : active.objectives()) {
             if (!obj.isMaterialObjective()) continue;
-            int count = ItemTags.countUntagged(player, obj.material());
+            int count = ItemTags.countUntagged(player, QuestConfig.acceptedMaterials(npc, obj));
             questManager.setProgress(uuid, npc, isSpecial, obj.id(), Math.min(count, obj.amount()));
         }
 
@@ -142,7 +142,7 @@ public class QuestListener implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         if (!(event.getEntity().getKiller() instanceof Player player)) return;
         UUID uuid = player.getUniqueId();
-        String entityName = event.getEntityType().name();
+        org.bukkit.entity.EntityType killedType = event.getEntityType();
 
         // ── Quêtes standards : objectifs de chasse ────────────────
         Set<String> active = questManager.getActiveQuestKeys(uuid);
@@ -151,7 +151,7 @@ public class QuestListener implements Listener {
             for (boolean special : new boolean[]{false, true}) {
                 if (!active.contains(QuestManager.activeKey(npc, special))) continue;
                 if (paused(npc)) continue;
-                if (incrementKill(player, npc, special, entityName)) {
+                if (incrementKill(player, npc, special, killedType)) {
                     checkQuestCompletion(player, npc, special);
                 }
             }
@@ -162,13 +162,14 @@ public class QuestListener implements Listener {
     }
 
     /** @return true si un objectif a progressé */
-    private boolean incrementKill(Player player, CityNPC npc, boolean isSpecial, String entityName) {
+    private boolean incrementKill(Player player, CityNPC npc, boolean isSpecial, org.bukkit.entity.EntityType killed) {
         QuestDefinition quest = questManager.getActiveQuest(player.getUniqueId(), npc, isSpecial);
         if (quest == null) return false;
         if (questManager.isReadyToValidate(player.getUniqueId(), npc, isSpecial)) return false;
         boolean progressed = false;
         for (QuestObjective obj : quest.objectives()) {
-            if (!obj.isEntityObjective() || !obj.entity().name().equals(entityName)) continue;
+            // Une créature de la famille demandée (« Guerriers Umvuthana » : trois types) compte
+            if (!obj.isEntityObjective() || !QuestConfig.acceptedEntities(npc, obj).contains(killed)) continue;
             questManager.incrementProgress(player.getUniqueId(), npc, isSpecial, obj.id(), 1, quest);
             int cur = questManager.getProgress(player.getUniqueId(), npc, isSpecial)
                     .getOrDefault(obj.id(), 0);
@@ -322,6 +323,7 @@ public class QuestListener implements Listener {
             if (npc == null) continue;
             NPCPersonalQuest quest = npc.getPersonalQuestById(entry.substring(sep + 1));
             if (quest == null || quest.trigger() != trigger) continue;
+            if (!quest.offered()) continue; // récit d'un mod désinstallé depuis : en pause
             if (paused(npc)) continue; // sans logis : récit en pause
             triggerPersonalQuest(player, npc, quest, context, times);
         }
@@ -383,6 +385,12 @@ public class QuestListener implements Listener {
             return;
         }
 
+        // Journal de quêtes : habitants suivis, affichage du suivi (menu classique)
+        if (slot == QuestGUI.SLOT_JOURNAL) {
+            gui.openJournal(player);
+            return;
+        }
+
         // Bouton quêtes personnelles
         if (slot == QuestGUI.SLOT_PERSONAL) {
             NPCPersonalQuestGUI personalGUI = gui.getPersonalQuestGUI();
@@ -430,7 +438,7 @@ public class QuestListener implements Listener {
         }
 
         // ── Validation ────────────────────────────────────────────
-        if (!hasAllItems(player, active)) {
+        if (!hasAllItems(player, npc, active)) {
             questManager.unmarkReadyToValidate(uuid, npc, isSpecial);
             player.sendMessage("§c❌ Il vous manque des items (non achetés à un PNJ) !");
             gui.open(player);
@@ -485,6 +493,10 @@ public class QuestListener implements Listener {
         if (personalQuestManager.isCompleted(uuid, npc, quest.id())) {
             player.sendMessage("§a✔ Cette quête est déjà complétée !");
         } else if (personalQuestManager.isActive(uuid, npc, quest.id())) {
+            if (quest.isDelivery()) {
+                deliverStory(player, gui, personalGUI, npc, quest);
+                return;
+            }
             player.sendMessage("§e⏳ Quête en cours : " + quest.displayName());
         } else {
             personalQuestManager.accept(uuid, npc, quest.id());
@@ -496,8 +508,44 @@ public class QuestListener implements Listener {
             if (quest.trigger() == TriggerType.ADVANCEMENT && quest.validator().validate(player, null)) {
                 triggerPersonalQuest(player, npc, quest, null);
             }
+            // « Rapporter… » : objets déjà sur soi, remis aussitôt (en face du personnage)
+            if (quest.isDelivery() && quest.delivery().has(player)) {
+                deliverStory(player, gui, personalGUI, npc, quest);
+                return;
+            }
             personalGUI.open(player); // refresh
         }
+    }
+
+    /**
+     * Récit « Rapporter… » : les objets se remettent au personnage lui-même (récits ouverts depuis
+     * son menu, pas depuis le journal de quêtes) ; seuls comptent ceux qui n'ont été ni achetés
+     * à un PNJ ni pris dans une réserve.
+     */
+    private void deliverStory(Player player, QuestGUI gui, NPCPersonalQuestGUI personalGUI,
+                              CityNPC npc, NPCPersonalQuest quest) {
+        if (personalGUI.journalBack(player) != null) {
+            player.sendMessage("§e📦 Rapportez-les à " + npc.displayName + " §een personne (ouvrez ses récits depuis son menu).");
+            personalGUI.open(player);
+            return;
+        }
+        if (paused(npc)) {
+            player.sendMessage("§6🏚 " + npc.displayName + " §6n'a plus d'atelier : ses récits sont en pause.");
+            return;
+        }
+        if (!quest.delivery().has(player)) {
+            player.sendMessage("§c❌ Il vous manque des objets (non achetés à un PNJ) :");
+            quest.delivery().lore(player).forEach(player::sendMessage);
+            personalGUI.open(player);
+            return;
+        }
+        // Validation d'abord (le validateur vérifie que les objets sont là), remise ensuite
+        triggerPersonalQuest(player, npc, quest, null);
+        if (personalQuestManager.isCompleted(player.getUniqueId(), npc, quest.id())) {
+            quest.delivery().take(player);
+            player.sendMessage("§a📦 Vous remettez votre trouvaille à " + npc.displayName + "§a.");
+        }
+        personalGUI.open(player);
     }
 
     /* =========================
@@ -542,10 +590,10 @@ public class QuestListener implements Listener {
        HELPERS — QUÊTES STANDARDS
        ========================= */
 
-    private boolean hasAllItems(Player player, QuestDefinition quest) {
+    private boolean hasAllItems(Player player, CityNPC npc, QuestDefinition quest) {
         for (QuestObjective obj : quest.objectives()) {
             if (!obj.isMaterialObjective()) continue;
-            if (ItemTags.countUntagged(player, obj.material()) < obj.amount()) return false;
+            if (ItemTags.countUntagged(player, QuestConfig.acceptedMaterials(npc, obj)) < obj.amount()) return false;
         }
         return true;
     }
@@ -558,10 +606,11 @@ public class QuestListener implements Listener {
         VillagerConfig cfg = market.config(npc);
         for (QuestObjective obj : quest.objectives()) {
             if (!obj.isMaterialObjective()) continue;
-            int removed = ItemTags.removeUntagged(player, obj.material(), obj.amount());
-            if (cfg != null && cfg.isSellable(obj.material()) && removed > 0) {
-                dataManager.addToInventory(npc, obj.material(), removed);
-            }
+            Map<Material, Integer> removed = ItemTags.removeUntagged(player,
+                    QuestConfig.acceptedMaterials(npc, obj), obj.amount());
+            removed.forEach((mat, n) -> {
+                if (cfg != null && cfg.isSellable(mat) && n > 0) dataManager.addToInventory(npc, mat, n);
+            });
         }
     }
 }

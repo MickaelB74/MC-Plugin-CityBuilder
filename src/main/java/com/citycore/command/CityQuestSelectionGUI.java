@@ -23,7 +23,8 @@ import java.util.*;
  *
  * Suivi : une tête de skin pour chaque NPC ayant une quête active ; cliquer sur la tête bascule
  * le suivi (visible ou masqué dans le panneau). L'état est celui de {@link QuestHUD} (partagé avec
- * le menu illustré, gardé après un redémarrage). Le livre de la dernière rangée ouvre les récits.
+ * le menu illustré, gardé dans les préférences du joueur). Dernière rangée : affichage du suivi
+ * (visible, accroché à la liste des joueurs, masqué) à gauche, livre des récits au milieu.
  *
  * Récits : les personnages dans l'ordre de la trame (survivants, puis légendes) ; colorant gris =
  * pas encore à Valmont ; un clic sur un personnage installé ouvre l'écran de ses récits.
@@ -85,6 +86,16 @@ public class CityQuestSelectionGUI {
             noQuest.setItemMeta(meta);
             inv.setItem(4, noQuest);
         }
+
+        // Affichage du suivi : clic gauche = mode suivant, clic droit = précédent
+        QuestHUD.Mode mode = questHUD.mode(player);
+        Material modeIcon = switch (mode) {
+            case VISIBLE  -> Material.LIME_DYE;
+            case ACCROCHE -> Material.LIGHT_BLUE_DYE;
+            case MASQUE   -> Material.GRAY_DYE;
+        };
+        inv.setItem(size - 9, actionItem(modeIcon, QuestHUD.modeTitle(mode),
+                QuestHUD.modeLore(mode, false, true), "mode"));
 
         if (journal != null) {
             inv.setItem(size - 5, actionItem(Material.WRITABLE_BOOK, "§5✦ Récits des habitants",
@@ -148,15 +159,21 @@ public class CityQuestSelectionGUI {
        ========================= */
 
     /**
-     * Suivi : bascule le suivi d'un NPC, ou ouvre les récits.
+     * Suivi : bascule le suivi d'un NPC, change l'affichage du suivi, ou ouvre les récits.
+     * @param rightClick clic droit (mode d'affichage précédent)
      * @return true si le clic a été traité (annuler l'event + ne pas fermer)
      */
-    public boolean handleClick(Player player, ItemStack clicked) {
+    public boolean handleClick(Player player, ItemStack clicked, boolean rightClick) {
         if (clicked == null || !clicked.hasItemMeta()) return false;
         ItemMeta meta = clicked.getItemMeta();
 
         if ("recits".equals(action(meta))) {
             openStories(player);
+            return true;
+        }
+        if ("mode".equals(action(meta))) {
+            questHUD.announce(player, questHUD.cycle(player, !rightClick));
+            open(player);
             return true;
         }
 
@@ -202,10 +219,10 @@ public class CityQuestSelectionGUI {
         lore.add("§7" + npc.function);
         lore.add("");
         if (tracked) {
-            lore.add("§a● Suivi §7— quête visible dans le scoreboard");
+            lore.add("§a● Suivi §7— quête affichée dans le suivi");
             lore.add("§7Cliquez pour §cmasquer§7.");
         } else {
-            lore.add("§8○ Non suivi §7— quête cachée du scoreboard");
+            lore.add("§8○ Non suivi §7— quête absente du suivi");
             lore.add("§7Cliquez pour §aafficher§7.");
         }
 

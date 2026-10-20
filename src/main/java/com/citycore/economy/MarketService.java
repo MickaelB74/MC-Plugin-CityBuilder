@@ -30,7 +30,8 @@ import java.util.*;
  *   1. Ce que les joueurs vendent entre dans le stock du PNJ (capacité limitée).
  *   2. Plus l'entrepôt se remplit, moins le PNJ paie (offre / demande) ;
  *      plein, il refuse d'acheter.
- *   3. Le stock se revend au prix de rachat × multiplicateur (toujours plus cher).
+ *   3. Le stock est la réserve de la ville : on s'y sert gratuitement, mais ce qu'on y prend
+ *      (et ce qu'on en fabrique) est marqué non revendable ; ses employés la remplissent.
  *   4. Les articles fabriqués consomment des ingrédients dans les stocks (le sien ou
  *      celui d'un autre artisan) : sans matière première, pas de production.
  *   5. Les stocks sont consommés lentement (l'artisan travaille, exporte),
@@ -163,14 +164,8 @@ public class MarketService {
     public record SellQuote(int lots, int coins, int items) {}
 
     /* =========================
-       REVENTE DU STOCK (PNJ → JOUEUR)
+       BOUTIQUE (PNJ → JOUEUR)
        ========================= */
-
-    public int resaleLotPrice(SellPrice sp, boolean employee) {
-        double p = sp.price() * cfg.resaleMultiplier();
-        if (employee) p *= 1 - cfg.jobShopDiscount() / 100.0;
-        return Math.max(1, ceil(p));
-    }
 
     public int shopPrice(ShopItem item, boolean employee) {
         if (!employee) return item.price();
@@ -342,7 +337,7 @@ public class MarketService {
 
     /** Construit l'item d'un article (enchantements, potion, livre) et le marque non revendable. */
     public ItemStack createStack(ShopItem item, String sellerName) {
-        ItemStack stack = new ItemStack(item.material(), item.quantity());
+        ItemStack stack = baseStack(item);
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             if (item.displayName() != null) meta.setDisplayName(item.displayName());
@@ -364,6 +359,24 @@ public class MarketService {
         }
         ItemTags.tag(stack, sellerName);
         return stack;
+    }
+
+    /**
+     * Objet de base d'un article : avec ses données de mod (sort d'un parchemin, compétence d'un
+     * livre…) quand config.yml en donne, sinon l'objet nu.
+     */
+    private ItemStack baseStack(ShopItem item) {
+        if (item.components() != null) {
+            try {
+                ItemStack base = Bukkit.getItemFactory().createItemStack(
+                        com.citycore.integration.ItemIds.keyOf(item.material()) + item.components());
+                base.setAmount(item.quantity());
+                return base;
+            } catch (RuntimeException e) {
+                plugin.getLogger().warning("Données d'objet refusées pour " + item.material() + " : " + e.getMessage());
+            }
+        }
+        return new ItemStack(item.material(), item.quantity());
     }
 
     /* =========================

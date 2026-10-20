@@ -56,6 +56,13 @@ import java.util.zip.ZipOutputStream;
  * Il ne contient que des images de menus, une police et le modèle d'un objet invisible : aucune
  * texture de bloc ni d'objet existant n'est modifiée. Un joueur qui refuse le pack garde les
  * menus classiques.
+ *
+ * La réponse du joueur est retenue (préférences du joueur) : un refus n'est plus reproposé à
+ * chaque connexion (/city ui valmont le repropose) ; un joueur qui n'a jamais répondu est
+ * interrogé. La question elle-même est posée par le jeu du joueur : il ne la saute que si le
+ * serveur figure dans sa liste avec « Packs de ressources : Activé » (une partie rejointe depuis
+ * « Jeux en réseau local » n'y est pas, d'où une question à chaque connexion). Le texte de la
+ * question l'explique à ceux qui ont déjà accepté.
  */
 public final class UiPack implements Listener {
 
@@ -173,6 +180,8 @@ public final class UiPack implements Listener {
 
         // Polices : fonds + espacements, puis une police par hauteur d'affichage
         UiFonts.generate(atlas).forEach((path, font) -> files.put(path, json(font)));
+        // Deuxième ligne des répliques des PNJ : police du jeu abaissée d'une ligne (UiDialogue)
+        UiDialogue.packFonts(plugin).forEach((path, font) -> files.put(path, json(font)));
 
         // Objet invisible : modèle du papier inchangé + variante transparente
         JsonObject paper = new JsonObject();
@@ -326,23 +335,46 @@ public final class UiPack implements Listener {
        ENVOI ET ÉTAT PAR JOUEUR
        ========================= */
 
+    /** Réponses retenues (préférence PlayerPrefs.UI_PACK). */
+    private static final String ACCEPTED = "accepte", DECLINED = "refuse";
+
     /** Propose le pack aux joueurs déjà connectés (redémarrage du plugin). */
     public void offerToOnlinePlayers() {
         if (!enabled()) return;
-        for (Player p : Bukkit.getOnlinePlayers()) if (!prefersClassic(p)) send(p);
+        for (Player p : Bukkit.getOnlinePlayers()) if (wantsPack(p)) send(p);
     }
 
     public void send(Player player) {
         if (!enabled()) return;
-        player.addResourcePack(PACK_ID, url, sha1,
-                "§6Menus illustrés des habitants de Valmont§7 (aucun bloc modifié).", required);
+        // Déjà accepté : le jeu du joueur ne redemande que s'il n'a pas pu retenir le « oui »
+        // (serveur absent de sa liste) ; la question lui dit alors comment ne plus la voir
+        String prompt = ACCEPTED.equals(answer(player))
+                ? "§6Menus illustrés de Valmont§7 : vous les aviez acceptés. §8Pour ne plus voir cette question, "
+                        + "ajoutez ce serveur à votre liste (Multijoueur → Ajouter un serveur) avec "
+                        + "« Packs de ressources : Activé »."
+                : "§6Menus illustrés des habitants de Valmont§7 (aucun bloc modifié).";
+        player.addResourcePack(PACK_ID, url, sha1, prompt, required);
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        if (!enabled() || prefersClassic(player)) return;
+        if (!enabled() || !wantsPack(player)) return;
         Bukkit.getScheduler().runTaskLater(plugin, () -> { if (player.isOnline()) send(player); }, 20L);
+    }
+
+    /** Le pack est-il à envoyer : ni menus classiques choisis, ni pack refusé (pack obligatoire : toujours) ? */
+    private boolean wantsPack(Player player) {
+        return !prefersClassic(player) && (required || !DECLINED.equals(answer(player)));
+    }
+
+    /** Réponse retenue du joueur (null : jamais répondu, ou préférences indisponibles). */
+    private String answer(Player player) {
+        return prefs == null ? null : prefs.get(player, com.citycore.player.PlayerPrefs.UI_PACK);
+    }
+
+    private void remember(Player player, String answer) {
+        if (prefs != null) prefs.set(player, com.citycore.player.PlayerPrefs.UI_PACK, answer);
     }
 
     private final Set<UUID> warned = new HashSet<>();
@@ -352,11 +384,16 @@ public final class UiPack implements Listener {
         if (!PACK_ID.equals(event.getID())) return;
         Player player = event.getPlayer();
         switch (event.getStatus()) {
-            case SUCCESSFULLY_LOADED -> ready.add(player.getUniqueId());
+            case ACCEPTED -> remember(player, ACCEPTED);
+            case SUCCESSFULLY_LOADED -> {
+                ready.add(player.getUniqueId());
+                remember(player, ACCEPTED);
+            }
             case DECLINED -> {
                 ready.remove(player.getUniqueId());
-                player.sendMessage("§7Pack d'interface refusé : les menus classiques restent utilisés."
-                        + " §8(/city ui valmont pour le reproposer)");
+                remember(player, DECLINED);
+                player.sendMessage("§7Pack d'interface refusé : les menus classiques restent utilisés, il ne vous"
+                        + " sera plus proposé. §8(/city ui valmont pour le reproposer)");
             }
             case FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> {
                 ready.remove(player.getUniqueId());
@@ -388,11 +425,25 @@ public final class UiPack implements Listener {
        PRÉFÉRENCE DU JOUEUR (/city ui)
        ========================= */
 
+    /** Préférences des joueurs (base SQLite) ; null = données du joueur, comme avant. */
+    private com.citycore.player.PlayerPrefs prefs;
+
+    public void setPrefs(com.citycore.player.PlayerPrefs prefs) {
+        this.prefs = prefs;
+    }
+
     public boolean prefersClassic(Player player) {
+        if (prefs != null) return prefs.flag(player, com.citycore.player.PlayerPrefs.UI_CLASSIC);
         return player.getPersistentDataContainer().has(classicKey, PersistentDataType.BYTE);
     }
 
     public void setClassic(Player player, boolean classic) {
+        if (prefs != null) {
+            prefs.setFlag(player, com.citycore.player.PlayerPrefs.UI_CLASSIC, classic);
+            // Retour aux menus illustrés : un ancien refus du pack est oublié (il est reproposé)
+            if (!classic && DECLINED.equals(answer(player))) remember(player, null);
+            return;
+        }
         if (classic) player.getPersistentDataContainer().set(classicKey, PersistentDataType.BYTE, (byte) 1);
         else player.getPersistentDataContainer().remove(classicKey);
     }

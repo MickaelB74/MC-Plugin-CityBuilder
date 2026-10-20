@@ -219,10 +219,10 @@ public final class MayorScreens {
                             afford ? "§aCliquez pour acheter" : "§cFonds insuffisants"),
                     () -> mayor.handleClick(player, MayorGUI.SLOT_EXPAND));
 
+            // Parcelles : revendiquer ou rendre celle où l'on se tient, voir les limites
+            // (pour les joueurs, à la place de /city claim et unclaim, réservées aux administrateurs)
             bar(c, (double) claimed / max, claimed >= max, "PARCELLES " + claimed + " / " + data.getMaxChunks());
-            zone(0, 5, 9, 1, "§eParcelles de la ville",
-                    List.of("§7Revendiquées : §f" + claimed, "§7Emplacements : §f" + data.getMaxChunks(),
-                            "§8Agrandissez pour revendiquer davantage."), null);
+            zone(0, 5, 9, 1, "§e🗺 Parcelles de la ville", mayor.parcelLore(player, data), t -> mayor.handleParcelClick(player, t));
         }
     }
 
@@ -481,9 +481,9 @@ public final class MayorScreens {
             info(c, 7, deleting ? "§c➖ Supprimer un bâtiment" : "§a🏗 Bâtiments de la ville",
                     deleting ? List.of("§7Cliquez sur un bâtiment", "§7pour le supprimer.", "§c§lDéfinitif.")
                             : List.of("§7Rangés par type : habitations,", "§7ateliers, mairie, divers.", "",
-                            "§eClic gauche §7: bordures 5 secondes", "§eClic droit §7: changer le type", "",
-                            "§6■ §7habité par un artisan  §c■ §7incomplet",
-                            "§8Détail d'un bâtiment : /city build inspect <nom>"));
+                            "§eClic gauche §7: bordures 5 secondes", "§eClic droit §7: changer le type",
+                            "§eMaj + clic §7: inspection détaillée", "",
+                            "§6■ §7habité par un artisan  §c■ §7incomplet"));
             close(c);
 
             List<Building> list = buildings.getAllBuildings();
@@ -515,11 +515,13 @@ public final class MayorScreens {
                 } else {
                     lore.add("§eClic gauche §7: voir les bordures");
                     if (screens != null) lore.add("§eClic droit §7: changer le type");
+                    lore.add("§eMaj + clic §7: inspection détaillée");
                 }
                 item(col, row, UiItems.shown(deleting ? Material.TNT : b.type().icon,
                                 (deleting ? "§c" : "§e") + b.name(), lore, false),
                         t -> {
                             if (deleting) buildingGUI().delete(player, b);
+                            else if (t.isShiftClick()) buildingGUI().inspect(player, b);
                             else if (t.isRightClick() && screens != null) screens.openRetype(player, b, () -> openBuildings(player));
                             else buildingGUI().showBorders(player, b);
                         });

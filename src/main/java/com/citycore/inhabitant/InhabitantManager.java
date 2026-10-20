@@ -13,6 +13,7 @@ import com.citycore.npc.NPCManager;
 import com.citycore.npc.NPCState;
 import com.citycore.npc.SafeNavigation;
 import com.citycore.util.DatabaseManager;
+import com.citycore.util.GroundFinder;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.EntityTarget;
 import net.citizensnpcs.api.event.DespawnReason;
@@ -99,7 +100,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * connecté, plusieurs recrues à la fois selon le rang de Roland), puis devient garde : uniforme
  * (soldats.skins), équipement et points de vie de son rôle. Les gardes patrouillent sur le
  * terrain de la ville, hors des bâtiments, de jour comme de nuit (ils ne dorment pas), et
- * attaquent les monstres (au contact, ou à l'arc). Ils gardent leur lit (la population ne dépasse
+ * attaquent les monstres (au contact, ou à l'arc ; pas plus de soldats.max-par-cible gardes au
+ * contact du même). Pendant un siège, la garde se répartit en groupes, un par secteur du front,
+ * qui vont chacun à la rencontre d'une escouade ennemie. Ils gardent leur lit (la population ne dépasse
  * pas le nombre de lits) et ne paient pas l'impôt. Un garde mort n'est pas remplacé : son lit
  * accueillera un nouvel habitant, qu'il faudra former à son tour.
  */
@@ -194,9 +197,22 @@ public class InhabitantManager implements Listener {
     private java.util.function.DoubleSupplier arrivalFactor = () -> 1.0;  // délai d'arrivée selon la satisfaction (0 = aucune)
     private java.util.function.Predicate<Entity> hostileNpc;             // soldat d'une armée ennemie (siège « bannière »)
     private java.util.function.BooleanSupplier siegeAssault;             // vague en cours : la garde sort combattre
-    private java.util.function.Supplier<List<LivingEntity>> siegeAttackers; // assaillants du siège en cours
+    private java.util.function.Supplier<List<SiegeFront.Band>> siegeBands; // escouades du siège en cours
     private SiegeFront front;                                            // front relu à chaque passage
     private final Map<Integer, Location> posts = new HashMap<>();        // garde → son poste sur le front
+    // Champ de bataille (siège) : groupes de la garde, escouades affrontées, mêlées en cours
+    private Set<Integer> postedRoster = Set.of();                        // gardes placés au dernier calcul des postes
+    private final Map<Integer, Integer> guardGroup = new HashMap<>();    // garde → son groupe
+    private double[] groupLane = new double[0];                          // secteur de chaque groupe (position sur la largeur du front)
+    private Location[] groupAnchor = new Location[0];                    // poste au centre de ce secteur
+    private final Map<Integer, Integer> groupBand = new HashMap<>();     // groupe → escouade qu'il va affronter
+    private boolean assaulting;                                          // vague en cours (relu à chaque passage)
+    private List<SiegeFront.Band> bands = List.of();                     // escouades présentes (relevé du passage)
+    private List<LivingEntity> attackersNow = List.of();                 // tous les assaillants présents
+    private final Map<Integer, LivingEntity> fightTarget = new HashMap<>(); // garde → adversaire en cours
+    private final Map<Integer, Long> nextPick = new HashMap<>();         // garde → prochain choix d'adversaire
+    private final Map<Integer, Location> supportGoal = new HashMap<>();  // garde → place d'attente près d'une mêlée
+    private final Engagements meleeTally = new Engagements();            // gardes au contact de chaque ennemi
     private final Map<Integer, Location> goals = new HashMap<>();        // garde → poste vers lequel il court
     private final Map<Integer, Location> returning = new HashMap<>();    // après un siège : retour vers son quartier
     private final Map<Integer, Long> returnUntil = new HashMap<>();
@@ -1014,6 +1030,7 @@ public class InhabitantManager implements Listener {
         ticks++;
         long now = System.currentTimeMillis();
         assignPosts();
+        refreshBattle();
         for (Map.Entry<Integer, NPC> e : new ArrayList<>(npcs.entrySet())) {
             Inhabitant inh = all.get(e.getKey());
             NPC npc = e.getValue();
@@ -1185,10 +1202,12 @@ public class InhabitantManager implements Listener {
     }
 
     /**
-     * Garde : attaque l'ennemi le plus proche dans la ville (monstre ou soldat d'une armée
-     * ennemie ; au contact, ou à l'arc). Pendant un siège, tient son poste sur le front, face à
-     * l'ennemi ; après un siège, rentre vers son quartier ; sinon fait sa ronde sur le terrain de
-     * la ville, hors des bâtiments. Jamais de sommeil.
+     * Garde : attaque un ennemi proche dans la ville (monstre ou soldat d'une armée ennemie ; au
+     * contact, ou à l'arc), sans s'entasser à plus de soldats.max-par-cible sur le même. Pendant
+     * un siège, tient son poste sur le front (dans le secteur de son groupe), face à l'ennemi ;
+     * pendant une vague, son groupe va à la rencontre d'une escouade. Après un siège, rentre vers
+     * son quartier ; sinon fait sa ronde sur le terrain de la ville, hors des bâtiments. Jamais de
+     * sommeil.
      */
     private void guardBehaviour(Inhabitant inh, NPC npc, long now) {
         GuardConfig.Role role = guard.role(inh.role);
@@ -1197,14 +1216,18 @@ public class InhabitantManager implements Listener {
 
         boolean archer = role != null && role.ranged();
         Location post = posts.get(inh.id);
-        // Assaut (vague en cours) : la garde sort de la ville à la rencontre des assaillants (64 blocs) ;
-        // hors vague, elle tient le front et ne combat que ce qui entre en ville (ou, pour un
-        // archer à son poste, ce qui approche à portée de tir)
-        boolean assault = post != null && siegeAssault != null && siegeAssault.getAsBoolean();
-        LivingEntity enemy = assault ? nearestAttacker(body, 64) : null;
-        if (enemy == null) enemy = nearestEnemy(body, archer && post != null);
+        // Assaut (vague en cours) : la garde sort de la ville, groupe par groupe, à la rencontre des
+        // escouades ; hors vague, elle tient le front et ne combat que ce qui entre en ville (ou,
+        // pour un archer à son poste, ce qui approche à portée de tir)
+        boolean assault = post != null && assaulting;
+        SiegeFront.Band band = assault ? bandOf(inh) : null;
+        LivingEntity enemy = assault ? assaultTarget(inh, body, archer, band, now) : null;
+        if (enemy == null) enemy = nearestEnemy(inh, body, archer, archer && post != null);
+        setFight(inh, enemy, archer);
         if (enemy != null) {
             idleSince.remove(inh.id);
+            supportGoal.remove(inh.id);
+            if (assault) awaySince.remove(inh.id); // à l'assaut : pas de compte à rebours avant d'être ramené à son poste
             double dist = body.getLocation().distance(enemy.getLocation());
             if (archer) {
                 if (dist <= guard.bowRange() && body.hasLineOfSight(enemy)) {
@@ -1251,6 +1274,13 @@ public class InhabitantManager implements Listener {
             npc.getNavigator().cancelNavigation();
             walking = false;
         }
+
+        // Assaut : tous les ennemis de son escouade sont déjà assez entourés, il se tient prêt tout près
+        if (band != null) {
+            support(inh, npc, body, band, archer);
+            return;
+        }
+        supportGoal.remove(inh.id);
 
         // Siège : en position sur le front dès l'alerte et pendant les répits, face à l'ennemi
         if (post != null && post.getWorld().equals(body.getWorld())) {
@@ -1327,17 +1357,86 @@ public class InhabitantManager implements Listener {
         heal(body);
     }
 
-    /** Assaillant du siège (monstre ou soldat ennemi) vivant le plus proche, à moins de radius blocs, n'importe où. */
-    private LivingEntity nearestAttacker(LivingEntity from, double radius) {
-        if (siegeAttackers == null) return null;
-        LivingEntity best = null;
-        double bestDist = radius * radius;
-        for (LivingEntity e : siegeAttackers.get()) {
-            if (e == null || !e.isValid() || e.isDead() || !e.getWorld().equals(from.getWorld())) continue;
-            double d = e.getLocation().distanceSquared(from.getLocation());
-            if (d < bestDist) { bestDist = d; best = e; }
+    /**
+     * Adversaire d'un garde pendant l'assaut : d'abord un assaillant qui le serre de près (4
+     * blocs), puis un membre de l'escouade qu'affronte son groupe (le plus proche de lui), enfin
+     * n'importe quel assaillant proche (16 blocs, portée de tir pour un archer) — toujours sans
+     * dépasser soldats.max-par-cible gardes au contact du même ennemi (pas de limite pour un
+     * archer). Le choix est revu toutes les ~1,5 s ; entre-temps il garde sa cible. null : aucun
+     * adversaire libre.
+     */
+    private LivingEntity assaultTarget(Inhabitant inh, LivingEntity body, boolean archer, SiegeFront.Band band, long now) {
+        LivingEntity current = fightTarget.get(inh.id);
+        int cap = archer ? 0 : guard.maxPerTarget();
+        if (current != null && current.isValid() && !current.isDead() && current.getWorld().equals(body.getWorld())
+                && now < nextPick.getOrDefault(inh.id, 0L) && (archer || meleeTally.acceptable(current, cap))
+                && current.getLocation().distanceSquared(body.getLocation()) < 48 * 48) {
+            return current;
         }
-        return best;
+        nextPick.put(inh.id, now + 1500 + Math.floorMod(inh.id * 37L, 500));
+        Location at = body.getLocation();
+        LivingEntity t = archer ? null : meleeTally.pick(at, attackersNow, 4, cap, current, null, 0);
+        if (t == null && band != null) t = meleeTally.pick(at, band.members(), 96, cap, current, band.center(), 10);
+        if (t == null) t = meleeTally.pick(at, attackersNow, archer ? guard.bowRange() : 16, cap, current, null, 0);
+        return t;
+    }
+
+    /** Adversaire en cours d'un garde (null : aucun) ; les gardes au contact sont comptés par ennemi. */
+    private void setFight(Inhabitant inh, LivingEntity enemy, boolean archer) {
+        LivingEntity before = enemy == null ? fightTarget.remove(inh.id) : fightTarget.put(inh.id, enemy);
+        if (!archer && before != enemy) meleeTally.swap(before, enemy);
+    }
+
+    /** Escouade qu'affronte le groupe de ce garde (null : aucune pour l'instant). */
+    private SiegeFront.Band bandOf(Inhabitant inh) {
+        Integer k = guardGroup.get(inh.id);
+        Integer id = k == null ? null : groupBand.get(k);
+        if (id == null) return null;
+        for (SiegeFront.Band b : bands) if (b.id() == id) return b;
+        return null;
+    }
+
+    /**
+     * Assaut, sans adversaire libre (ceux de son escouade sont déjà assez entourés) : le garde se
+     * tient prêt à quelques blocs de l'escouade qu'affronte son groupe, de son côté, un peu décalé
+     * de ses voisins (pas d'entassement) ; un archer reste à portée de tir. Il ne relance son
+     * chemin que si sa place s'est déplacée de quelques blocs.
+     */
+    private void support(Inhabitant inh, NPC npc, LivingEntity body, SiegeFront.Band band, boolean archer) {
+        goals.remove(inh.id);
+        idleSince.remove(inh.id);
+        awaySince.remove(inh.id);
+        Location c = band.center();
+        Location at = body.getLocation();
+        if (!c.getWorld().equals(at.getWorld())) return;
+        Vector away = at.toVector().subtract(c.toVector()).setY(0);
+        if (away.lengthSquared() < 1e-4) away = new Vector(1, 0, 0);
+        away.normalize();
+        double keep = archer ? Math.max(6, guard.bowRange() - 4) : 5;
+        Vector aside = new Vector(-away.getZ(), 0, away.getX()).multiply((Math.floorMod(inh.id, 5) - 2) * 1.5);
+        Location spot = c.clone().add(away.multiply(keep)).add(aside);
+        double far = at.distance(spot);
+        boolean walking = npc.getNavigator().isNavigating() && npc.getNavigator().getEntityTarget() == null;
+        if (far <= 2) { // à sa place : face à la mêlée
+            supportGoal.remove(inh.id);
+            if (ticks % 4 == 0) npc.faceLocation(c.clone().add(0, 1.5, 0));
+            return;
+        }
+        if (far > 40) { // mêlée lointaine : il y court par étapes
+            supportGoal.remove(inh.id);
+            if (!walking) {
+                npc.getNavigator().cancelNavigation();
+                advance(npc, body, spot, 1.1f);
+            }
+            return;
+        }
+        Location prev = supportGoal.get(inh.id);
+        if (walking && prev != null && prev.getWorld().equals(spot.getWorld()) && prev.distanceSquared(spot) < 3 * 3) return;
+        World w = spot.getWorld();
+        if (!w.isChunkLoaded(spot.getBlockX() >> 4, spot.getBlockZ() >> 4)) return;
+        Location stand = GroundFinder.standAt(w, spot.getBlockX(), c.getBlockY(), spot.getBlockZ());
+        if (stand == null) return;
+        if (SafeNavigation.walkTo(npc, stand, 1.1f, false) == SafeNavigation.Result.WALKING) supportGoal.put(inh.id, stand);
     }
 
     /**
@@ -1391,36 +1490,192 @@ public class InhabitantManager implements Listener {
         return null;
     }
 
+    /** Groupes de la garde au plus pendant un siège (secteurs du front). */
+    private static final int MAX_GROUPS = 8;
+
     /**
-     * Postes du front, recalculés à chaque passage : les gardes au contact en première ligne, les
-     * archers en retrait, dans l'ordre (un poste chacun, du centre vers les ailes).
+     * Postes du front et groupes de la garde, recalculés quand le front change ou qu'un garde
+     * arrive ou tombe (sinon rien à refaire). La garde est répartie en groupes
+     * (soldats.groupe-taille gardes chacun, soldats et archers mêlés), chacun chargé d'un secteur
+     * sur la largeur du front ; dans son secteur, les gardes au contact en première ligne, les
+     * archers en retrait, un poste chacun, au plus près du centre du secteur. Sur un même front,
+     * un garde reste dans son groupe ; une nouvelle recrue rejoint le plus petit.
      */
     private void assignPosts() {
+        SiegeFront f = siegeFront == null ? null : siegeFront.get();
+        if (f == null) {
+            if (front != null) clearBattle();
+            return;
+        }
+        List<Inhabitant> roster = guards();
+        Set<Integer> ids = new HashSet<>();
+        for (Inhabitant g : roster) ids.add(g.id);
+        if (f == front && ids.equals(postedRoster)) return;
+        boolean newFront = f != front || groupLane.length == 0;
+        front = f;
+        postedRoster = ids;
         posts.clear();
-        front = siegeFront == null ? null : siegeFront.get();
-        if (front == null) return;
         List<Inhabitant> melee = new ArrayList<>(), ranged = new ArrayList<>();
-        for (Inhabitant g : guards()) {
+        for (Inhabitant g : roster) {
             GuardConfig.Role r = guard.role(g.role);
             (r != null && r.ranged() ? ranged : melee).add(g);
         }
-        place(melee, front.melee(), front.ranged());
-        place(ranged, front.ranged(), front.melee());
+        if (newFront) {
+            // Secteurs répartis sur la largeur couverte par les postes ; un seul : face au ralliement
+            int count = Math.max(1, Math.min(MAX_GROUPS, (roster.size() + guard.groupSize() - 1) / guard.groupSize()));
+            double lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
+            for (List<Location> list : List.of(f.melee(), f.ranged())) {
+                for (Location l : list) { double t = f.lateral(l); lo = Math.min(lo, t); hi = Math.max(hi, t); }
+            }
+            if (lo > hi) lo = hi = 0;
+            groupLane = new double[count];
+            groupAnchor = new Location[count];
+            for (int k = 0; k < count; k++) {
+                groupLane[k] = count == 1 ? Math.max(lo, Math.min(hi, 0)) : lo + (hi - lo) * (k + 0.5) / count;
+                groupAnchor[k] = nearestOnFront(f, groupLane[k]);
+            }
+            guardGroup.clear();
+            groupBand.clear();
+            int i = 0;
+            for (Inhabitant g : melee) guardGroup.put(g.id, i++ % count);
+            for (Inhabitant g : ranged) guardGroup.put(g.id, i++ % count);
+        } else {
+            guardGroup.keySet().retainAll(ids);
+            int[] sizes = new int[groupLane.length];
+            for (int k : guardGroup.values()) sizes[k]++;
+            for (Inhabitant g : roster) {
+                if (guardGroup.containsKey(g.id)) continue;
+                int smallest = 0;
+                for (int k = 1; k < sizes.length; k++) if (sizes[k] < sizes[smallest]) smallest = k;
+                guardGroup.put(g.id, smallest);
+                sizes[smallest]++;
+            }
+        }
+        placeGroups(melee, f.melee(), f.ranged());
+        placeGroups(ranged, f.ranged(), f.melee());
     }
 
-    private void place(List<Inhabitant> who, List<Location> spots, List<Location> fallback) {
+    /** Un poste par garde, dans le secteur de son groupe : le plus proche de son centre encore libre. */
+    private void placeGroups(List<Inhabitant> who, List<Location> spots, List<Location> fallback) {
         List<Location> list = !spots.isEmpty() ? spots : !fallback.isEmpty() ? fallback
                 : front.rally() != null ? List.of(front.rally()) : List.of(); // aucun poste praticable : au ralliement
-        if (list.isEmpty()) return;
-        for (int i = 0; i < who.size(); i++) posts.put(who.get(i).id, list.get(i % list.size()));
+        if (list.isEmpty() || who.isEmpty()) return;
+        boolean[] taken = new boolean[list.size()];
+        for (int k = 0; k < groupLane.length; k++) {
+            double lane = groupLane[k];
+            List<Integer> order = new ArrayList<>(list.size());
+            for (int i = 0; i < list.size(); i++) order.add(i);
+            order.sort(Comparator.comparingDouble(i -> Math.abs(front.lateral(list.get(i)) - lane))); // tri stable : 1re rangée d'abord
+            int next = 0;
+            for (Inhabitant g : who) {
+                if (guardGroup.getOrDefault(g.id, 0) != k) continue;
+                while (next < order.size() && taken[order.get(next)]) next++;
+                int index = next < order.size() ? order.get(next) : order.get(Math.floorMod(g.id, order.size())); // plus de place : on double
+                taken[index] = true;
+                posts.put(g.id, list.get(index));
+            }
+        }
+    }
+
+    /** Poste du front le plus proche (sur la largeur) de la position lane ; le ralliement s'il n'y en a pas. */
+    private static Location nearestOnFront(SiegeFront f, double lane) {
+        Location best = f.rally();
+        double bestGap = Double.MAX_VALUE;
+        for (Location l : !f.melee().isEmpty() ? f.melee() : f.ranged()) {
+            double gap = Math.abs(f.lateral(l) - lane);
+            if (gap < bestGap) { bestGap = gap; best = l; }
+        }
+        return best;
+    }
+
+    /**
+     * Relevé du champ de bataille, à chaque passage : vague en cours, escouades présentes (une
+     * seule demande au siège), gardes au contact de chaque ennemi (recomptés à partir des
+     * adversaires en cours), et escouade affrontée par chaque groupe.
+     */
+    private void refreshBattle() {
+        assaulting = front != null && siegeAssault != null && siegeAssault.getAsBoolean();
+        bands = assaulting && siegeBands != null ? siegeBands.get() : List.of();
+        if (bands.isEmpty()) {
+            attackersNow = List.of();
+        } else {
+            List<LivingEntity> everyone = new ArrayList<>();
+            for (SiegeFront.Band b : bands) everyone.addAll(b.members());
+            attackersNow = everyone;
+        }
+        meleeTally.clear();
+        fightTarget.entrySet().removeIf(e -> {
+            Inhabitant g = all.get(e.getKey());
+            LivingEntity t = e.getValue();
+            return g == null || g.state != State.SOLDAT || t == null || t.isDead() || !t.isValid();
+        });
+        for (Map.Entry<Integer, LivingEntity> e : fightTarget.entrySet()) {
+            GuardConfig.Role r = guard.role(all.get(e.getKey()).role);
+            if (r == null || !r.ranged()) meleeTally.add(e.getValue()); // seuls ceux au contact comptent
+        }
+        if (assaulting) matchBands(); else groupBand.clear();
+    }
+
+    /**
+     * Chaque groupe de la garde va à la rencontre d'une escouade : la plus proche du centre de son
+     * secteur, une escouade déjà prise par un autre groupe comptant comme plus lointaine (les
+     * groupes se répartissent). Un groupe garde son escouade tant qu'elle existe, sauf si une
+     * autre est nettement plus proche (revu toutes les 2 s).
+     */
+    private void matchBands() {
+        if (bands.isEmpty() || groupLane.length == 0) { groupBand.clear(); return; }
+        Set<Integer> present = new HashSet<>();
+        for (SiegeFront.Band b : bands) present.add(b.id());
+        groupBand.values().removeIf(id -> !present.contains(id));
+        boolean due = ticks % 4 == 0;
+        Map<Integer, Integer> load = new HashMap<>();
+        for (int id : groupBand.values()) load.merge(id, 1, Integer::sum);
+        for (int k = 0; k < groupLane.length; k++) {
+            Integer current = groupBand.get(k);
+            if (current != null && !due) continue;
+            Location anchor = groupAnchor[k] != null ? groupAnchor[k] : front.rally();
+            if (current != null) load.merge(current, -1, Integer::sum);
+            int bestId = Integer.MIN_VALUE;
+            double bestScore = Double.MAX_VALUE, currentScore = Double.MAX_VALUE;
+            for (SiegeFront.Band b : bands) {
+                if (!b.center().getWorld().equals(anchor.getWorld())) continue;
+                double score = b.center().distance(anchor) + 24 * load.getOrDefault(b.id(), 0);
+                if (current != null && b.id() == current) currentScore = score - 12; // il ne change pas pour si peu
+                if (score < bestScore) { bestScore = score; bestId = b.id(); }
+            }
+            int chosen = current != null && currentScore <= bestScore ? current : bestId;
+            if (chosen == Integer.MIN_VALUE) { groupBand.remove(k); continue; }
+            groupBand.put(k, chosen);
+            load.merge(chosen, 1, Integer::sum);
+        }
+    }
+
+    /** Fin de siège (ou plus de front) : postes, groupes, escouades et mêlées oubliés. */
+    private void clearBattle() {
+        posts.clear();
+        goals.clear();
+        front = null;
+        postedRoster = Set.of();
+        guardGroup.clear();
+        groupBand.clear();
+        groupLane = new double[0];
+        groupAnchor = new Location[0];
+        assaulting = false;
+        bands = List.of();
+        attackersNow = List.of();
+        nextPick.clear();
+        supportGoal.clear();
     }
 
     /**
      * Ennemi vivant le plus proche, à portée de vue et dans la ville (ou n'importe où si
      * outside) : monstre hostile (zombie, squelette, pillard…) ou soldat d'une armée ennemie.
+     * Un garde au contact laisse de côté un ennemi déjà serré par soldats.max-par-cible gardes.
      */
-    private LivingEntity nearestEnemy(LivingEntity from, boolean outside) {
+    private LivingEntity nearestEnemy(Inhabitant inh, LivingEntity from, boolean archer, boolean outside) {
         double r = guard.sight();
+        int cap = archer ? 0 : guard.maxPerTarget();
+        LivingEntity current = fightTarget.get(inh.id);
         LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
         for (Entity e : from.getNearbyEntities(r, 8, r)) {
@@ -1428,6 +1683,7 @@ public class InhabitantManager implements Listener {
             boolean monster = e instanceof Enemy && e instanceof Mob && !e.hasMetadata("NPC");
             if ((!soldier && !monster) || !(e instanceof LivingEntity le) || le.isDead()) continue;
             if (!outside && !claims.isClaimed(le.getLocation())) continue;
+            if (cap > 0 && meleeTally.count(le) - (le == current ? 1 : 0) >= cap) continue; // assez entouré
             double d = le.getLocation().distanceSquared(from.getLocation());
             if (d < bestDist) { bestDist = d; best = le; }
         }
@@ -1792,7 +2048,7 @@ public class InhabitantManager implements Listener {
         }
         player.sendMessage("§8Rôles : " + String.join(", ", guard.roles().stream()
                 .map(r -> r.key() + (r.rank() > 1 ? " (rang " + r.rank() + ")" : "")).toList())
-                + " — former : /city garde former <habitant> <rôle>");
+                + " — former : chez §6Roland§8, Actions → La garde");
     }
 
     /** Fait mourir un habitant ou un garde (test) ; false s'il est introuvable. */
@@ -1818,13 +2074,14 @@ public class InhabitantManager implements Listener {
     }
 
     /**
-     * Assaut : pendant une vague (assault vrai), les gardes quittent le front et sortent de la ville
-     * combattre les assaillants (attackers) ; pendant l'alerte et les répits, ils tiennent le front.
+     * Assaut : pendant une vague (assault vrai), les gardes quittent le front et sortent de la ville,
+     * groupe par groupe, à la rencontre des escouades d'assaillants (bands, relues une fois par
+     * passage) ; pendant l'alerte et les répits, ils tiennent le front.
      */
     public void setSiegeAssault(java.util.function.BooleanSupplier assault,
-                                java.util.function.Supplier<List<LivingEntity>> attackers) {
+                                java.util.function.Supplier<List<SiegeFront.Band>> bands) {
         this.siegeAssault = assault;
-        this.siegeAttackers = attackers;
+        this.siegeBands = bands;
     }
 
     /** Reconnaît les soldats d'une armée ennemie : les gardes les combattent, ils peuvent blesser les habitants. */
@@ -1834,9 +2091,7 @@ public class InhabitantManager implements Listener {
 
     /** Fin d'un siège : les gardes quittent le front et rentrent vers leur quartier, puis reprennent leur ronde. */
     public void siegeEnded() {
-        posts.clear();
-        goals.clear();
-        front = null;
+        clearBattle();
         long until = System.currentTimeMillis() + 90_000;
         for (Inhabitant g : guards()) {
             NPC npc = npcs.get(g.id);

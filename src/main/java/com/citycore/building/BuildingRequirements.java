@@ -173,9 +173,14 @@ public final class BuildingRequirements {
     private List<Need> needs(String owner, List<Map<?, ?>> list, boolean required) {
         List<Need> out = new ArrayList<>();
         for (Map<?, ?> m : list) {
+            // Contenu facultatif : bloc compté seulement avec (ou sans) un mod
+            if (!com.citycore.integration.ModIntegrations.allows(text(m.get("avec-mod")), text(m.get("sans-mod")))) continue;
             String block = String.valueOf(m.get("bloc"));
             Set<Material> mats = resolve(block);
             if (mats.isEmpty()) {
+                // Bloc d'un mod absent : ignoré sans alerte (le mod présent, c'est une erreur d'identifiant)
+                String ns = com.citycore.integration.ItemIds.namespace(block.replace("#", ""));
+                if (!ns.equals("minecraft") && !com.citycore.integration.ModIntegrations.present(ns)) continue;
                 warn(owner + " : bloc inconnu « " + block + " » ignoré");
                 continue;
             }
@@ -205,12 +210,19 @@ public final class BuildingRequirements {
                         : NamespacedKey.minecraft(name.toLowerCase(Locale.ROOT));
                 Tag<Material> tag = key == null ? null : Bukkit.getTag(Tag.REGISTRY_BLOCKS, key, Material.class);
                 if (tag != null) out.addAll(tag.getValues());
+            } else if (token.contains("*") || com.citycore.integration.ItemIds.isModId(token)) {
+                // Blocs de mods (« tide:angling_table ») et motifs (« furniture:lamp_* »)
+                for (Material mat : MaterialGroups.resolveAny(token)) if (mat.isBlock()) out.add(mat);
             } else {
                 Material mat = Material.matchMaterial(token);
                 if (mat != null) out.add(mat);
             }
         }
         return out;
+    }
+
+    private static String text(Object o) {
+        return o == null ? null : o.toString();
     }
 
     private void warn(String message) {

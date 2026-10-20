@@ -2,6 +2,7 @@ package com.citycore.command;
 
 import com.citycore.building.*;
 import com.citycore.city.City;
+import com.citycore.city.ParcelActions;
 import com.citycore.npc.*;
 import com.citycore.npc.villager.VillagerGUI;
 import com.citycore.player.PlayerDataManager;
@@ -96,6 +97,20 @@ public class CityCommand implements CommandExecutor {
         this.jobs = jobs;
     }
 
+    /** Mods du serveur hybride (/city mods, admin). */
+    private com.citycore.integration.ModIntegrations modIntegrations;
+
+    public void setModIntegrations(com.citycore.integration.ModIntegrations modIntegrations) {
+        this.modIntegrations = modIntegrations;
+    }
+
+    /** Parcelles de la ville sur les cartes JourneyMap (/city carte, admin). */
+    private com.citycore.city.CityMapExport mapExport;
+
+    public void setMapExport(com.citycore.city.CityMapExport mapExport) {
+        this.mapExport = mapExport;
+    }
+
     /** Besoins et satisfaction des habitants (phase 6). */
     public void setNeeds(com.citycore.needs.NeedsManager needs) {
         this.needs = needs;
@@ -124,6 +139,13 @@ public class CityCommand implements CommandExecutor {
     /** Menu illustré « Quêtes suivies » (/city quests). */
     public void setQuestTracking(com.citycore.ui.screens.QuestTrackingScreen questTracking) {
         this.questTracking = questTracking;
+    }
+
+    /** Où sont-ils ? (/city locate) : carte de Valmont et position des personnages. */
+    private com.citycore.ui.screens.LocateScreens locate;
+
+    public void setLocate(com.citycore.ui.screens.LocateScreens locate) {
+        this.locate = locate;
     }
 
     /** Arbre de progression (/city progression). */
@@ -169,18 +191,82 @@ public class CityCommand implements CommandExecutor {
         else plugin.getLogger().warning("Vault/Economy introuvable.");
     }
 
+    /* =========================
+       DROITS (voir CityPermissions et plugin.yml)
+       Un joueur passe par les habitants pour tout ce qu'ils savent faire : la commande ne lui
+       laisse que les consultations et le confort ; les administrateurs ont tout.
+       ========================= */
+
+    /** Où former et renvoyer les gardes (écran illustré de Roland). */
+    private static final String GUARD_HINT = "Parlez à §9Roland §7: cliquez sur son portrait, puis « Actions » → « La garde ».";
+
+    /** Le joueur voit-il les écrans illustrés (sans eux, certaines commandes restent son seul accès) ? */
+    private boolean illustrated(Player player) {
+        return player != null && uiPack != null && uiPack.isReady(player);
+    }
+
+    /**
+     * /city build pour un joueur sans citycore.admin.batiments : inspection et bordures, le bâton
+     * de création (skip) ; new et type seulement depuis les boutons du chat qu'Alderic vient de
+     * proposer (menus classiques). Le reste se fait chez Alderic ou chez l'artisan.
+     * @return true si l'action est permise (sinon le joueur est renvoyé vers le bon PNJ)
+     */
+    private boolean playerBuildAction(Player player, String[] args) {
+        String action = args.length < 2 ? "" : args[1].toLowerCase(java.util.Locale.ROOT);
+        switch (action) {
+            case "inspect", "inspecter", "show", "skip" -> { return true; }
+            case "new" -> {
+                if (buildingCreation != null && buildingCreation.hasChatChoice(player, null)) return true;
+                CityPermissions.deny(player, "Parlez à §6Alderic §7(Maire) → « Bâtiments » → « Ajouter un bâtiment ».");
+            }
+            case "type" -> {
+                if (args.length >= 3 && buildingCreation != null && buildingCreation.hasChatChoice(player, args[2])) return true;
+                CityPermissions.deny(player, "Parlez à §6Alderic §7(Maire) → « Bâtiments » → §fclic droit §7sur le bâtiment.");
+            }
+            case "remove" -> CityPermissions.deny(player,
+                    "Parlez à §6Alderic §7(Maire) → « Bâtiments » → « Supprimer un bâtiment ».");
+            case "assign" -> CityPermissions.deny(player,
+                    "Parlez à l'artisan lui-même → « Choisir son logis » §8(« Chercher un bâtiment » en menus classiques)§7.");
+            case "hauteur", "height" -> {
+                player.sendMessage("§c❌ Réglage d'administration : la zone en hauteur d'un bâtiment se règle seule"
+                        + " à sa création, et la hauteur construite se mesure à chaque inspection.");
+            }
+            case "" -> CityPermissions.deny(player, "Les bâtiments se gèrent chez §6Alderic §7(Maire) → « Bâtiments »."
+                    + "\n§7En commande : §f/city build inspect [nom] §7· §f/city build show");
+            default -> player.sendMessage("§cUsage : /city " + CitySubCommand.BUILD.usageFor(player));
+        }
+        return false;
+    }
+
+    /** Message d'une action réservée à un joueur (position, menu…) demandée depuis la console. */
+    private static boolean inGameOnly(CommandSender sender, Player player) {
+        if (player != null) return false;
+        sender.sendMessage("§cEn jeu seulement.");
+        return true;
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command,
                              String label, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("Commande joueur uniquement.");
-            return true;
-        }
-
-        if (args.length == 0) { sendHelp(player); return true; }
+        if (args.length == 0) { sendHelp(sender); return true; }
 
         CitySubCommand sub = CitySubCommand.fromLabel(args[0]);
-        if (sub == null) { sendHelp(player); return true; }
+        if (sub == null) { sendHelp(sender); return true; }
+
+        // ── Droit d'utiliser la sous-commande : sinon, le PNJ qui s'en charge ──
+        if (!CityPermissions.canUse(sender, sub)) {
+            CityPermissions.deny(sender, sub.rights.npcHint());
+            return true;
+        }
+        // ── Console : seulement les sous-commandes sans position ni menu ──
+        Player player = sender instanceof Player p ? p : null;
+        if (player == null && !sub.rights.console()) {
+            sender.sendMessage("Commande joueur uniquement. Depuis la console : " + String.join(", ",
+                    Arrays.stream(CitySubCommand.values()).filter(c -> c.rights.console()).map(c -> c.label).toList()) + ".");
+            return true;
+        }
+        // Actions d'administration et de test de cette sous-commande (nœud citycore.admin.*)
+        boolean admin = CityPermissions.isAdmin(sender, sub);
 
         try {
             switch (sub) {
@@ -201,79 +287,30 @@ public class CityCommand implements CommandExecutor {
                     player.sendMessage("§7👴 Le §6Maire §7est apparu devant vous.");
                 }
 
-                // ── /city claim ──────────────────────────────────
-                case CLAIM -> {
-                    if (!cityManager.isCityInitialized()) {
-                        player.sendMessage("§c❌ Aucune ville fondée.");
-                        return true;
-                    }
-                    Chunk chunk = player.getLocation().getChunk();
-                    if (cityManager.isChunkClaimed(chunk)) {
-                        player.sendMessage("§c❌ Ce chunk est déjà claimé.");
-                        return true;
-                    }
-                    if (!cityManager.isAdjacentToClaimed(chunk)) {
-                        player.sendMessage("§c❌ Ce chunk doit être adjacent à un chunk déjà claimé.");
-                        return true;
-                    }
-                    if (!cityManager.canClaimChunk()) {
-                        int price = cityManager.getNextExpandPrice();
-                        player.sendMessage("§c❌ Limite atteinte §7(§f"
-                                + cityManager.getClaimedChunkCount() + "§7/§f"
-                                + cityManager.getMaxChunks() + "§7).");
-                        player.sendMessage("§7💡 §e/city expand §7pour +1 slot · prix : §6"
-                                + price + " coins");
-                        return true;
-                    }
-                    cityManager.claimChunk(chunk);
-                    player.sendMessage("§a✅ Chunk claimé ! §7(§f"
-                            + cityManager.getClaimedChunkCount() + "§7/§f"
-                            + cityManager.getMaxChunks() + "§7)");
-                }
+                // ── /city claim (admin ; joueurs : barre « Parcelles » d'Alderic) ──
+                case CLAIM -> ParcelActions.claimHere(cityManager, player);
 
-                // ── /city unclaim ────────────────────────────────
-                case UNCLAIM -> {
-                    if (!cityManager.isCityInitialized()) {
-                        player.sendMessage("§c❌ Aucune ville fondée.");
-                        return true;
-                    }
-                    Chunk chunk = player.getLocation().getChunk();
-                    if (!cityManager.isChunkClaimed(chunk)) {
-                        player.sendMessage("§c❌ Ce chunk n'appartient pas à la ville.");
-                        return true;
-                    }
-                    if (cityManager.getClaimedChunkCount() <= 1) {
-                        player.sendMessage("§c❌ Impossible de retirer le dernier chunk.");
-                        return true;
-                    }
-                    cityManager.unclaimChunk(chunk);
-                    player.sendMessage("§e🗑 Chunk retiré. §7(§f"
-                            + cityManager.getClaimedChunkCount() + "§7/§f"
-                            + cityManager.getMaxChunks() + "§7)");
-                }
+                // ── /city unclaim (admin ; joueurs : barre « Parcelles » d'Alderic) ──
+                case UNCLAIM -> ParcelActions.unclaimHere(cityManager, buildingManager, player);
 
-                // ── /city expand ─────────────────────────────────
+                // ── /city expand (admin ; joueurs : « Agrandir la ville » chez Alderic) ──
                 case EXPAND -> {
-                    if (!player.isOp()) {
-                        player.sendMessage("§c❌ Parlez au §6Maire §cpour agrandir la ville.");
-                        return true;
-                    }
                     if (!cityManager.isCityInitialized()) {
-                        player.sendMessage("§c❌ Aucune ville fondée.");
+                        sender.sendMessage("§c❌ Aucune ville fondée.");
                         return true;
                     }
                     int price   = cityManager.getNextExpandPrice();
                     int balance = cityManager.getCityCoins();
-                    player.sendMessage("§7Prix : §6" + price
+                    sender.sendMessage("§7Prix : §6" + price
                             + " coins §7· Caisse : §6" + balance + " coins");
                     CityManager.ExpandResult result = cityManager.expandMaxChunks();
                     if (result.success()) {
-                        player.sendMessage("§a✅ Capacité étendue ! §7Max : §f"
+                        sender.sendMessage("§a✅ Capacité étendue ! §7Max : §f"
                                 + result.newMaxChunks());
-                        player.sendMessage("§7Caisse restante : §6"
+                        sender.sendMessage("§7Caisse restante : §6"
                                 + result.newBalance() + " coins");
                     } else {
-                        player.sendMessage("§c❌ Fonds insuffisants. Il manque §f"
+                        sender.sendMessage("§c❌ Fonds insuffisants. Il manque §f"
                                 + (price - balance) + " coins.");
                     }
                 }
@@ -328,28 +365,36 @@ public class CityCommand implements CommandExecutor {
                 case INFO -> {
                     City city = cityManager.getCity();
                     if (city == null) {
-                        player.sendMessage("§c❌ Aucune ville fondée.");
+                        sender.sendMessage("§c❌ Aucune ville fondée.");
                         return true;
                     }
-                    player.sendMessage("§8§m--------------------");
-                    player.sendMessage("§6 " + city.getName());
-                    player.sendMessage("§8§m--------------------");
-                    player.sendMessage("§eNiveau  : §f" + city.getLevel());
-                    player.sendMessage("§eCaisse  : §6" + city.getCoins() + " coins");
-                    player.sendMessage("§eChunks  : §f" + city.getClaimedChunks()
+                    sender.sendMessage("§8§m--------------------");
+                    sender.sendMessage("§6 " + city.getName());
+                    sender.sendMessage("§8§m--------------------");
+                    sender.sendMessage("§eNiveau  : §f" + city.getLevel());
+                    sender.sendMessage("§eCaisse  : §6" + city.getCoins() + " coins");
+                    sender.sendMessage("§eChunks  : §f" + city.getClaimedChunks()
                             + " §7/ §f" + city.getMaxChunks());
-                    player.sendMessage("§eExpand  : §6" + cityManager.getNextExpandPrice()
+                    sender.sendMessage("§eExpand  : §6" + cityManager.getNextExpandPrice()
                             + " coins §7pour +1 slot");
-                    player.sendMessage("§8§m--------------------");
+                    sender.sendMessage("§8§m--------------------");
                 }
 
                 // ── /city quests ─────────────────────────────────
                 case QUESTS -> {
-                    // /city quests toggle : affiche ou masque le suivi ; /city quests recits : onglet
-                    // des récits ; sinon onglet du suivi (menu illustré, ou classique sans le pack)
+                    // /city quests toggle [visible|accroche|masque] : fait défiler (ou choisit) l'affichage
+                    // du suivi, gardé dans les préférences du joueur ; /city quests recits : onglet des
+                    // récits ; sinon onglet du suivi (menu illustré, ou classique sans le pack)
                     String option = args.length > 1 ? args[1].toLowerCase(java.util.Locale.ROOT) : "";
                     switch (option) {
-                        case "toggle" -> questHUD.toggle(player);
+                        case "toggle" -> {
+                            QuestHUD.Mode chosen = args.length > 2 ? QuestHUD.Mode.parse(args[2]) : null;
+                            if (args.length > 2 && chosen == null) {
+                                player.sendMessage("§c❌ Affichage inconnu : §fvisible§c, §faccroche §cou §fmasque§c.");
+                                return true;
+                            }
+                            questHUD.toggle(player, chosen);
+                        }
                         case "recits", "récits" -> {
                             if (questTracking == null || !questTracking.openStories(player)) questSelectionGUI.openStories(player);
                         }
@@ -357,6 +402,26 @@ public class CityCommand implements CommandExecutor {
                             if (questTracking == null || !questTracking.open(player)) questSelectionGUI.open(player);
                         }
                     }
+                }
+
+                // ── /city locate [personnage] : où sont-ils ? (carte illustrée, sinon texte) ──
+                case LOCATE -> {
+                    if (locate == null) return true;
+                    com.citycore.npc.CityNPC focus = null;
+                    if (args.length > 1) {
+                        String name = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+                        focus = locate.find(name);
+                        if (focus == null) {
+                            player.sendMessage("§c❌ Personnage inconnu : §f" + name);
+                            return true;
+                        }
+                        if (!locate.discovered(focus)) {
+                            player.sendMessage("§7🔒 " + focus.displayName.replaceAll("§.", "")
+                                    + " §7n'est pas encore arrivé à Valmont.");
+                            focus = null;
+                        }
+                    }
+                    if (!locate.open(player, focus)) locate.report(player);
                 }
 
                 // ── /city progression ────────────────────────────
@@ -391,80 +456,81 @@ public class CityCommand implements CommandExecutor {
                 }
 
                 case ECO -> {
-                    if (!player.isOp()) {
-                        player.sendMessage("§c❌ Réservé aux admins.");
-                        return true;
-                    }
                     if (economyCheck == null) return true;
                     List<String> warnings = economyCheck.get();
                     if (warnings.isEmpty()) {
-                        player.sendMessage("§a✅ Économie saine : aucun arbitrage achat → craft → revente.");
+                        sender.sendMessage("§a✅ Économie saine : aucun arbitrage achat → craft → revente.");
                     } else {
-                        player.sendMessage("§6⚠ " + warnings.size() + " alerte(s) économiques :");
-                        warnings.stream().limit(15).forEach(w -> player.sendMessage("§7- §e" + w));
-                        if (warnings.size() > 15) player.sendMessage("§8… voir la console pour la suite.");
+                        sender.sendMessage("§6⚠ " + warnings.size() + " alerte(s) économiques :");
+                        warnings.stream().limit(15).forEach(w -> sender.sendMessage("§7- §e" + w));
+                        if (warnings.size() > 15) sender.sendMessage("§8… voir la console pour la suite.");
                         warnings.forEach(w -> plugin.getLogger().warning("⚠ [Économie] " + w));
                     }
                     // Équilibrage (phase 6) : revenus de l'impôt face aux chartes restantes
                     if (needs != null && inhabitants != null && cityQuestManager != null) {
                         needs.economyLines(cityQuestManager.getCityLevel(), inhabitants.taxPerInhabitant())
-                                .forEach(player::sendMessage);
+                                .forEach(sender::sendMessage);
                     }
                 }
 
                 // ── /city habitants (phase 3) ────────────────────
+                // Liste et besoins pour tous (comme l'écran « Population » d'Alderic) ; le reste : tests (admin)
                 case HABITANTS -> {
                     if (inhabitants == null) return true;
                     String action = args.length >= 2 ? args[1].toLowerCase() : "list";
-                    if (!action.equals("list") && !action.equals("besoins") && !player.isOp()) {
-                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                    if (!admin && !List.of("list", "liste", "besoins", "satisfaction").contains(action)) {
+                        CityPermissions.deny(sender, null);
                         return true;
                     }
                     switch (action) {
-                        case "list", "liste" -> inhabitants.list(player);
-                        case "arrivee", "arrivée" -> player.sendMessage(inhabitants.arrive()
+                        case "list", "liste" -> {
+                            if (inGameOnly(sender, player)) return true;
+                            inhabitants.list(player);
+                        }
+                        case "arrivee", "arrivée" -> sender.sendMessage(inhabitants.arrive()
                                 ? "§a✅ Un habitant arrive." : "§7Aucun lit libre dans une habitation conforme.");
                         case "kill", "tuer" -> {
                             if (args.length < 3) {
-                                player.sendMessage("§cUsage : /city habitants kill <nom>");
+                                sender.sendMessage("§cUsage : /city habitants kill <nom>");
                                 return true;
                             }
                             String target = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
-                            if (!inhabitants.kill(target)) player.sendMessage("§c❌ Habitant §f" + target + " §cintrouvable.");
+                            if (!inhabitants.kill(target)) sender.sendMessage("§c❌ Habitant §f" + target + " §cintrouvable.");
                         }
                         case "impot", "impôt" -> {
                             int paid = inhabitants.payTax();
-                            if (paid == 0) player.sendMessage("§7Aucun habitant : aucun impôt versé.");
+                            if (paid == 0) sender.sendMessage("§7Aucun habitant : aucun impôt versé.");
                         }
-                        // Besoins (phase 6) : bilan pour tous ; « aube » (op) déclenche repas, soins, impôt et départs
+                        // Besoins (phase 6) : bilan pour tous ; « aube » (admin) déclenche repas, soins et impôt
                         case "besoins", "satisfaction" -> {
-                            if (needs != null) needs.report().forEach(player::sendMessage);
+                            if (needs != null) needs.report().forEach(sender::sendMessage);
                         }
                         case "aube" -> {
                             int paid = inhabitants.dawn();
-                            if (paid == 0) player.sendMessage("§7Aube passée : aucun impôt versé.");
+                            if (paid == 0) sender.sendMessage("§7Aube passée : aucun impôt versé.");
                         }
-                        case "deuil" -> player.sendMessage("§a✅ " + inhabitants.endAllMourning()
+                        case "deuil" -> sender.sendMessage("§a✅ " + inhabitants.endAllMourning()
                                 + " lit(s) libéré(s) : de nouveaux habitants pourront arriver.");
                         case "recharger", "reload" -> {
                             inhabitants.loadSettings();
                             if (needs != null) needs.config().reload();
-                            player.sendMessage("§a✅ Réglages des habitants et de leurs besoins relus (sections habitants et besoins).");
+                            sender.sendMessage("§a✅ Réglages des habitants et de leurs besoins relus (sections habitants et besoins).");
                         }
-                        default -> player.sendMessage("§cUsage : /city habitants [list|besoins|arrivee|kill <nom>|impot|aube|deuil|recharger]");
+                        default -> sender.sendMessage("§cUsage : /city " + sub.usageFor(sender));
                     }
                 }
 
                 // ── /city siege (phase 4) ────────────────────────
+                // État pour tous ; lancer, arrêter, vague suivante : admin (citycore.admin.evenements)
                 case SIEGE -> {
                     if (siege == null) return true;
                     String action = args.length >= 2 ? args[1].toLowerCase() : "etat";
-                    if (!action.equals("etat") && !action.equals("état") && !player.isOp()) {
-                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                    if (!admin && !List.of("etat", "état", "status").contains(action)) {
+                        CityPermissions.deny(sender, null);
                         return true;
                     }
                     switch (action) {
-                        case "etat", "état", "status" -> siege.status().forEach(player::sendMessage);
+                        case "etat", "état", "status" -> siege.status().forEach(sender::sendMessage);
                         case "start", "lancer" -> {
                             // /city siege start [palier] [monstres|banniere] (dans n'importe quel ordre)
                             Integer tier = null;
@@ -475,119 +541,149 @@ public class CityCommand implements CommandExecutor {
                                 try {
                                     tier = Integer.parseInt(args[i]);
                                 } catch (NumberFormatException e) {
-                                    player.sendMessage("§cUsage : /city siege start [palier 1-10] [monstres|banniere]");
+                                    sender.sendMessage("§cUsage : /city siege start [palier 1-10] [monstres|banniere]");
                                     return true;
                                 }
                             }
                             String err = siege.begin(tier, true, kind);
-                            if (err != null) player.sendMessage("§c❌ " + err);
+                            if (err != null) sender.sendMessage("§c❌ " + err);
                         }
                         case "stop", "arreter", "arrêter" -> {
-                            if (!siege.stop()) player.sendMessage("§7Aucun siège en cours.");
+                            if (!siege.stop()) sender.sendMessage("§7Aucun siège en cours.");
                         }
                         case "next", "suivante" -> {
-                            if (!siege.skipWave()) player.sendMessage("§7Aucun siège en cours.");
+                            if (!siege.skipWave()) sender.sendMessage("§7Aucun siège en cours.");
                         }
-                        default -> player.sendMessage("§cUsage : /city siege [start [palier]|stop|next]");
+                        default -> sender.sendMessage("§cUsage : /city siege [start [palier]|stop|next]");
                     }
                 }
 
                 // ── /city event (phase 4) ────────────────────────
+                // Planning pour tous ; lancer, arrêter, recharger : admin (citycore.admin.evenements)
                 case EVENT -> {
                     if (calendar == null) return true;
                     String action = args.length >= 2 ? args[1].toLowerCase() : "list";
-                    if (!action.equals("list") && !action.equals("liste") && !player.isOp()) {
-                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                    if (!admin && !List.of("list", "liste").contains(action)) {
+                        CityPermissions.deny(sender, null);
                         return true;
                     }
                     switch (action) {
-                        case "list", "liste" -> calendar.listing().forEach(player::sendMessage);
+                        case "list", "liste" -> calendar.listing().forEach(sender::sendMessage);
                         case "start", "lancer" -> {
                             com.citycore.siege.EventCalendar.Event event = calendar.event(args.length >= 3 ? args[2] : "siege");
                             if (event == null) {
-                                player.sendMessage("§c❌ Type inconnu. Types : " + String.join(", ", calendar.types()));
+                                sender.sendMessage("§c❌ Type inconnu. Types : " + String.join(", ", calendar.types()));
                                 return true;
                             }
                             String err = event.start();
-                            if (err != null) player.sendMessage("§c❌ " + err);
+                            if (err != null) sender.sendMessage("§c❌ " + err);
                         }
                         case "stop", "arreter", "arrêter" -> {
                             boolean stopped = false;
                             for (String type : calendar.types()) stopped |= calendar.event(type).stop();
-                            if (!stopped) player.sendMessage("§7Aucun événement en cours.");
+                            if (!stopped) sender.sendMessage("§7Aucun événement en cours.");
                         }
                         case "recharger", "reload" -> {
                             calendar.reload();
                             siege.reload();
-                            player.sendMessage("§a✅ Calendrier et réglages des sièges relus (sections evenements et sieges).");
+                            sender.sendMessage("§a✅ Calendrier et réglages des sièges relus (sections evenements et sieges).");
                         }
-                        default -> player.sendMessage("§cUsage : /city event [list|start <type>|stop|recharger]");
+                        default -> sender.sendMessage("§cUsage : /city event [list|start <type>|stop|recharger]");
                     }
                 }
 
                 // ── /city emplois ────────────────────────────────
+                // Bilan pour tous (embauches : chez l'artisan, Actions → Employés) ; produire, recharger : admin
                 case EMPLOIS -> {
                     if (jobs == null || inhabitants == null) return true;
                     String action = args.length >= 2 ? args[1].toLowerCase() : "list";
-                    if (!action.equals("list") && !action.equals("liste") && !player.isOp()) {
-                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                    if (!admin && !List.of("list", "liste").contains(action)) {
+                        CityPermissions.deny(sender, null);
                         return true;
                     }
                     switch (action) {
-                        case "list", "liste" -> jobs.report().forEach(player::sendMessage);
-                        case "produire" -> player.sendMessage("§a✅ Cycles de travail terminés : §f"
+                        case "list", "liste" -> jobs.report().forEach(sender::sendMessage);
+                        case "produire" -> sender.sendMessage("§a✅ Cycles de travail terminés : §f"
                                 + inhabitants.finishWorkNow() + " §aobjet(s) produit(s) dans les entrepôts.");
                         case "recharger", "reload" -> {
                             jobs.config().reload();
-                            player.sendMessage("§a✅ Réglages des emplois relus (section emplois de config.yml).");
+                            sender.sendMessage("§a✅ Réglages des emplois relus (section emplois de config.yml).");
                         }
-                        default -> player.sendMessage("§cUsage : /city emplois [list|produire|recharger]");
+                        default -> sender.sendMessage("§cUsage : /city emplois [list|produire|recharger]");
+                    }
+                }
+
+                // ── /city mods : mods présents ou absents, personnages concernés (admin, console aussi) ──
+                case MODS -> {
+                    if (modIntegrations != null) modIntegrations.report().forEach(sender::sendMessage);
+                }
+
+                // ── /city carte : parcelles sur les cartes JourneyMap (admin, console aussi) ──
+                case CARTE -> {
+                    if (mapExport == null) return true;
+                    String action = args.length >= 2 ? args[1].toLowerCase() : "etat";
+                    switch (action) {
+                        case "etat", "état" -> mapExport.report().forEach(sender::sendMessage);
+                        case "recharger", "reload" -> {
+                            mapExport.reload();
+                            mapExport.export();
+                            sender.sendMessage("§a✅ Réglages de la carte relus (section carte de config.yml) ; "
+                                    + "les cartes suivent dans les 2 s.");
+                        }
+                        default -> sender.sendMessage("§cUsage : /city " + CitySubCommand.CARTE.usage);
                     }
                 }
 
                 // ── /city garde (phase 5) ────────────────────────
-                // Même chose que le menu de Roland (commun à tous) ; fin et kill sont des actions de test
+                // Liste pour tous. Former et renvoyer se font chez Roland (écran « La garde ») : la commande
+                // ne reste ouverte aux joueurs que sans les écrans illustrés (Roland n'a pas d'écran classique
+                // de la garde). Fin, kill et test sont des actions de test (admin).
                 case GARDE -> {
                     if (inhabitants == null) return true;
                     String action = args.length >= 2 ? args[1].toLowerCase() : "list";
-                    if ((action.equals("fin") || action.equals("kill") || action.equals("tuer") || action.equals("test"))
-                            && !player.isOp()) {
-                        player.sendMessage("§c❌ Réservé aux admins (actions de test).");
+                    boolean rolandMenu = List.of("former", "train", "renvoyer", "dismiss").contains(action);
+                    if (!admin && !List.of("list", "liste").contains(action)
+                            && (!rolandMenu || illustrated(player))) {
+                        CityPermissions.deny(sender, rolandMenu ? GUARD_HINT : null);
                         return true;
                     }
                     switch (action) {
-                        case "list", "liste" -> inhabitants.listGuard(player);
+                        case "list", "liste" -> {
+                            if (inGameOnly(sender, player)) return true;
+                            inhabitants.listGuard(player);
+                        }
                         case "former", "train" -> {
                             if (args.length < 4) {
-                                player.sendMessage("§cUsage : /city garde former <habitant> <rôle>");
+                                sender.sendMessage("§cUsage : /city garde former <habitant> <rôle>");
                                 return true;
                             }
                             // Le rôle est le dernier mot, le nom peut en contenir plusieurs (« Jehan 2 »)
                             String name = String.join(" ", Arrays.copyOfRange(args, 2, args.length - 1));
                             com.citycore.inhabitant.InhabitantManager.Inhabitant inh = inhabitants.byName(name);
                             if (inh == null) {
-                                player.sendMessage("§c❌ Habitant §f" + name + " §cintrouvable.");
+                                sender.sendMessage("§c❌ Habitant §f" + name + " §cintrouvable.");
                                 return true;
                             }
                             String err = inhabitants.train(inh.id, args[args.length - 1].toLowerCase());
-                            if (err != null) player.sendMessage("§c❌ " + err);
+                            if (err != null) sender.sendMessage("§c❌ " + err);
                         }
                         case "renvoyer", "dismiss" -> {
                             if (args.length < 3) {
-                                player.sendMessage("§cUsage : /city garde renvoyer <nom>");
+                                sender.sendMessage("§cUsage : /city garde renvoyer <nom>");
                                 return true;
                             }
                             String name = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
                             com.citycore.inhabitant.InhabitantManager.Inhabitant inh = inhabitants.byName(name);
                             String err = inh == null ? "Garde " + name + " introuvable." : inhabitants.dismiss(inh.id);
-                            if (err != null) player.sendMessage("§c❌ " + err);
+                            if (err != null) sender.sendMessage("§c❌ " + err);
                         }
                         // /city garde test [nombre] [rôle] | test retirer : vrais gardes, sans lit ni formation
                         case "test" -> {
                             if (args.length >= 3 && (args[2].equalsIgnoreCase("retirer") || args[2].equalsIgnoreCase("clear"))) {
-                                player.sendMessage("§a✅ " + inhabitants.removeTestGuards() + " garde(s) de test retiré(s).");
+                                sender.sendMessage("§a✅ " + inhabitants.removeTestGuards() + " garde(s) de test retiré(s).");
                                 return true;
                             }
+                            if (inGameOnly(sender, player)) return true; // les gardes apparaissent près du joueur
                             int count = 1;
                             String roleKey = null;
                             for (int i = 2; i < args.length; i++) {
@@ -604,26 +700,22 @@ public class CityCommand implements CommandExecutor {
                                     + " formé chez Roland ; ni lit ni formation ; retirés au redémarrage ou par"
                                     + " §f/city garde test retirer§7).");
                         }
-                        case "fin" -> player.sendMessage("§a✅ " + inhabitants.finishTrainingNow()
+                        case "fin" -> sender.sendMessage("§a✅ " + inhabitants.finishTrainingNow()
                                 + " recrue(s) devenue(s) garde(s).");
                         case "kill", "tuer" -> {
                             if (args.length < 3) {
-                                player.sendMessage("§cUsage : /city garde kill <nom>");
+                                sender.sendMessage("§cUsage : /city garde kill <nom>");
                                 return true;
                             }
                             String target = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
-                            if (!inhabitants.kill(target)) player.sendMessage("§c❌ §f" + target + " §cintrouvable.");
+                            if (!inhabitants.kill(target)) sender.sendMessage("§c❌ §f" + target + " §cintrouvable.");
                         }
-                        default -> player.sendMessage("§cUsage : /city garde [list|former <habitant> <rôle>|renvoyer <nom>|fin|kill <nom>]");
+                        default -> sender.sendMessage("§cUsage : /city " + sub.usageFor(sender));
                     }
                 }
 
-                // ── /city proto (phase 0, temporaire) ────────────
+                // ── /city proto (phase 0, temporaire ; admin : citycore.admin.proto) ──
                 case PROTO -> {
-                    if (!player.isOp()) {
-                        player.sendMessage("§c❌ Réservé aux admins.");
-                        return true;
-                    }
                     // Le soldat du prototype (phase 0) n'a pas le comportement de la garde : on crée un vrai
                     // garde de test à la place (rondes, front d'un siège, combat contre les soldats ennemis)
                     if (args.length >= 2 && args[1].equalsIgnoreCase("soldat") && inhabitants != null) {
@@ -639,10 +731,10 @@ public class CityCommand implements CommandExecutor {
                     }
                 }
 
-                // ── /city npc ────────────────────────────────────
+                // ── /city npc (admin : citycore.admin.pnj) ───────
                 case NPC -> {
                     if (args.length < 3) {
-                        player.sendMessage("§cUsage : /city npc <type> <action>");
+                        sender.sendMessage("§cUsage : /city " + CitySubCommand.NPC.usage);
                         return true;
                     }
 
@@ -657,16 +749,13 @@ public class CityCommand implements CommandExecutor {
                                 .filter(n -> n != CityNPC.MAYOR)
                                 .map(n -> n.tag.replace("citycore_", ""))
                                 .collect(java.util.stream.Collectors.joining("§7, §e"));
-                        player.sendMessage("§c❌ NPC inconnu. Disponibles : §e" + available);
+                        sender.sendMessage("§c❌ NPC inconnu. Disponibles : §e" + available);
                         return true;
                     }
 
                     switch (args[2].toLowerCase()) {
                         case "spawn" -> {
-                            if (!player.isOp()) {
-                                player.sendMessage("§c❌ Réservé aux admins.");
-                                return true;
-                            }
+                            if (inGameOnly(sender, player)) return true; // apparaît devant l'administrateur
                             if (npcManager.getNPC(target) != null) {
                                 player.sendMessage("§c❌ " + target.displayName
                                         + " §cexiste déjà.");
@@ -678,36 +767,30 @@ public class CityCommand implements CommandExecutor {
                                     + " §aest apparu !");
                         }
                         case "levelup" -> {
-                            if (!player.isOp()) return false;
                             int lvl = npcDataManager.getLevel(target);
                             if (lvl >= 5) {
-                                player.sendMessage("§c❌ Niveau maximum atteint.");
+                                sender.sendMessage("§c❌ Niveau maximum atteint.");
                                 return true;
                             }
                             npcDataManager.setLevel(target, lvl + 1, loadThresholds(target));
-                            player.sendMessage("§a✅ §e" + target.displayName
+                            sender.sendMessage("§a✅ §e" + target.displayName
                                     + " §a→ niveau §e"
                                     + VillagerGUI.getLevelName(lvl + 1) + "§a.");
                         }
                         case "leveldown" -> {
-                            if (!player.isOp()) return false;
                             int lvl = npcDataManager.getLevel(target);
                             if (lvl <= 1) {
-                                player.sendMessage("§c❌ Niveau minimum atteint.");
+                                sender.sendMessage("§c❌ Niveau minimum atteint.");
                                 return true;
                             }
                             npcDataManager.setLevel(target, lvl - 1, loadThresholds(target));
-                            player.sendMessage("§a✅ §e" + target.displayName
+                            sender.sendMessage("§a✅ §e" + target.displayName
                                     + " §a→ niveau §e"
                                     + VillagerGUI.getLevelName(lvl - 1) + "§a.");
                         }
                         case "remove" -> {
-                            if (!player.isOp()) {
-                                player.sendMessage("§c❌ Réservé aux Op.");
-                                return true;
-                            }
                             if (!npcManager.isSpawned(target)) {
-                                player.sendMessage("§c❌ §e" + target.displayName
+                                sender.sendMessage("§c❌ §e" + target.displayName
                                         + " §cn'est pas spawné.");
                                 return true;
                             }
@@ -715,16 +798,19 @@ public class CityCommand implements CommandExecutor {
                             npcDataManager.resetNPC(target);
                             buildingManager.unassignNPCByTag(target.tag);
                             cityManager.removeResident();
-                            player.sendMessage("§a✅ §e" + target.displayName
+                            sender.sendMessage("§a✅ §e" + target.displayName
                                     + " §asupprimé et remis à zéro !");
                         }
-                        default -> player.sendMessage(
+                        default -> sender.sendMessage(
                                 "§c❌ Actions : §fspawn§c, §flevelUp§c, §flevelDown§c, §fremove");
                     }
                 }
 
                 // ── /city build ──────────────────────────────────
+                // Admin (citycore.admin.batiments) : tout, sans passer par les PNJ. Joueurs : inspection,
+                // bordures, étapes du bâton ; le reste chez Alderic ou l'artisan (voir playerBuildAction)
                 case BUILD -> {
+                    if (!admin && !playerBuildAction(player, args)) return true;
                     if (args.length == 1) { buildingGUI.open(player); return true; }
 
                     switch (args[1].toLowerCase()) {
@@ -868,11 +954,7 @@ public class CityCommand implements CommandExecutor {
                                 player.sendMessage("§cUsage : /city build remove <nom|all>");
                                 return true;
                             }
-                            if (args[2].equalsIgnoreCase("all")) {
-                                if (!player.isOp()) {
-                                    player.sendMessage("§c❌ Réservé aux admins.");
-                                    return true;
-                                }
+                            if (args[2].equalsIgnoreCase("all")) { // admin seulement (voir playerBuildAction)
                                 buildingManager.removeAll();
                                 player.sendMessage("§a✅ Tous les bâtiments supprimés.");
                                 return true;
@@ -972,25 +1054,24 @@ public class CityCommand implements CommandExecutor {
                             player.getInventory().setItemInMainHand(null);
                         }
                         default -> player.sendMessage(
-                                "§cUsage : /city build [new|show|remove|assign|skip|type|hauteur]");
+                                "§cUsage : /city build [new|inspect|show|remove|assign|skip|type|hauteur]");
                     }
                 }
 
-                // ── /city job ────────────────────────────────────
+                // ── /city job (admin : citycore.admin.joueurs ; joueurs : métier chez l'artisan) ──
                 case JOB -> {
-                    if (!player.isOp()) return true;
                     if (args.length < 3) {
-                        player.sendMessage("§cUsage : /city job <joueur> <npc|clear>");
+                        sender.sendMessage("§cUsage : /city job <joueur> <npc|clear>");
                         return true;
                     }
                     Player jTarget = Bukkit.getPlayer(args[1]);
                     if (jTarget == null) {
-                        player.sendMessage("§c❌ Joueur introuvable.");
+                        sender.sendMessage("§c❌ Joueur introuvable.");
                         return true;
                     }
                     if (args[2].equalsIgnoreCase("clear")) {
                         playerDataManager.clearJob(jTarget.getUniqueId());
-                        player.sendMessage("§a✅ Job de §e" + jTarget.getName()
+                        sender.sendMessage("§a✅ Job de §e" + jTarget.getName()
                                 + " §aeffacé.");
                         jTarget.sendMessage("§7Votre job a été réinitialisé.");
                         return true;
@@ -1000,26 +1081,25 @@ public class CityCommand implements CommandExecutor {
                                     .equalsIgnoreCase(args[2]))
                             .findFirst().orElse(null);
                     if (jNpc == null) {
-                        player.sendMessage("§c❌ NPC §f" + args[2] + " §cintrouvable.");
+                        sender.sendMessage("§c❌ NPC §f" + args[2] + " §cintrouvable.");
                         return true;
                     }
                     playerDataManager.setJob(jTarget.getUniqueId(), jNpc);
-                    player.sendMessage("§a✅ Job de §e" + jTarget.getName()
+                    sender.sendMessage("§a✅ Job de §e" + jTarget.getName()
                             + " §a: §e" + jNpc.displayName);
                     jTarget.sendMessage("§a✅ Votre job : §e" + jNpc.displayName);
                 }
 
-                // ── /city player ─────────────────────────────────
+                // ── /city player (admin : citycore.admin.joueurs) ──
                 case PLAYER -> {
-                    if (!player.isOp()) return true;
                     if (args.length < 3) {
-                        player.sendMessage("§cUsage : /city player <joueur>"
+                        sender.sendMessage("§cUsage : /city player <joueur>"
                                 + " <levelUp|levelDown|setLevel> [nombre]");
                         return true;
                     }
                     Player pTarget = Bukkit.getPlayer(args[1]);
                     if (pTarget == null) {
-                        player.sendMessage("§c❌ Joueur §f" + args[1]
+                        sender.sendMessage("§c❌ Joueur §f" + args[1]
                                 + " §cintrouvable.");
                         return true;
                     }
@@ -1028,7 +1108,7 @@ public class CityCommand implements CommandExecutor {
                         case "levelup" -> {
                             playerDataManager.setLevelAndXP(
                                     pTarget.getUniqueId(), currentLevel + 1, 0);
-                            player.sendMessage("§a✅ §e" + pTarget.getName()
+                            sender.sendMessage("§a✅ §e" + pTarget.getName()
                                     + " §a→ niveau §e" + (currentLevel + 1) + "§a.");
                             pTarget.sendMessage("§a🎉 Vous êtes passé niveau §e"
                                     + (currentLevel + 1) + "§a !");
@@ -1037,20 +1117,20 @@ public class CityCommand implements CommandExecutor {
                         }
                         case "leveldown" -> {
                             if (currentLevel <= 1) {
-                                player.sendMessage("§c❌ §e" + pTarget.getName()
+                                sender.sendMessage("§c❌ §e" + pTarget.getName()
                                         + " §cest déjà niveau 1.");
                                 return true;
                             }
                             playerDataManager.setLevelAndXP(
                                     pTarget.getUniqueId(), currentLevel - 1, 0);
-                            player.sendMessage("§a✅ §e" + pTarget.getName()
+                            sender.sendMessage("§a✅ §e" + pTarget.getName()
                                     + " §a→ niveau §e" + (currentLevel - 1) + "§a.");
                             pTarget.sendMessage("§7Rétrogradé niveau §e"
                                     + (currentLevel - 1) + "§7.");
                         }
                         case "setlevel" -> {
                             if (args.length < 4) {
-                                player.sendMessage("§cUsage : /city player <joueur>"
+                                sender.sendMessage("§cUsage : /city player <joueur>"
                                         + " setLevel <nombre>");
                                 return true;
                             }
@@ -1058,42 +1138,52 @@ public class CityCommand implements CommandExecutor {
                             try {
                                 targetLevel = Integer.parseInt(args[3]);
                             } catch (NumberFormatException e) {
-                                player.sendMessage("§c❌ Nombre invalide.");
+                                sender.sendMessage("§c❌ Nombre invalide.");
                                 return true;
                             }
                             if (targetLevel < 1) {
-                                player.sendMessage("§c❌ Niveau minimum : 1.");
+                                sender.sendMessage("§c❌ Niveau minimum : 1.");
                                 return true;
                             }
                             playerDataManager.setLevelAndXP(
                                     pTarget.getUniqueId(), targetLevel, 0);
-                            player.sendMessage("§a✅ Niveau de §e" + pTarget.getName()
+                            sender.sendMessage("§a✅ Niveau de §e" + pTarget.getName()
                                     + " §adéfini à §e" + targetLevel + "§a.");
                             pTarget.sendMessage("§7Niveau défini à §e" + targetLevel
                                     + " §7par un administrateur.");
                             pTarget.sendTitle("§6Niveau " + targetLevel,
                                     "§7Défini par un administrateur", 10, 40, 10);
                         }
-                        default -> player.sendMessage("§cActions : levelUp, levelDown, setLevel");
+                        default -> sender.sendMessage("§cActions : levelUp, levelDown, setLevel");
                     }
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
-            player.sendMessage("§c❌ Erreur interne.");
+            sender.sendMessage("§c❌ Erreur interne.");
         }
 
         return true;
     }
 
-    private void sendHelp(Player player) {
-        player.sendMessage("§8§m--------------------");
-        player.sendMessage("§6 CityCore §7— Commandes");
-        player.sendMessage("§8§m--------------------");
+    /**
+     * Aide : seulement ce que l'expéditeur a le droit d'utiliser (la partie « joueur » d'une
+     * sous-commande mixte pour un joueur ; depuis la console, ce qui s'y utilise).
+     */
+    private void sendHelp(CommandSender sender) {
+        boolean console = !(sender instanceof Player);
+        sender.sendMessage("§8§m--------------------");
+        sender.sendMessage("§6 CityCore §7— Commandes");
+        sender.sendMessage("§8§m--------------------");
         for (CitySubCommand cmd : CitySubCommand.values()) {
-            player.sendMessage("§e/city " + cmd.usage + " §7— " + cmd.description);
+            if (!CityPermissions.canUse(sender, cmd) || (console && !cmd.rights.console())) continue;
+            sender.sendMessage("§e/city " + cmd.usageFor(sender) + " §7— " + cmd.descriptionFor(sender));
         }
-        player.sendMessage("§8§m--------------------");
+        if (!sender.hasPermission(CityPermissions.ADMIN)) {
+            sender.sendMessage("§7Le reste se fait auprès des habitants : §6Alderic §7(maire : bâtiments,"
+                    + " parcelles, trésor), les artisans (logis, emplois), §9Roland §7(garde).");
+        }
+        sender.sendMessage("§8§m--------------------");
     }
 
     private Location spawnLocation(Player player) {

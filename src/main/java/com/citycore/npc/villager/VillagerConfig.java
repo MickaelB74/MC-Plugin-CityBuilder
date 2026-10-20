@@ -43,6 +43,8 @@ public class VillagerConfig {
     private final Map<Integer, List<ShopItem>> shopItems    = new LinkedHashMap<>();
     /** Objets de mods introuvables sur ce serveur (mod absent) : ignorés, résumés en une ligne. */
     private final Set<String> missingModItems = new TreeSet<>();
+    /** Objets de mods introuvables alors que le mod est présent (erreur d'identifiant) : avertis un par un. */
+    private final List<String> brokenModItems = new ArrayList<>();
     private int xpPerStack;
     private int xpPerCoin;
 
@@ -57,6 +59,7 @@ public class VillagerConfig {
         xpThresholds.clear();
         shopItems.clear();
         missingModItems.clear();
+        brokenModItems.clear();
 
         plugin.saveDefaultConfig();
         var config = plugin.getConfig();
@@ -65,19 +68,36 @@ public class VillagerConfig {
         xpPerCoin  = config.getInt(configKey + ".xp-per-coin", 1);
 
         // ── Prix de rachat (joueur → PNJ) ────────────────────────
+        // Une clé de groupe (« #minecraft:wool », « handcrafted:*_chair », « #LOGS ») vaut pour
+        // chacun de ses objets, avec le même lot, le même prix et la même capacité ; une clé simple
+        // déclarée à part l'emporte sur le groupe.
         ConfigurationSection sell = config.getConfigurationSection(configKey + ".sell-prices");
         if (sell != null) {
+            Map<Material, SellPrice> fromGroups = new LinkedHashMap<>();
             for (String key : sell.getKeys(false)) {
+                if (!com.citycore.integration.ModIntegrations.allows(
+                        sell.getString(key + ".avec-mod"), sell.getString(key + ".sans-mod"))) continue;
+                int price    = sell.getInt(key + ".price");
+                int quantity = Math.max(1, sell.getInt(key + ".quantity", 64));
+                int capacity = Math.max(0, sell.getInt(key + ".capacity", 0));
+                SellPrice sp = new SellPrice(price, quantity, capacity);
+                if (isGroup(key)) {
+                    Set<Material> mats = MaterialGroups.resolveAny(key);
+                    if (mats.isEmpty()) {
+                        missing(key, "groupe vide dans sell-prices : " + key);
+                        continue;
+                    }
+                    for (Material m : mats) if (m.isItem()) fromGroups.putIfAbsent(m, sp);
+                    continue;
+                }
                 Material mat = material(key);
                 if (mat == null) {
                     if (!com.citycore.integration.ItemIds.isModId(key)) warn("matériau inconnu dans sell-prices : " + key);
                     continue;
                 }
-                int price    = sell.getInt(key + ".price");
-                int quantity = Math.max(1, sell.getInt(key + ".quantity", 64));
-                int capacity = Math.max(0, sell.getInt(key + ".capacity", 0));
-                sellPrices.put(mat, new SellPrice(price, quantity, capacity));
+                sellPrices.put(mat, sp);
             }
+            fromGroups.forEach(sellPrices::putIfAbsent);
         }
 
         // ── Seuils XP ────────────────────────────────────────────
@@ -117,13 +137,35 @@ public class VillagerConfig {
             plugin.getLogger().info("   [" + configKey + "] objets de mods absents du serveur, ignorés : "
                     + String.join(", ", missingModItems));
         }
+        for (String problem : brokenModItems) {
+            // Le mod est installé mais l'objet n'existe pas (mod mis à jour ?) : l'article est ignoré
+            plugin.getLogger().warning("[" + configKey + "] " + problem + " — ignoré.");
+        }
     }
 
     /** Matériau d'un identifiant (vanilla ou « mod:objet ») ; note les objets de mods absents. */
     private Material material(String id) {
         Material mat = com.citycore.integration.ItemIds.resolve(id);
-        if (mat == null && com.citycore.integration.ItemIds.isModId(id)) missingModItems.add(id.trim());
+        if (mat == null && com.citycore.integration.ItemIds.isModId(id)) {
+            missing(id, "objet introuvable « " + id.trim() + " » alors que son mod est installé");
+        }
         return mat;
+    }
+
+    /**
+     * Objet ou groupe d'un mod introuvable : mod absent (cas normal, résumé en une ligne), ou mod
+     * présent (identifiant faux ou mod mis à jour : avertissement détaillé).
+     */
+    private void missing(String id, String problem) {
+        String ns = com.citycore.integration.ItemIds.namespace(id.replace("#", "").replace("-", "").trim());
+        if (ns.equals("minecraft")) warn(problem);
+        else if (com.citycore.integration.ModIntegrations.present(ns)) brokenModItems.add(problem);
+        else missingModItems.add(id.trim());
+    }
+
+    /** Clé de groupe : tag (#…), motif (*) ou liste (,). */
+    private static boolean isGroup(String token) {
+        return token.startsWith("#") || token.contains("*") || token.contains(",");
     }
 
     /* =========================
@@ -131,6 +173,8 @@ public class VillagerConfig {
        ========================= */
 
     private ShopItem parseShopItem(int level, int index, Map<?, ?> map) {
+        // Contenu facultatif : article proposé seulement avec (ou sans) un mod
+        if (!com.citycore.integration.ModIntegrations.allows(text(map.get("avec-mod")), text(map.get("sans-mod")))) return null;
         String id = String.valueOf(map.get("material"));
         Material mat = material(id);
         if (mat == null) {
@@ -147,18 +191,20 @@ public class VillagerConfig {
                 String raw = String.valueOf(e.getKey()).trim();
                 String supplier = null;
                 String token = raw;
+                // « thorvald:IRON_INGOT » : stock d'un autre artisan (préfixe = clé d'un PNJ) ;
+                // « tide:carp », « #minecraft:wool » : objet ou groupe pris dans le stock du vendeur
                 int colon = raw.indexOf(':');
-                if (colon > 0 && !raw.toLowerCase(Locale.ROOT).startsWith("minecraft:")) {
+                if (colon > 0 && isNpcKey(raw.substring(0, colon))) {
                     supplier = raw.substring(0, colon).toLowerCase(Locale.ROOT);
                     token    = raw.substring(colon + 1);
                 }
-                Set<Material> mats = MaterialGroups.resolve(token.toUpperCase(Locale.ROOT));
-                if (mats == null || mats.isEmpty()) {
-                    warn("ingrédient inconnu pour " + mat + " : " + raw);
+                Set<Material> mats = MaterialGroups.resolveAny(token);
+                if (mats.isEmpty()) {
+                    missing(token, "ingrédient inconnu pour " + mat + " : " + raw);
                     return null;
                 }
-                requires.add(new Requirement(supplier, token.toUpperCase(Locale.ROOT),
-                        mats, Math.max(1, toInt(e.getValue(), 1))));
+                requires.add(new Requirement(supplier, token,
+                        Collections.unmodifiableSet(mats), Math.max(1, toInt(e.getValue(), 1))));
             }
         }
 
@@ -209,9 +255,37 @@ public class VillagerConfig {
                     pages);
         }
 
+        // Données propres à un mod (« [irons_spellbooks:spell_container={…}] » : sort d'un parchemin,
+        // compétence d'un livre d'Epic Fight…) : vérifiées tout de suite, l'article est ignoré si
+        // le serveur les refuse
+        String components = map.get("components") != null ? String.valueOf(map.get("components")).trim() : null;
+        if (components != null && !components.isEmpty()) {
+            String full = com.citycore.integration.ItemIds.keyOf(mat) + components;
+            try {
+                org.bukkit.Bukkit.getItemFactory().createItemStack(full);
+            } catch (RuntimeException ex) {
+                warn("données d'objet refusées pour " + id + " (" + ex.getMessage() + ") — article ignoré");
+                return null;
+            }
+        } else {
+            components = null;
+        }
+
         String entryKey = "L" + level + "#" + index + ":" + mat.name();
         return new ShopItem(entryKey, level, mat, price, quantity, List.copyOf(requires), supply,
-                name, List.copyOf(lore), Collections.unmodifiableMap(enchants), potion, book);
+                name, List.copyOf(lore), Collections.unmodifiableMap(enchants), potion, book, components);
+    }
+
+    /** Clé de section d'un habitant (« thorvald ») : préfixe d'un ingrédient pris chez lui. */
+    private static boolean isNpcKey(String prefix) {
+        for (com.citycore.npc.CityNPC npc : com.citycore.npc.CityNPC.values()) {
+            if (npc.skinId.equalsIgnoreCase(prefix)) return true;
+        }
+        return false;
+    }
+
+    private static String text(Object o) {
+        return o == null ? null : String.valueOf(o);
     }
 
     private static int toInt(Object o, int def) {
@@ -322,11 +396,14 @@ public class VillagerConfig {
             List<String> lore,
             Map<Enchantment, Integer> enchantments,
             PotionType potion,
-            BookData book
+            BookData book,
+            /* Composants d'objet en texte (« [mod:composant=…] »), ou null. */
+            String components
     ) {
-        /** Article "spécial" : ne se compare pas à l'item de base (enchanté, potion, livre…). */
+        /** Article "spécial" : ne se compare pas à l'item de base (enchanté, potion, livre, données de mod…). */
         public boolean isSpecial() {
-            return displayName != null || !enchantments.isEmpty() || potion != null || book != null;
+            return displayName != null || !enchantments.isEmpty() || potion != null || book != null
+                    || components != null;
         }
     }
 }

@@ -16,16 +16,34 @@ public class CityManager {
     private final DatabaseManager db;
     private final JavaPlugin plugin;
 
-    private static final int    DEFAULT_BASE_PRICE   = 200;
-    private static final double DEFAULT_MULTIPLIER   = 1.5;
-    private static final int    DEFAULT_MAX_PRICE    = 5000;
-    private static final int    DEFAULT_FREE_CHUNKS  = 8;
+    private static final int    DEFAULT_BASE_PRICE   = 50;
+    private static final double DEFAULT_MULTIPLIER   = 1.03;
+    private static final int    DEFAULT_MAX_PRICE    = 300;
+    private static final int    DEFAULT_FREE_CHUNKS  = 10;
+
+    /** Observateurs des parcelles (carte des mods…), prévenus après chaque claim, unclaim ou fondation. */
+    private final List<Runnable> claimListeners = new ArrayList<>();
 
     public CityManager(DatabaseManager db, JavaPlugin plugin) {
         this.db     = db;
         this.plugin = plugin;
         ensureBonusColumn();
         ensureGiftColumn();
+    }
+
+    /** S'abonner aux changements de parcelles (appelé sur le fil qui a fait le changement). */
+    public void addClaimListener(Runnable listener) {
+        claimListeners.add(listener);
+    }
+
+    private void claimsChanged() {
+        for (Runnable listener : claimListeners) {
+            try {
+                listener.run();
+            } catch (RuntimeException e) {
+                plugin.getLogger().warning("Suivi des parcelles : " + e);
+            }
+        }
     }
 
     /** Colonne mayor_gift : le cadeau de fondation d'Alderic n'est versé qu'une fois. */
@@ -90,6 +108,7 @@ public class CityManager {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        claimsChanged();
     }
 
     /* =========================
@@ -251,6 +270,7 @@ public class CityManager {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        claimsChanged();
     }
 
     public void unclaimChunk(Chunk chunk) {
@@ -265,6 +285,7 @@ public class CityManager {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        claimsChanged();
     }
 
     public boolean isChunkClaimed(Chunk chunk) {
