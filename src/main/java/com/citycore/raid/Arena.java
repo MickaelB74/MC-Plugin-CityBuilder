@@ -36,6 +36,18 @@ public record Arena(String structure, World world, BoundingBox box, Location cen
                     List<UUID> defenders, List<UUID> civilians, List<UUID> golems, List<UUID> gates,
                     Map<String, Map<String, Integer>> byKind) {
 
+    /**
+     * Même arène sur une zone agrandie (ville fortifiée : village, tours et siège), avec les
+     * bannières, portes et coffres des pièces posées par le plugin.
+     */
+    Arena extend(BoundingBox zone, List<Location> moreBanners, List<Location> moreDoors, List<Location> moreContainers) {
+        List<Location> b = new ArrayList<>(banners), d = new ArrayList<>(doors), c = new ArrayList<>(containers);
+        b.addAll(moreBanners);
+        d.addAll(moreDoors);
+        c.addAll(moreContainers);
+        return new Arena(structure, world, zone, center, bells, b, spawners, c, d, beds, defenders, civilians, golems, gates, byKind);
+    }
+
     /** Taille de la boîte : « 66×36×80 ». */
     public String size() {
         if (box == null) return "?";

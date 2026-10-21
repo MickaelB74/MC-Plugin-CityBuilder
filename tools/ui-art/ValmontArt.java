@@ -801,6 +801,46 @@ public class ValmontArt {
                 "..kBbYYbBk..",
                 "...kBYYBk...",
                 "....kkkk....");
+        // Raids (plan « Raids ») : épée, cloche du rassemblement, dé du tirage au hasard
+        icon("sword",
+                "..........kk",
+                ".........ksk",
+                "........kssk",
+                ".......ksSk.",
+                "......ksSk..",
+                ".kk..ksSk...",
+                ".kOkksSk....",
+                "..kOkSk.....",
+                "..kkOk......",
+                ".kmkkOk.....",
+                "kmk...kk....",
+                "kk..........");
+        icon("bell",
+                ".....kk.....",
+                "....kOOk....",
+                "...kYYYOk...",
+                "..kYyYYYOk..",
+                "..kYyYYYOk..",
+                "..kYyYYYOk..",
+                "..kYYYYYOk..",
+                ".kYyYYYYYOk.",
+                "kYYYYYYYYYOk",
+                "kkkkkkkkkkkk",
+                ".....kOk....",
+                "......k.....");
+        icon("dice",
+                "............",
+                ".kkkkkkkkkk.",
+                ".kwwwwwwwWk.",
+                ".kwkkwwwwWk.",
+                ".kwkkwwwwWk.",
+                ".kwwwkkwwWk.",
+                ".kwwwkkwwWk.",
+                ".kwwwwwkkWk.",
+                ".kwwwwwkkWk.",
+                ".kWWWWWWWWk.",
+                ".kkkkkkkkkk.",
+                "............");
         icon("crown",
                 "............",
                 "............",
@@ -1474,6 +1514,13 @@ public class ValmontArt {
         big.put("btn_deposer",    button(90, 18, GREEN,  "coinup", "DÉPOSER"));
         big.put("btn_histoire",   button(90, 18, BROWN,  "book",   "SON HISTOIRE"));
         big.put("btn_actions",    button(90, 18, RED,    "shield", "ACTIONS"));
+        // Raids (plan « Raids ») : accueil de la mairie, écran Événements, fiche d'une cible
+        big.put("btn_evenements", button(90, 18, AMBER,  "flag",   "ÉVÉNEMENTS"));
+        big.put("btn_raids",      button(90, 18, RED,    "sword",  "RAIDS"));
+        big.put("btn_sieges",     button(90, 18, BLUE,   "shield", "SIÈGES"));
+        big.put("btn_fetes_off",  button(90, 18, GRAY,   "lock",   "FÊTES"));
+        big.put("btn_rassembler", button(90, 18, GREEN,  "bell",   "RASSEMBLER"));
+        big.put("btn_rassembler_off", button(90, 18, GRAY, "lock", "RASSEMBLER"));
         big.put("plate",          plate(90));
         for (var e : big.entrySet()) save(e.getValue(), e.getKey());
 
@@ -1513,6 +1560,7 @@ public class ValmontArt {
         small.put("ic_story",      iconButton(BROWN,  "book",   false));
         small.put("ic_purse",      iconButton(GOLD,   "coins",  false));
         small.put("ic_map",        iconButton(TEAL,   "map",    false)); // vue d'ensemble (/city locate)
+        small.put("ic_random",     iconButton(PURPLE, "dice",   false)); // cible au hasard (raids)
         for (var e : small.entrySet()) save(e.getValue(), e.getKey());
 
         // ── Bannières 108 x 18 ──────────────────────────────
@@ -1533,6 +1581,7 @@ public class ValmontArt {
         ribs.put("rib_population", ribbon(GOLD,  "POPULATION"));
         ribs.put("rib_employes",  ribbon(BLUE,   "EMPLOYÉS"));
         ribs.put("rib_annexe",    ribbon(TEAL,   "SON ANNEXE"));
+        ribs.put("rib_raids",     ribbon(RED,    "RAIDS"));
         for (var e : ribs.entrySet()) save(e.getValue(), e.getKey());
 
         // ── États des cases, pastilles, étoiles, barres ─────

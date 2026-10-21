@@ -41,7 +41,7 @@ public final class RaidCatalog {
 
     /** Objectifs connus (§5.2). */
     public static final Set<String> OBJECTIVES = Set.of(
-            "garnison", "cloche", "bannieres", "porte", "chef", "maitre", "cages", "tenir", "liberer", "aborder");
+            "garnison", "cloche", "bannieres", "porte", "chef", "maitre", "cages", "tenir", "liberer", "aborder", "tours");
     /** Bonus connus (§5.2). */
     public static final Set<String> BONUSES = Set.of("epargner", "sans-perte", "eclair");
 
@@ -253,31 +253,68 @@ public final class RaidCatalog {
                 c.contains("heure") ? c.getLong("heure") : null, null, c.getBoolean("active", true));
     }
 
+    /**
+     * Ville fortifiée (refaite sans /place, 21/10/2026) : village naturel (village.naturels, sinon
+     * ceux qui naissent sur les terrains de la ville), tours (tours.id, tours.nombre) et siège
+     * (siege) posés par le plugin. Les anciennes clés village.pool, profondeur et structure ne
+     * servent plus.
+     */
     private RaidTarget parseCity(String key, ConfigurationSection c) {
         ConfigurationSection v = c.getConfigurationSection("village");
         ConfigurationSection towers = c.getConfigurationSection("tours");
         String seat = c.getString("siege");
-        if (v == null || towers == null || seat == null || v.getString("pool") == null || v.getString("structure") == null
-                || towers.getString("id") == null) {
-            loadWarnings.add("ville " + key + " : village (pool, structure), tours (id) et siege requis, ville ignorée");
+        if (towers == null || seat == null || towers.getString("id") == null) {
+            loadWarnings.add("ville " + key + " : tours (id) et siege requis, ville ignorée");
             return null;
         }
-        RaidTarget.City city = new RaidTarget.City(v.getString("pool").trim().toLowerCase(Locale.ROOT),
-                Math.max(1, Math.min(20, v.getInt("profondeur", 10))), v.getString("structure").trim().toLowerCase(Locale.ROOT),
-                towers.getString("id").trim().toLowerCase(Locale.ROOT), Math.max(1, towers.getInt("nombre", 3)),
-                seat.trim().toLowerCase(Locale.ROOT));
-        List<RaidTarget.Piece> pieces = List.of(new RaidTarget.Piece(city.village(), "centre"),
-                new RaidTarget.Piece(city.tower(), "tour"), new RaidTarget.Piece(city.seat(), "siege"));
-        // Les occupants des pièces ajoutées sont remplacés par ceux de la faction de la ville (§7.8)
-        RaidTarget.Defenders defenders = new RaidTarget.Defenders("armee", true, List.of(), true, null, null);
+        List<String> terrain = terrain("ville " + key, c.getStringList("terrain"));
+        List<String> villages = new ArrayList<>();
+        if (v != null) for (String id : v.getStringList("naturels")) villages.add(id.trim().toLowerCase(Locale.ROOT));
+        if (villages.isEmpty()) villages.addAll(naturalVillages(terrain));
+        if (villages.isEmpty()) {
+            loadWarnings.add("ville " + key + " : aucun village naturel pour ses terrains (village.naturels), ville ignorée");
+            return null;
+        }
+        RaidTarget.City city = new RaidTarget.City(List.copyOf(villages), towers.getString("id").trim().toLowerCase(Locale.ROOT),
+                Math.max(1, Math.min(3, towers.getInt("nombre", 3))), seat.trim().toLowerCase(Locale.ROOT));
+        // Pièce du centre : le premier village présent sur le serveur (les autres sont des variantes)
+        String centre = villages.stream().filter(ModIntegrations::structureExists).findFirst().orElse(villages.get(0));
+        RaidTarget.Piece tower = new RaidTarget.Piece(city.tower(), "tour"), seatPiece = new RaidTarget.Piece(city.seat(), "siege");
+        List<RaidTarget.Piece> pieces = List.of(new RaidTarget.Piece(centre, "centre"), tower, seatPiece);
+        // Faction de la ville : soldats des sièges ; les villageois restent (bonus « épargner »)
+        RaidTarget.Defenders defenders = new RaidTarget.Defenders("armee", true, List.of(), false, null, null);
         int level = Math.max(1, Math.min(7, c.getInt("niveau", 5)));
         List<String> bonuses = new ArrayList<>();
         addDefaultBonuses(RaidTarget.Type.VILLE, bonuses);
         return new RaidTarget(key, c.getString("nom", key), RaidTarget.Type.VILLE, level,
-                terrain("ville " + key, c.getStringList("terrain")), pieces, "", c.getString("occupants", ""),
+                terrain, pieces, "", c.getString("occupants", ""),
                 defenders, defaultObjectives(RaidTarget.Type.VILLE, level, defenders), bonuses,
-                mods(pieces, defenders, city.pool(), c.getString("avec-mod")), false, false, null, city,
+                mods(List.of(tower, seatPiece), defenders, null, c.getString("avec-mod")), false, false, null, city,
                 c.getBoolean("active", true));
+    }
+
+    /** Villages qui naissent sur ces terrains (jeu de base, puis Towns and Towers). */
+    private static List<String> naturalVillages(List<String> terrain) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (String t : terrain) {
+            switch (t) {
+                case "plaines" -> out.addAll(List.of("minecraft:village_plains", "towns_and_towers:village_sunflower_plains"));
+                case "prairie" -> out.add("towns_and_towers:village_meadow");
+                case "taiga" -> out.addAll(List.of("minecraft:village_taiga", "towns_and_towers:village_old_growth_taiga"));
+                case "neige" -> out.addAll(List.of("minecraft:village_snowy", "towns_and_towers:village_snowy_taiga",
+                        "towns_and_towers:village_grove", "towns_and_towers:village_snowy_slopes"));
+                case "savane" -> out.addAll(List.of("minecraft:village_savanna", "towns_and_towers:village_savanna_plateau"));
+                case "plage" -> out.add("towns_and_towers:village_beach");
+                case "marais" -> out.add("towns_and_towers:village_swamp");
+                case "desert" -> out.add("minecraft:village_desert");
+                case "foret" -> out.addAll(List.of("towns_and_towers:village_forest", "towns_and_towers:village_birch_forest",
+                        "towns_and_towers:village_flower_forest"));
+                case "jungle" -> out.addAll(List.of("towns_and_towers:village_jungle", "towns_and_towers:village_sparse_jungle"));
+                case "badlands" -> out.addAll(List.of("towns_and_towers:village_badlands", "towns_and_towers:village_wooded_badlands"));
+                default -> { }
+            }
+        }
+        return new ArrayList<>(out);
     }
 
     private static RaidTarget.Defenders parseDefenders(ConfigurationSection d) {
@@ -319,7 +356,7 @@ public final class RaidCatalog {
             case CAMP -> List.of("garnison");
             case AVANT_POSTE -> List.of("garnison", "bannieres", "liberer");
             case VILLAGE -> List.of("garnison", "cloche");
-            case VILLE -> List.of("garnison", "bannieres", "chef", "tenir");
+            case VILLE -> List.of("garnison", "tours", "bannieres", "chef", "tenir");
             case FORT -> List.of("garnison", "cages", "chef");
             case CHATEAU -> List.of("porte", "bannieres", "garnison", "chef", "tenir");
             case ABORDAGE -> List.of("aborder", "garnison", "bannieres", "chef");

@@ -100,16 +100,18 @@ public final class UiLayout {
         for (String s : new String[]{"rib_vendre", "rib_entrepot", "rib_boutique", "rib_quetes_pnj",
                 "rib_recits", "rib_logis", "rib_batiments", "rib_supprimer", "rib_quetes",
                 "rib_atelier", "rib_actions", "rib_garde", "rib_role", "rib_population", "rib_employes",
-                "rib_annexe"}) a.sprite(s, row0);
+                "rib_annexe", "rib_raids"}) a.sprite(s, row0);
         // Pied de page : pagination et gros boutons
-        for (String s : new String[]{"ic_prev", "ic_next", "ic_prev_off", "ic_next_off"}) a.sprite(s, row5);
+        for (String s : new String[]{"ic_prev", "ic_next", "ic_prev_off", "ic_next_off", "ic_random"}) a.sprite(s, row5);
         for (String s : new String[]{"fb_ajouter", "fb_supprimer", "fb_retour", "fb_recit", "fb_charte",
                 "fb_charte_fonds", "fb_charte_lock", "fb_capitale"}) a.sprite(s, row5);
         // Gros boutons et plaques des rangées 1 à 4
         for (String s : new String[]{"btn_vendre", "btn_entrepot", "btn_boutique",
                 "btn_suivre", "btn_arreter", "btn_logis", "btn_promener", "btn_rester", "btn_quetes",
                 "btn_batiments", "btn_tresor", "btn_agrandir", "btn_agrandir_off", "btn_deposer",
-                "btn_histoire", "btn_actions", "plate"}) a.sprite(s, rows14);
+                "btn_histoire", "btn_actions", "plate",
+                "btn_evenements", "btn_raids", "btn_sieges", "btn_fetes_off", "btn_rassembler",
+                "btn_rassembler_off"}) a.sprite(s, rows14);
         // États des cases de liste, cadenas
         for (String s : new String[]{"ring_green", "ring_amber", "ring_red", "ring_gray", "ring_purple",
                 "ring_gold"}) a.sprite(s, rows14);
@@ -118,7 +120,8 @@ public final class UiLayout {
         for (int n = 0; n <= 5; n++) a.sprite("stars_" + n, STARS_Y);
         a.sprite("seg_xp", BAR_Y);
         a.sprite("seg_xp_max", BAR_Y);
-        a.sprite("coin", sy(1) + 5, sy(2) + 5, sy(5) + 5);
+        a.sprite("coin", sy(1) + 5, sy(2) + 5, sy(3) + 5, sy(5) + 5); // rangée 3 : gain d'un raid (fiche)
+        a.sprite("ring_gold", row5); // filtre choisi (cibles des raids)
         // Quêtes des PNJ
         for (String s : new String[]{"qb_accepter", "qb_valider", "qb_encours", "qb_repos", "qb_aucune"})
             a.sprite(s, sy(4));

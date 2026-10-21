@@ -11,8 +11,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Section raids de config.yml (plan « Raids ») : mondes des raids et repérage des cibles. Les
- * réglages des phases suivantes (camp, rassemblement, niveaux, récompenses) s'y ajouteront.
+ * Section raids de config.yml (plan « Raids ») : mondes des raids et repérage des cibles, camp,
+ * rassemblement, sécurité des joueurs, niveaux, défenseurs et leur force, objectifs, récompenses.
  */
 public final class RaidConfig {
 
@@ -40,6 +40,10 @@ public final class RaidConfig {
 
     /** Blocs entre le bord de la cible et le camp. */
     public final int campDistance;
+    /** Gabarits de camp des mods (un au hasard parmi ceux présents), vide = camp du plugin. */
+    public final List<String> campModels;
+    /** Skin du héraut du camp : {value, signature} (mineskin.org), ou null (skin de Minecraft). */
+    public final String[] heraldSkin;
     /** Rassemblement : rayon du cercle autour d'Alderic, durée du compte à rebours, joueurs requis. */
     public final int gatherRadius;
     public final int gatherSeconds;
@@ -52,6 +56,33 @@ public final class RaidConfig {
     public final List<String> blockedCommands;
     /** Niveaux 1 à 7. */
     private final Map<Integer, Level> levels = new LinkedHashMap<>();
+    /** Force des défenseurs, par niveau. */
+    private final Map<Integer, Strength> strengths = new LinkedHashMap<>();
+
+    /** Défenseurs : nombre × (1 + perPlayer × (joueurs - 1)), au plus maxAlive vivants. */
+    public final double perPlayer;
+    public final int maxAlive;
+    /** Objectifs : part de la garnison à abattre, rayon de la place dégagée, part du chrono du bonus éclair. */
+    public final double garrisonPart;
+    public final int bellRadius;
+    public final double eclairFraction;
+    /** Objectif « tenir » : secondes à tenir la place, rayon de la place. */
+    public final int holdSeconds;
+    public final int holdRadius;
+    private final Map<String, Double> weights = new LinkedHashMap<>();
+    /** Récompenses : bonus par bonus réussi, renommée par victoire et plafond, force par victoire et plafond. */
+    public final double bonusRate;
+    public final double renownPerVictory;
+    public final double renownMax;
+    public final double strengthPerVictory;
+    public final double strengthMax;
+
+    /**
+     * Force des défenseurs d'un niveau.
+     *
+     * @param armor aucune, cuir, maille, fer, diamant ou netherite
+     */
+    public record Strength(double health, double damage, String armor) {}
 
     /**
      * Un niveau de difficulté (PLAN_RAIDS §4.1, §6.1).
@@ -89,6 +120,12 @@ public final class RaidConfig {
 
         ConfigurationSection camp = root.getConfigurationSection("camp");
         campDistance = Math.max(12, Math.min(64, camp == null ? 32 : camp.getInt("distance", 32)));
+        ConfigurationSection skin = camp == null ? null : camp.getConfigurationSection("heraut-skin");
+        String skinValue = skin == null ? "" : skin.getString("value", "").trim();
+        heraldSkin = skinValue.isEmpty() ? null : new String[]{skinValue, skin.getString("signature", "").trim()};
+        campModels = camp == null || !camp.contains("modeles")
+                ? List.of("valarian_conquest:bandit_camp", "valarian_conquest:aegis_camp")
+                : List.copyOf(camp.getStringList("modeles"));
         ConfigurationSection gather = root.getConfigurationSection("rassemblement");
         gatherRadius  = Math.max(3, gather == null ? 10 : gather.getInt("rayon", 10));
         gatherSeconds = Math.max(5, gather == null ? 30 : gather.getInt("secondes", 30));
@@ -98,6 +135,37 @@ public final class RaidConfig {
         respawnInvulnerableSeconds = Math.max(0, players == null ? 3 : players.getInt("invulnerable-reapparition-secondes", 3));
         blockedCommands = players == null ? List.of() : players.getStringList("commandes-bloquees").stream()
                 .map(c -> c.trim().toLowerCase(Locale.ROOT).replaceFirst("^/", "")).toList();
+
+        ConfigurationSection defs = root.getConfigurationSection("defenseurs");
+        perPlayer = Math.max(0, defs == null ? 0.5 : defs.getDouble("par-joueur", 0.5));
+        maxAlive  = Math.max(5, defs == null ? 60 : defs.getInt("max", 60));
+        double[] hp = {1.0, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5};
+        double[] dmg = {1.0, 1.0, 1.1, 1.15, 1.2, 1.25, 1.3};
+        String[] arm = {"aucune", "aucune", "cuir", "cuir", "maille", "maille", "fer"};
+        ConfigurationSection force = root.getConfigurationSection("force");
+        for (int n = 1; n <= 7; n++) {
+            ConfigurationSection f = force == null ? null : force.getConfigurationSection(String.valueOf(n));
+            strengths.put(n, new Strength(f == null ? hp[n - 1] : f.getDouble("vie", hp[n - 1]),
+                    f == null ? dmg[n - 1] : f.getDouble("degats", dmg[n - 1]),
+                    f == null ? arm[n - 1] : f.getString("armure", arm[n - 1]).trim().toLowerCase(Locale.ROOT)));
+        }
+        ConfigurationSection obj = root.getConfigurationSection("objectifs");
+        garrisonPart   = Math.max(0.1, Math.min(1.0, obj == null ? 0.8 : obj.getDouble("garnison-part", 0.8)));
+        bellRadius     = Math.max(4, obj == null ? 16 : obj.getInt("cloche-rayon", 16));
+        eclairFraction = Math.max(0.1, Math.min(1.0, obj == null ? 0.5 : obj.getDouble("eclair", 0.5)));
+        holdSeconds    = Math.max(10, obj == null ? 45 : obj.getInt("tenir-secondes", 45));
+        holdRadius     = Math.max(3, obj == null ? 8 : obj.getInt("tenir-rayon", 8));
+        ConfigurationSection w = obj == null ? null : obj.getConfigurationSection("poids");
+        for (String k : List.of("garnison", "cloche", "bannieres", "cages", "liberer", "chef", "aborder", "maitre", "tenir", "tours")) {
+            double d = k.equals("garnison") ? 3 : k.equals("chef") || k.equals("maitre") || k.equals("tours") ? 2 : 1;
+            weights.put(k, Math.max(0.1, w == null ? d : w.getDouble(k, d)));
+        }
+        ConfigurationSection rw = root.getConfigurationSection("recompenses");
+        bonusRate          = rw == null ? 0.15 : rw.getDouble("bonus", 0.15);
+        renownPerVictory   = rw == null ? 0.05 : rw.getDouble("renommee-par-victoire", 0.05);
+        renownMax          = rw == null ? 0.25 : rw.getDouble("renommee-max", 0.25);
+        strengthPerVictory = rw == null ? 0.05 : rw.getDouble("force-par-victoire", 0.05);
+        strengthMax        = rw == null ? 0.25 : rw.getDouble("force-max", 0.25);
 
         String[] names = {"Escarmouche", "Coup de main", "Expédition", "Assaut", "Offensive", "Grande offensive", "Légende"};
         int[] chronos = {6, 8, 10, 15, 18, 20, 25};
@@ -117,6 +185,15 @@ public final class RaidConfig {
     /** Niveau 1 à 7 (borné). */
     public Level level(int n) {
         return levels.get(Math.max(1, Math.min(7, n)));
+    }
+
+    public Strength strength(int n) {
+        return strengths.get(Math.max(1, Math.min(7, n)));
+    }
+
+    /** Poids d'un objectif dans la défiance. */
+    public double weight(String objective) {
+        return weights.getOrDefault(objective, 1.0);
     }
 
     private static WorldSpec world(ConfigurationSection worlds, String id, String defName, long defSeed,

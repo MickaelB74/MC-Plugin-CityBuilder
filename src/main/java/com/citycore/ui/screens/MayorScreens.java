@@ -85,6 +85,13 @@ public final class MayorScreens {
         this.inhabitants = inhabitants;
     }
 
+    /** Événements (plan « Raids ») : le bouton remplace « Agrandir », qui passe dans le Trésor ; null = pas d'écran. */
+    private RaidScreens raidScreens;
+
+    public void setRaids(RaidScreens raidScreens) {
+        this.raidScreens = raidScreens;
+    }
+
     /* =========================
        POINTS D'ENTRÉE (false = menu classique)
        ========================= */
@@ -145,6 +152,17 @@ public final class MayorScreens {
         void bigButton(UiCanvas c, int row, String sprite, String name, List<String> lore, Runnable action) {
             c.sprite(sprite, sx(4), sy(row));
             zone(4, row, 5, 1, name, lore, action == null ? null : t -> action.run());
+        }
+
+        /** « Agrandir la ville » (rangée 4) : accueil sans les événements, sinon le Trésor. */
+        void expandButton(UiCanvas c, Runnable action) {
+            int price = city.getNextExpandPrice();
+            boolean afford = city.canAfford(price);
+            bigButton(c, 4, afford ? "btn_agrandir" : "btn_agrandir_off", "§6🗺 Agrandir la ville",
+                    List.of("§7Ajoute §f+1 emplacement §7de chunk", "", "§7Prix   : §6" + fmt(price) + " coins",
+                            "§7Caisse : §6" + fmt(city.getCityCoins()) + " coins", "",
+                            afford ? "§aCliquez pour acheter" : "§cFonds insuffisants"),
+                    action);
         }
 
         /** Plaque de valeur (caisse, bourse) : « LIBELLÉ montant », ou pièce + montant si trop long. */
@@ -211,13 +229,18 @@ public final class MayorScreens {
                     List.of("§7Caisse : §6" + fmt(city.getCityCoins()) + " coins", "§7Déposez des coins pour",
                             "§7financer chartes et parcelles."),
                     () -> mayor.handleClick(player, MayorGUI.SLOT_ECONOMY));
-            int price = city.getNextExpandPrice();
-            boolean afford = city.canAfford(price);
-            bigButton(c, 4, afford ? "btn_agrandir" : "btn_agrandir_off", "§6🗺 Agrandir la ville",
-                    List.of("§7Ajoute §f+1 emplacement §7de chunk", "", "§7Prix   : §6" + fmt(price) + " coins",
-                            "§7Caisse : §6" + fmt(city.getCityCoins()) + " coins", "",
-                            afford ? "§aCliquez pour acheter" : "§cFonds insuffisants"),
-                    () -> mayor.handleClick(player, MayorGUI.SLOT_EXPAND));
+            if (raidScreens != null) {
+                // Événements : raids, sièges, fêtes ; badge quand un raid est prêt à partir
+                boolean ready = raidScreens.raidAvailable();
+                bigButton(c, 4, "btn_evenements", "§6📅 Événements",
+                        List.of("§7Raids, sièges et fêtes de Valmont.", "",
+                                ready ? "§a⚔ Un raid est prêt à partir !" : "§7Aucun raid prêt pour l'instant.", "",
+                                "§eCliquez pour ouvrir"),
+                        () -> raidScreens.openEvents(player));
+                if (ready) c.sprite("badge_new", sx(8) + 4, sy(4) + 4);
+            } else {
+                expandButton(c, () -> mayor.handleClick(player, MayorGUI.SLOT_EXPAND));
+            }
 
             // Parcelles : revendiquer ou rendre celle où l'on se tient, voir les limites
             // (pour les joueurs, à la place de /city claim et unclaim, réservées aux administrateurs)
@@ -394,6 +417,11 @@ public final class MayorScreens {
                     List.of("§7Transférez vos coins", "§7dans la caisse de la ville.", "",
                             "§eCliquez pour saisir le montant"),
                     () -> mayor.getEconomyGUI().promptDeposit(player));
+            // « Agrandir » a quitté l'accueil pour le bouton Événements (plan « Raids ») : il est ici
+            if (raidScreens != null) expandButton(c, () -> {
+                mayor.expand(player);
+                openTreasury(player);
+            });
 
             bar(c, (double) treasury / Math.max(1, price), treasury >= price, "PARCELLE : " + fmt(price));
             zone(0, 5, 9, 1, "§eProchaine parcelle", List.of("§7Prix : §6" + fmt(price) + " coins",

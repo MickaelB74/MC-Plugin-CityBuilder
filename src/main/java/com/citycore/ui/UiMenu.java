@@ -43,9 +43,21 @@ public abstract class UiMenu implements InventoryHolder {
         actions.clear();
         UiCanvas canvas = kit.canvas();
         draw(canvas);
-        inventory = Bukkit.createInventory(this, SIZE, canvas.build());
+        inventory = Bukkit.createInventory(this, SIZE, windowTitle(canvas));
         inventory.setContents(contents);
         player.openInventory(inventory);
+    }
+
+    /** Titre de la fenêtre : le dessin ; un menu classique (sans le pack) y met un texte simple. */
+    protected net.kyori.adventure.text.Component windowTitle(UiCanvas canvas) {
+        return canvas.build();
+    }
+
+    /** Remplace l'objet d'une case du menu ouvert (affichage vivant : compte de joueurs…). */
+    protected final void refresh(int col, int row, ItemStack item) {
+        int s = slot(col, row);
+        contents[s] = item;
+        if (inventory != null) inventory.setItem(s, item);
     }
 
     /* =========================

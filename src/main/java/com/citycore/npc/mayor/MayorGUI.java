@@ -34,6 +34,15 @@ public class MayorGUI implements NPCGui {
     public static final int SLOT_POPULATION  = 3;
     /** Parcelles : revendiquer ou rendre celle où l'on se tient, voir les limites de la ville. */
     public static final int SLOT_PARCELS     = 7;
+    /** Événements (plan « Raids ») : raids, sièges, fêtes. */
+    public static final int SLOT_EVENTS      = 5;
+
+    /** Ouvre l'écran des événements (raids) ; null = case absente. */
+    private java.util.function.Consumer<Player> events;
+
+    public void setEvents(java.util.function.Consumer<Player> events) {
+        this.events = events;
+    }
 
     /** Besoins et satisfaction (phase 6) : bilan affiché dans le chat (menu classique) ; null = case absente. */
     private java.util.function.Supplier<List<String>> populationReport;
@@ -87,21 +96,11 @@ public class MayorGUI implements NPCGui {
             case SLOT_BUILDINGS -> buildingGUI.open(player);
             case SLOT_ECONOMY   -> economyGUI.open(player);
             case SLOT_EXPAND -> {
-                int price = cityManager.getNextExpandPrice();
-                CityManager.ExpandResult result = cityManager.expandMaxChunks();
-                if (result.success()) {
-                    player.sendMessage("§a✅ Capacité étendue ! Max : §f"
-                            + result.newMaxChunks());
-                    player.sendMessage("§7Caisse restante : §6"
-                            + result.newBalance() + " coins");
-                } else {
-                    int missing = price - cityManager.getCityCoins();
-                    player.sendMessage("§c❌ Fonds insuffisants. Il manque §f"
-                            + missing + " coins§c.");
-                    player.sendMessage("§7💡 Déposez des coins dans la caisse : " + CityNPC.MAYOR.displayName
-                            + " §7→ §e« Trésor »§7.");
-                }
+                expand(player);
                 open(player);
+            }
+            case SLOT_EVENTS -> {
+                if (events != null) events.accept(player);
             }
             case SLOT_POPULATION -> {
                 if (populationReport == null) return;
@@ -120,6 +119,24 @@ public class MayorGUI implements NPCGui {
                 }
                 open(player);
             }
+        }
+    }
+
+    /** Achat d'un emplacement de chunk (Agrandir) : messages du résultat, sans rouvrir de menu. */
+    public void expand(Player player) {
+        int price = cityManager.getNextExpandPrice();
+        CityManager.ExpandResult result = cityManager.expandMaxChunks();
+        if (result.success()) {
+            player.sendMessage("§a✅ Capacité étendue ! Max : §f"
+                    + result.newMaxChunks());
+            player.sendMessage("§7Caisse restante : §6"
+                    + result.newBalance() + " coins");
+        } else {
+            int missing = price - cityManager.getCityCoins();
+            player.sendMessage("§c❌ Fonds insuffisants. Il manque §f"
+                    + missing + " coins§c.");
+            player.sendMessage("§7💡 Déposez des coins dans la caisse : " + CityNPC.MAYOR.displayName
+                    + " §7→ §e« Trésor »§7.");
         }
     }
 
@@ -192,6 +209,12 @@ public class MayorGUI implements NPCGui {
                         "", canAfford ? "§aCliquez pour acheter"
                                 : "§cFonds insuffisants"
                 )));
+
+        // ── ÉVÉNEMENTS (raids, sièges, fêtes) ───────────────────
+        if (events != null) {
+            inv.setItem(SLOT_EVENTS, makeItem(Material.BELL, "§6📅 Événements",
+                    List.of("§7Raids, sièges et fêtes de Valmont.", "", "§eCliquez pour ouvrir")));
+        }
 
         // ── PARCELLES ────────────────────────────────────────────
         inv.setItem(SLOT_PARCELS, makeItem(Material.FILLED_MAP, "§e🗺 Parcelles de la ville",

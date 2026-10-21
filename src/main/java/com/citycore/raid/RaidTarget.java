@@ -82,17 +82,15 @@ public record RaidTarget(String key, String name, Type type, int level, List<Str
                             String master, String chief) {}
 
     /**
-     * Ville fortifiée (§7.8) : village de style agrandi par {@code place jigsaw}, tours d'une
-     * faction sur les routes, siège du pouvoir du côté opposé au camp.
+     * Ville fortifiée (§7.8, refaite sans /place) : un village né de la génération, entouré par le
+     * plugin de tours d'une faction et du siège du pouvoir (gabarits des mods).
      *
-     * @param pool    pool de départ du village
-     * @param depth   profondeur d'assemblage
-     * @param village structure du village (repli si l'agrandissement échoue)
-     * @param tower   avant-poste posé sur les routes
-     * @param towers  nombre de tours
-     * @param seat    siège du pouvoir
+     * @param villages villages possibles (structures qui naissent), un au hasard parmi ceux du monde
+     * @param tower    tour de la faction (gabarit)
+     * @param towers   nombre de tours (3 au plus)
+     * @param seat     siège du pouvoir (gabarit), du côté opposé au camp
      */
-    public record City(String pool, int depth, String village, String tower, int towers, String seat) {}
+    public record City(List<String> villages, String tower, int towers, String seat) {}
 
     /** Structure principale (celle qui se pose au centre). */
     public String mainStructure() {

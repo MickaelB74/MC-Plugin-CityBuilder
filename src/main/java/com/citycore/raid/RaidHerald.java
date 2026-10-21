@@ -5,6 +5,7 @@ import net.citizensnpcs.api.npc.MemoryNPCDataStore;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.api.npc.NPCRegistry;
 import net.citizensnpcs.trait.LookClose;
+import net.citizensnpcs.trait.SkinTrait;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 
@@ -20,13 +21,22 @@ final class RaidHerald {
     private NPCRegistry registry;
     private NPC npc;
 
-    /** Fait apparaître le héraut (un seul à la fois). */
-    void spawn(Location at) {
+    /**
+     * Fait apparaître le héraut (un seul à la fois).
+     *
+     * @param skin {value, signature} de son skin (raids.camp.heraut-skin), ou null
+     */
+    void spawn(Location at, String[] skin) {
         remove();
         if (registry == null) registry = CitizensAPI.createAnonymousNPCRegistry(new MemoryNPCDataStore());
         npc = registry.createNPC(EntityType.PLAYER, NAME);
         npc.setProtected(true);
         npc.getOrAddTrait(LookClose.class).lookClose(true);
+        // Skin avant l'apparition (sinon le PNJ apparaît d'abord avec un skin par défaut)
+        SkinTrait trait = npc.getOrAddTrait(SkinTrait.class);
+        if (skin != null) trait.setSkinPersistent("citycore_heraut", skin[1], skin[0]);
+        else trait.setFetchDefaultSkin(false);
+        com.citycore.inhabitant.NpcGestures.prepare(npc); // pas de balancement de bras à l'apparition (Epic Fight)
         npc.spawn(at);
     }
 

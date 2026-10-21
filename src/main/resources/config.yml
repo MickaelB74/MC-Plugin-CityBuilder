@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 33
+config-version: 38
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -3175,6 +3175,8 @@ raids:
     difficulte: NORMAL      # PEACEFUL, EASY, NORMAL ou HARD
   camp:
     distance: 32            # blocs entre le bord de la cible et le camp (point de réapparition)
+    heraut-skin: {value: "ewogICJ0aW1lc3RhbXAiIDogMTc4MzU5MTA5OTM2NCwKICAicHJvZmlsZUlkIiA6ICIxYjkzYjI5MjhkMjI0MDQxYjU0ZjI3ZjM2YjU5MGViZCIsCiAgInByb2ZpbGVOYW1lIiA6ICJtYW51ZHJpbmtzIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlL2MwMDc0ZTc5ZGQ1MTE0Y2Q3YmJkYjFjMDdhYTViZTQwMjk5NzRlMWM5ZTU0MmE5NGY3YTIyOGNlYTE3NTM3MWIiLAogICAgICAibWV0YWRhdGEiIDogewogICAgICAgICJtb2RlbCIgOiAic2xpbSIKICAgICAgfQogICAgfQogIH0KfQ==", signature: "eX2ENyhwvYSxdUSXom+fpqYle4hz/dkGsH0lWO/sl7lS3qJp1bLLbT03bAWzRnJSzoqFuAyxK3GYO1b4EsdCr6rk8TlihfmvltMgImhVn9qVeCLmjVU8OxHZrv+f13+7+XqId90NIVDZW9TYK2u1p1mGW8x5BMo6RS3M6Hx/LsBvuvXXq0s+FJKEQ5HIasOt0k/N2aGtgUq7Me0738fbY+pw3jiKQrq6Dj6G3xkVuWATdyZ7/EcsaPd7QZRl5wPvABX8v1a3K82Fh5SXFyuL0HY8ywvVVSfygFR6sgO+xD3HeTSduP4ZkHjQGg/cvdH+bor67pKpPfpvMT37tPzOZY7DrRjEXy2/SayAE4jHb+Y9z0ppc+k9V3Mlf9virHjENcciUUO+TwqG/cm/BzpmE5f2Lq7x566gewT4A1HQjbYdAxca/8XvuFHrFbq1L9C8jPGS89a/9NeMYW4s1ouVDcNJKSJxXwTZtPA366hw8Swfy0X0qBywfb5IGcdy7oTZrpXdgt2NgfW50G5hLXvqs/GGvkaKTw4gHygDOJ0gVLA/WOv/XOrXT1uCDbYem+tTKhKTaMFCO2PvldntTekqTKAXB3eN1vBlfiFKULlexVmBJmNjqCMQlUkQEoCEWBARpWFELjVNFoFzqA3xKdAkO61IxNbQaQcJVElBpdxF8Ak="}   # skin du héraut du camp (mineskin.org) ; value vide = skin de Minecraft
+    modeles: [valarian_conquest:bandit_camp, valarian_conquest:aegis_camp]   # camps des mods (un au hasard, sans occupants, coffres vidés) ; [] ou absents : camp du plugin
   rassemblement: {rayon: 10, secondes: 30, joueurs-min: 1}   # cercle autour d'Alderic, compte à rebours, joueurs requis
   bilan-secondes: 20        # temps pour souffler après la fin, avant le retour de chacun à Valmont
   joueurs:
@@ -3191,3 +3193,32 @@ raids:
     5: {nom: "Offensive", chapitre: 6, defenseurs: [20, 35], chrono-minutes: 18, renforts: 2, recharge-minutes: 120, caisse: 400, joueur: 70}
     6: {nom: "Grande offensive", chapitre: 8, defenseurs: [25, 45], chrono-minutes: 20, renforts: 3, recharge-minutes: 180, caisse: 520, joueur: 90}
     7: {nom: "Légende", chapitre: 10, defenseurs: [30, 60], chrono-minutes: 25, renforts: 3, recharge-minutes: 360, caisse: 700, joueur: 120}
+  # Défenseurs : ceux de la structure, complétés jusqu'au nombre du niveau (× (1 + par-joueur ×
+  # (joueurs - 1)), au plus max vivants), ou une garnison ajoutée (soldats des factions des sièges,
+  # créatures de la cible). Force selon le niveau : vie × vie, dégâts × degats, armure des
+  # créatures qui n'en ont pas (aucune, cuir, maille, fer, diamant, netherite). L'armure compte plus
+  # que la vie : une armure de netherite absorbe 60 à 70 % des coups d'une bonne épée.
+  defenseurs: {par-joueur: 0.5, max: 60}
+  force:
+    1: {vie: 1.0, degats: 1.0, armure: aucune}
+    2: {vie: 1.0, degats: 1.0, armure: aucune}
+    3: {vie: 1.1, degats: 1.1, armure: cuir}
+    4: {vie: 1.2, degats: 1.15, armure: cuir}
+    5: {vie: 1.3, degats: 1.2, armure: maille}
+    6: {vie: 1.4, degats: 1.25, armure: maille}
+    7: {vie: 1.5, degats: 1.3, armure: fer}
+  # Objectifs (PLAN_RAIDS §5.2) : la défiance de l'adversaire part de 100 % ; chaque objectif en
+  # retire sa part (poids). garnison-part : part des défenseurs à abattre ; cloche : sonnée une fois
+  # la place dégagée (aucun défenseur dans cloche-rayon blocs) ; eclair : victoire avant cette part
+  # du chrono (bonus).
+  objectifs:
+    garnison-part: 0.8
+    cloche-rayon: 16
+    tenir-secondes: 45      # « tenir » (villes, châteaux) : secondes à tenir la place, sans défenseur dedans
+    tenir-rayon: 8
+    eclair: 0.5
+    poids: {garnison: 3, cloche: 1, bannieres: 1, cages: 1, liberer: 1, chef: 2, aborder: 1, maitre: 2, tenir: 1, tours: 2}
+  # Récompenses (niveaux : caisse de la ville et par joueur) : + bonus par bonus réussi ; renommée :
+  # + renommee-par-victoire par victoire du niveau (au plus renommee-max), qui renforce aussi les
+  # défenseurs de force-par-victoire (au plus force-max)
+  recompenses: {bonus: 0.15, renommee-par-victoire: 0.05, renommee-max: 0.25, force-par-victoire: 0.05, force-max: 0.25}

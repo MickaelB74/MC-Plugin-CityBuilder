@@ -33,6 +33,10 @@ import java.util.UUID;
  *
  * Hors d'un raid, personne ne se réveille dans ce monde : retour auprès d'Alderic (décision du
  * 21/10/2026 : connexion perdue, partie quittée, plantage, arrêt du serveur).
+ *
+ * Anti-exploitation (§6.3) : la seule chose que rapporte un raid est sa récompense — aucun butin
+ * des créatures (l'expérience reste), rien ne tombe des blocs cassés ni des explosions, pas de
+ * commerce avec les villageois (un village neuf à chaque raid ferait des échanges neufs à volonté).
  */
 final class RaidParticipants implements Listener {
 
@@ -220,6 +224,63 @@ final class RaidParticipants implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPortal(PlayerPortalEvent event) {
         if (raids.isRaidWorld(event.getFrom().getWorld())) event.setCancelled(true);
+    }
+
+    /* =========================
+       ANTI-EXPLOITATION (§6.3)
+       ========================= */
+
+    /** Blocs cassés (y compris ceux posés par les joueurs) : rien ne tombe. */
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockDrop(org.bukkit.event.block.BlockDropItemEvent event) {
+        if (raids.isRaidWorld(event.getBlock().getWorld())) event.setCancelled(true);
+    }
+
+    /** Créatures du monde des raids : aucun butin, l'expérience reste. */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onMobDeath(org.bukkit.event.entity.EntityDeathEvent event) {
+        if (event.getEntity() instanceof Player || !raids.isRaidWorld(event.getEntity().getWorld())) return;
+        event.getDrops().clear();
+    }
+
+    /** Explosions : les blocs détruits ne donnent rien. */
+    @EventHandler(ignoreCancelled = true)
+    public void onExplode(org.bukkit.event.entity.EntityExplodeEvent event) {
+        if (raids.isRaidWorld(event.getEntity().getWorld())) event.setYield(0f);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockExplode(org.bukkit.event.block.BlockExplodeEvent event) {
+        if (raids.isRaidWorld(event.getBlock().getWorld())) event.setYield(0f);
+    }
+
+    /** Pas de commerce avec les villageois ni les marchands dans le monde des raids. */
+    @EventHandler(ignoreCancelled = true)
+    public void onTrade(org.bukkit.event.player.PlayerInteractEntityEvent event) {
+        if (!(event.getRightClicked() instanceof org.bukkit.entity.AbstractVillager)) return;
+        if (!raids.isRaidWorld(event.getRightClicked().getWorld())) return;
+        event.setCancelled(true);
+        event.getPlayer().sendActionBar(net.kyori.adventure.text.Component.text(
+                "Pas de commerce ici : ces gens se méfient de Valmont.", net.kyori.adventure.text.format.NamedTextColor.GRAY));
+    }
+
+    /** Cadres et tableaux arrachés : rien ne tombe (les cadres sont vidés à la préparation). */
+    @EventHandler(ignoreCancelled = true)
+    public void onHangingBreak(org.bukkit.event.hanging.HangingBreakEvent event) {
+        if (!raids.isRaidWorld(event.getEntity().getWorld())) return;
+        event.setCancelled(true);
+        event.getEntity().remove();
+    }
+
+    /** Barques du radeau : ni cassées ni récupérées (elles restent au service de l'expédition). */
+    @EventHandler(ignoreCancelled = true)
+    public void onBoatBreak(org.bukkit.event.vehicle.VehicleDestroyEvent event) {
+        if (event.getVehicle().getScoreboardTags().contains(RaidCamp.TAG_CAMP)) event.setCancelled(true);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBoatHit(org.bukkit.event.vehicle.VehicleDamageEvent event) {
+        if (event.getVehicle().getScoreboardTags().contains(RaidCamp.TAG_CAMP)) event.setCancelled(true);
     }
 
     /** Clic sur le héraut du camp. */

@@ -330,6 +330,55 @@ public class CityCommand implements CommandExecutor {
                 }
 
                 // ── /city deposit ────────────────────────────────
+                // ── /city niveau [monter|descendre|<n>] : chapitre de la ville (tests) ──
+                case NIVEAU -> {
+                    if (!cityManager.isCityInitialized() || cityQuestManager == null) {
+                        sender.sendMessage("§c❌ Aucune ville fondée.");
+                        return true;
+                    }
+                    com.citycore.quest.city.CityTier[] tiers = com.citycore.quest.city.CityTier.values();
+                    int max = tiers[tiers.length - 1].level;
+                    int current = cityQuestManager.getCityLevel();
+                    String how = args.length >= 2 ? args[1].toLowerCase(java.util.Locale.ROOT) : "";
+                    int wanted;
+                    switch (how) {
+                        case "" -> {
+                            com.citycore.quest.city.CityTier t = com.citycore.quest.city.CityTier.fromLevel(current);
+                            sender.sendMessage("§6🏛 Niveau de la ville : §f" + current + " §7— " + t.tierName + " §7(" + t.chapter + ")");
+                            sender.sendMessage("§7Usage : §f/city niveau <monter|descendre|1-" + max + ">");
+                            return true;
+                        }
+                        case "monter", "up", "+" -> wanted = current + 1;
+                        case "descendre", "down", "-" -> wanted = current - 1;
+                        default -> {
+                            try {
+                                wanted = Integer.parseInt(how);
+                            } catch (NumberFormatException e) {
+                                sender.sendMessage("§cUsage : /city niveau <monter|descendre|1-" + max + ">");
+                                return true;
+                            }
+                        }
+                    }
+                    wanted = Math.max(1, Math.min(max, wanted));
+                    if (wanted == current) {
+                        sender.sendMessage("§7La ville est déjà au niveau " + current + (current == max ? " (le plus haut)."
+                                : current == 1 ? " (le premier)." : "."));
+                        return true;
+                    }
+                    cityQuestManager.setCityLevel(wanted);
+                    cityQuestManager.syncCurrentTier();
+                    // Écrans des quêtes de la cité ouverts : contenu périmé, fermés
+                    for (Player p : Bukkit.getOnlinePlayers()) {
+                        if (com.citycore.ui.screens.MayorScreens.isCityQuestScreen(p.getOpenInventory().getTopInventory().getHolder())) {
+                            p.closeInventory();
+                        }
+                    }
+                    com.citycore.quest.city.CityTier t = com.citycore.quest.city.CityTier.fromLevel(wanted);
+                    sender.sendMessage("§a✅ Niveau de la ville : §f" + current + " → " + wanted + " §7— " + t.tierName
+                            + " §7(" + t.chapter + "). §8Sans charte payée ni parcelles offertes.");
+                    plugin.getLogger().info("Niveau de la ville changé par " + sender.getName() + " : " + current + " → " + wanted + ".");
+                }
+
                 case DEPOSIT -> {
                     if (!cityManager.isCityInitialized()) {
                         player.sendMessage("§c❌ Aucune ville fondée.");

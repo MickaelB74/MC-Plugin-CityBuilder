@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
  * /city raid : consultation pour les joueurs ; essais et contrôles pour l'administration
  * (citycore.admin.raid). Joueurs : état de l'expédition, quitter (retraite, aussi par le héraut).
  * Administration : start, stop (phase R1) ; essai, zones, tp, retour, purge (R0) ; catalogue,
- * inconnues (R2).
+ * inconnues (R2) ; recharge, debloquer (R4 : recharges levées, niveaux ouverts pour les essais).
  */
 public final class RaidCommands {
 
@@ -29,7 +29,8 @@ public final class RaidCommands {
     private static final String[] ROMAN = {"I", "II", "III", "IV", "V", "VI", "VII"};
 
     private static final List<String> ADMIN_ACTIONS = List.of(
-            "start", "stop", "quitter", "essai", "zones", "tp", "retour", "purge", "catalogue", "inconnues");
+            "start", "stop", "quitter", "essai", "zones", "tp", "retour", "purge", "catalogue", "inconnues",
+            "recharge", "debloquer");
 
     private final RaidManager raids;
 
@@ -68,12 +69,16 @@ public final class RaidCommands {
         switch (action) {
             case "start", "lancer" -> {
                 if (args.length < 3) {
-                    sender.sendMessage("§cUsage : /city raid start <cible> [ici] §8(cible : clé de raids.yml ou structure ;"
-                            + " ici = rassemblement autour de vous plutôt qu'autour d'Alderic)");
+                    sender.sendMessage("§cUsage : /city raid start <cible> [ici] [force] §8(cible : clé de raids.yml ou structure ;"
+                            + " ici = rassemblement autour de vous plutôt qu'autour d'Alderic ; force = sans déblocage ni recharge)");
                     return;
                 }
-                boolean here = args.length >= 4 && args[3].equalsIgnoreCase("ici");
-                String err = raids.startRaid(sender, args[2].toLowerCase(Locale.ROOT), here);
+                boolean here = false, force = false;
+                for (int i = 3; i < args.length; i++) {
+                    if (args[i].equalsIgnoreCase("ici")) here = true;
+                    else if (args[i].equalsIgnoreCase("force")) force = true;
+                }
+                String err = raids.startRaid(sender, args[2].toLowerCase(Locale.ROOT), here, force);
                 if (err != null) sender.sendMessage("§c❌ " + err);
             }
             case "stop", "arreter", "arrêter" -> {
@@ -121,6 +126,27 @@ public final class RaidCommands {
             }
             case "catalogue", "catalog" -> catalogue(sender, args);
             case "inconnues", "unknown" -> unknown(sender);
+            case "recharge", "recharges" -> {
+                raids.resetCooldowns();
+                sender.sendMessage("§a✅ Recharges des sept niveaux levées.");
+            }
+            case "debloquer", "débloquer" -> {
+                int level = 0;
+                try {
+                    level = args.length >= 3 ? Integer.parseInt(args[2]) : 0;
+                } catch (NumberFormatException ignored) {
+                    // usage ci-dessous
+                }
+                if (level < 1 || level > 7) {
+                    sender.sendMessage("§cUsage : /city raid debloquer <1-7> §8(une victoire comptée à chaque niveau en dessous ;"
+                            + " le chapitre de la ville reste exigé)");
+                    return;
+                }
+                raids.unlock(level);
+                String still = raids.levelClosed(level);
+                sender.sendMessage("§a✅ Victoires comptées jusqu'au niveau " + ROMAN[level - 1] + "."
+                        + (still == null ? "" : " §7" + still));
+            }
             default -> sender.sendMessage("§cUsage : /city raid [" + String.join("|", ADMIN_ACTIONS) + "]");
         }
     }
@@ -182,13 +208,13 @@ public final class RaidCommands {
         if (!admin) return args.length == 2 ? filter(List.of("quitter"), last) : new ArrayList<>();
         if (args.length == 2) return filter(ADMIN_ACTIONS, last);
         String action = args[1].toLowerCase(Locale.ROOT);
-        if (args.length == 4 && (action.equals("start") || action.equals("lancer"))) return filter(List.of("ici"), last);
+        if (args.length >= 4 && (action.equals("start") || action.equals("lancer"))) return filter(List.of("ici", "force"), last);
         if (args.length == 3) {
             return switch (action) {
                 case "start", "lancer" -> filter(raids.catalog() == null ? List.of() : raids.catalog().all().stream()
-                        .filter(t -> raids.catalog().isAvailable(t) && !t.otherDimension()).map(RaidTarget::key).toList(), last);
+                        .filter(t -> raids.catalog().isAvailable(t)).map(RaidTarget::key).toList(), last);
                 case "essai", "poser", "place" -> filter(structureIds(), last);
-                case "catalogue", "catalog" -> List.of("1", "2", "3", "4", "5", "6", "7");
+                case "catalogue", "catalog", "debloquer" -> List.of("1", "2", "3", "4", "5", "6", "7");
                 case "tp" -> raids.sites() == null || raids.sites().history().isEmpty() ? List.of()
                         : java.util.stream.IntStream.rangeClosed(1, raids.sites().history().size()).mapToObj(String::valueOf).toList();
                 default -> new ArrayList<>();

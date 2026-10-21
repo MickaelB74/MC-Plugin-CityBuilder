@@ -254,6 +254,17 @@ public class CityCore extends JavaPlugin {
         // Un tick plus tard : registres des structures et des créatures complets, mondes chargés
         raids = new com.citycore.raid.RaidManager(this, databaseManager);
         raids.setSiegeRunning(siege::running); // pas d'expédition pendant un siège
+        raids.setCityLevel(cityQuestManager::getCityLevel); // déblocage des niveaux par chapitre
+        // Garnisons « armée » des raids : soldats des factions des sièges, dans leur propre armée
+        raids.setArmy(() -> {
+            com.citycore.siege.EnemyArmy army = new com.citycore.siege.EnemyArmy(this, inhabitants, siege.config(), l -> true);
+            getServer().getPluginManager().registerEvents(army, this);
+            army.start();
+            return army;
+        }, siege::config);
+        // Récompenses d'une victoire : caisse de la ville, bourse de chaque combattant
+        raids.setRewards(cityManager::addCityCoins, (id, amount) -> economy.depositPlayer(Bukkit.getOfflinePlayer(id), amount));
+        getServer().getPluginManager().registerEvents(raids.assault(), this);
         // Sécurité des joueurs dans le monde des raids : retours, mort, téléportations, commandes, héraut
         getServer().getPluginManager().registerEvents(raids.participants(), this);
         Bukkit.getScheduler().runTask(this, raids::start);
@@ -349,6 +360,11 @@ public class CityCore extends JavaPlugin {
         mayorScreens.setPopulation(needs, inhabitants);     // clic sur le portrait d'Alderic : « Population »
         mayorGUI.setPopulationReport(needs::report);        // menu classique : bilan dans le chat
         mayorGUI.setThemed(mayorScreens);
+        // Événements chez Alderic (plan « Raids ») : raids, sièges (calendrier), fêtes à venir
+        com.citycore.ui.screens.RaidScreens raidScreens = new com.citycore.ui.screens.RaidScreens(uiKit, raids, mayorGUI::open);
+        raidScreens.setCalendar(calendar::listing);
+        mayorScreens.setRaids(raidScreens);
+        mayorGUI.setEvents(raidScreens::openEvents);
         // « Ajouter un bâtiment », changement de type et inspection sans passer par /city build (admin)
         mayorGUI.getBuildingGUI().setCreation(buildingCreation, buildingInspector);
 
@@ -441,6 +457,7 @@ public class CityCore extends JavaPlugin {
         questHUD.setIntegrations(modIntegrations);
         // Suivi « accroché » : panneau « Quêtes » de la liste des joueurs, renvoyée à chaque progression
         questHUD.setTabRefresher(cityHUD::updatePlayer);
+        questHUD.setRaid(raids::hudRows, raids::hudLines); // expédition en cours : défiance et objectifs
         cityHUD.setQuests(questHUD);
         questHUD.startUpdating();
 

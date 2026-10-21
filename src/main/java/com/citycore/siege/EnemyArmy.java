@@ -79,6 +79,8 @@ public final class EnemyArmy implements Listener {
         long lastSwing, riposteUntil;
         int slot = -1;              // place dans la formation (-1 : meneur)
         Location moveGoal;          // place visée en formation (évite de relancer le chemin à chaque passage)
+        Location post;              // poste à tenir (garnison d'un raid) : il y revient faute d'adversaire
+        long staggerUntil;          // frappé : il recule et ne marche pas avant cette heure (recul visible)
 
         Soldier(NPC npc, SiegeConfig.Unit unit, boolean champion, boolean standard, Squad squad) {
             this.npc = npc;
@@ -217,6 +219,27 @@ public final class EnemyArmy implements Listener {
         return npc;
     }
 
+    /**
+     * Garnison d'un raid (plan « Raids ») : un soldat isolé qui tient {@code post} — il combat les
+     * joueurs qui approchent (24 blocs), riposte, puis revient à son poste faute d'adversaire.
+     * {@code healthFactor} : vie × ce facteur (force du niveau du raid).
+     */
+    public NPC spawnDefender(SiegeConfig.Unit unit, Location at, SiegeConfig.Faction faction, boolean champion,
+                             Location post, double healthFactor) {
+        NPC npc = spawn(unit, at, faction, champion, false, null);
+        if (npc == null) return null;
+        Soldier s = soldiers.get(npc.getId());
+        if (s != null) s.post = post == null ? at.clone() : post.clone();
+        if (healthFactor != 1.0 && npc.getEntity() instanceof LivingEntity body) {
+            AttributeInstance max = body.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+            if (max != null) {
+                max.setBaseValue(unit.health() * healthFactor);
+                body.setHealth(max.getBaseValue());
+            }
+        }
+        return npc;
+    }
+
     private static ItemStack item(Material m) {
         return new ItemStack(m == null ? Material.AIR : m);
     }
@@ -295,6 +318,7 @@ public final class EnemyArmy implements Listener {
     /** Un soldat, deux fois par seconde : choix de l'adversaire, puis combat, formation ou marche. */
     private void behave(Soldier s, LivingEntity body, List<LivingEntity> defenders, long now) {
         NpcCombat.sanitize(body); // vitesse invalide : remise à zéro avant l'envoi aux joueurs
+        if (now < s.staggerUntil) return; // il encaisse le coup : pas de pas vers l'adversaire pendant le recul
         // Riposte : celui qui vient de le frapper (garde ou joueur, à moins de 16 blocs) devient sa cible
         Player attacker = body.getKiller();
         if (attacker != null && attacker != s.target && body.getNoDamageTicks() > 0 && valid(attacker, body)
@@ -413,6 +437,12 @@ public final class EnemyArmy implements Listener {
         }
         if (walking) return;
         s.moveGoal = null;
+        if (s.post != null) {
+            // Garnison d'un raid : il reste à son poste (à quelques blocs près)
+            if (!s.post.getWorld().equals(body.getWorld()) || s.post.distanceSquared(body.getLocation()) <= 4 * 4) return;
+            SafeNavigation.walkTo(s.npc, s.post, config.armySpeed(), false);
+            return;
+        }
         Location goal = sq != null ? sq.goal(body.getLocation()) : null;
         if (goal == null) goal = objective.get();
         if (goal == null || !goal.getWorld().equals(body.getWorld())) return;
@@ -499,6 +529,38 @@ public final class EnemyArmy implements Listener {
         }
         player.resetCooldown();
         NpcCombat.strike(player, soldier, damage);
+    }
+
+    /**
+     * Recul d'un soldat frappé. Constaté en raid (21/10/2026) : frappé, le soldat était tiré vers
+     * celui qui frappait, comme un recul inversé — le recul calculé par Citizens pour un PNJ de type
+     * joueur, aussitôt annulé par son chemin qui repartait vers l'adversaire. Le recul de Citizens est
+     * remplacé ici par un recul à l'opposé du coup, et le soldat ne marche pas pendant une demi-seconde.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onKnockback(net.citizensnpcs.api.event.NPCKnockbackEvent event) {
+        if (registry == null || event.getNPC().getOwningRegistry() != registry) return;
+        Soldier s = soldiers.get(event.getNPC().getId());
+        Entity hitter = event.getKnockingBackEntity();
+        if (hitter instanceof Projectile p && p.getShooter() instanceof Entity shooter) hitter = shooter;
+        if (!(event.getNPC().getEntity() instanceof LivingEntity body) || hitter == null
+                || !hitter.getWorld().equals(body.getWorld())) return;
+        event.setCancelled(true);
+        Vector away = body.getLocation().toVector().subtract(hitter.getLocation().toVector()).setY(0);
+        if (away.lengthSquared() < 1e-6) return;
+        double strength = Math.max(0.35, Math.min(1.2, event.getStrength()));
+        Vector push = away.normalize().multiply(strength).setY(body.isOnGround() ? 0.36 : Math.min(0.2, body.getVelocity().getY()));
+        if (s != null) {
+            s.staggerUntil = System.currentTimeMillis() + 500;
+            if (s.npc.getNavigator().isNavigating()) s.npc.getNavigator().cancelNavigation();
+        }
+        // Au tick suivant : après le traitement du coup par Citizens et le jeu
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (body.isValid() && !body.isDead()) {
+                body.setVelocity(push);
+                NpcCombat.sanitize(body);
+            }
+        });
     }
 
     /** Pas de tirs ni de coups entre soldats d'une même armée. */

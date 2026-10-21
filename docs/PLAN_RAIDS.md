@@ -18,13 +18,13 @@ Documents liés : `docs/PLAN_VILLE_VIVANTE.md` (sièges, garde, besoins, calendr
 | R0 | Prototype technique : monde des raids, pose des structures, observation | — | petite | codée, test en jeu à faire |
 | R1 | Monde, allers-retours et sécurité des joueurs | R0 | grosse | codée, test en jeu à faire |
 | R2 | Catalogue des cibles et vérification des mods | R0 | moyenne | codée, test en jeu à faire |
-| R3 | Écrans d'Alderic : Événements → Raid → Difficulté → Cibles → Fiche | R1, R2 | moyenne | à faire |
-| R4 | L'assaut : défiance, objectifs, chrono, victoire, récompenses (niveaux I à III, terre) | R3 | grosse | à faire |
-| R5 | Défenseurs ajoutés, renforts, chefs (niveaux IV à VII, terre) | R4 | moyenne à grosse | à faire |
-| R6 | Villes fortifiées (villages agrandis + tours + siège du pouvoir) | R5 | moyenne | à faire |
-| R7 | Abordage (navires, emplacements en mer) | R5 | moyenne | à faire |
-| R8 | Repaires (maîtres, cages, souterrains) | R5 | moyenne | à faire |
-| R9 | Raids du Nether et de l'End (mondes `citycore_raids_nether` et `citycore_raids_end`) | R5 | petite à moyenne | à faire |
+| R3 | Écrans d'Alderic : Événements → Raid → Difficulté → Cibles → Fiche | R1, R2 | moyenne | codée, test en jeu à faire |
+| R4 | L'assaut : défiance, objectifs, chrono, victoire, récompenses (niveaux I à III, terre) | R3 | grosse | codée, test en jeu à faire |
+| R5 | Défenseurs ajoutés, renforts, chefs (niveaux IV à VII, terre) | R4 | moyenne à grosse | codée (sans trophées), test en jeu à faire |
+| R6 | Villes fortifiées (villages agrandis + tours + siège du pouvoir) | R5 | moyenne | codée (refaite sans `/place`), test en jeu à faire |
+| R7 | Abordage (navires, emplacements en mer) | R5 | moyenne | codée, test en jeu à faire |
+| R8 | Repaires (maîtres, cages, souterrains) | R5 | moyenne | codée, test en jeu à faire |
+| R9 | Raids du Nether et de l'End (mondes `citycore_raids_nether` et `citycore_raids_end`) | R5 | petite à moyenne | codée, test en jeu à faire |
 | R10 | Finitions : dialogues, trophées, succès, sons, équilibrage, documentation joueurs | R4 à R9 | moyenne | à faire |
 
 R6, R7, R8 et R9 sont indépendantes entre elles.
@@ -565,7 +565,8 @@ titre. Bilan dans le chat.
 | VII | 700 | 120 | trophée unique par cible légendaire |
 
 - Bonus : +15 % par bonus réussi ; renommée +5 % par victoire du niveau (plafond +25 %), qui
-  renforce aussi les défenseurs de +10 % par victoire (plafond +50 %).
+  renforce aussi les défenseurs de +5 % de vie par victoire (plafond +25 % ; d'abord +10 % et
+  +50 %, baissé après le test des raids légendaires).
 - Comparaison : un siège rapporte 150 + 50 × palier à la caisse.
 - Bonus « sécurité » des besoins (phase 6) par le même branchement que les sièges, bonus seulement.
 - Trophées marqués **non revendables** (même marque que les objets des réserves).
@@ -747,6 +748,11 @@ civils ou rien → occupants du plugin (§5.3). Noms : propositions.
 | `minecraft:end_city` | Cité de l'End | ville | **End** (hautes terres des îles extérieures) | générée par le jeu | shulkers (posés par la génération, à vérifier) ; élytres de la nef retirées à la pose | gabarit + complément |
 
 ### 7.8 Villes fortifiées (niveau V)
+
+> **Refaite le 21/10/2026** (journal §12, « R6 ») : sans `/place`, une ville est un village **né
+> de la génération** (`village.naturels`, ou ceux des terrains de la ville) entouré par le plugin
+> de ses tours et de son siège, posés comme des gabarits. Le texte ci-dessous décrit le projet
+> d'origine (villages de style agrandis), abandonné.
 
 Une ville = un **village de style agrandi** (`place jigsaw` sur son pool de départ, profondeur
 10 à 12 au lieu de 3 à 6) + **3 avant-postes d'une faction** sur les routes qui en sortent + un
@@ -935,11 +941,13 @@ ignorees: ["minecraft:ruined_portal*", "minecraft:shipwreck*", "mostructures:*_a
 
 - Joueurs (`citycore.player`) : `/city raid` (raid en cours, niveaux débloqués, recharges),
   `/city raid quitter` (retraite).
-- Administration (`citycore.admin.raid`) : `start <cible> [ici]` (rassemblement autour de
-  l'administrateur avec `ici`), `stop`, `next` (objectif suivant), `essai <structure>` (repérage
-  d'un exemplaire naturel et génération de son site ; R0), `zones` (recherches et essais),
-  `tp [essai]`, `retour`, `purge`, `catalogue [niveau]`, `inconnues`, `recharge reset`,
-  `debloquer <niveau>`.
+- Administration (`citycore.admin.raid`) : `start <cible> [ici] [force]` (rassemblement autour
+  de l'administrateur avec `ici` ; `force` : sans déblocage ni recharge), `stop`, `essai
+  <structure>` (repérage d'un exemplaire naturel et génération de son site ; R0), `zones`
+  (recherches et essais), `tp [essai]`, `retour`, `purge`, `catalogue [niveau]`, `inconnues`,
+  `recharge` (recharges levées), `debloquer <niveau>` (victoires comptées en dessous). `next`
+  (objectif suivant) n'a pas été repris. Pour les tests : `/city niveau [monter|descendre|<n>]`
+  (`citycore.admin.ville`), chapitre de la ville.
 
 ### 8.7 Écrans et dessins
 
@@ -1134,6 +1142,282 @@ Dialogues d'Alderic et du héraut, trophées, succès dans l'écran des progrès
 ---
 
 ## 12. Journal de réalisation
+
+### R6 — villes fortifiées refaites sans `/place`, codées le 21/10/2026 (tests en jeu à faire)
+
+Le projet d'origine (village de style agrandi par `place jigsaw`) reposait sur `/place`,
+abandonné ; les villages « de style » de Towns and Towers ne naissent d'ailleurs jamais dans le
+monde des raids (biomes de mods absents).
+
+**Code** : `RaidTemplates` (pose d'un gabarit commune aux camps et aux villes : sans occupants,
+sol comblé, coffres vidés, blocs « jigsaw » de raccord remplacés), `RaidCity` (siège et tours
+autour du village), `RaidCatalog` (nouveau format des villes, villages par terrain, objectif
+`tours`), `RaidTarget.City`, `Arena.extend`, `RaidAssault` (garnisons des tours et du siège,
+bailli, tours prises), `RaidManager` (village tiré au sort, zone générée agrandie, ville
+assemblée avant la préparation), raids.yml (section `villes`), `config-version` 38 (poids
+`tours: 2`).
+
+**Une ville** : un village tiré au sort parmi `village.naturels` (raids.yml ; sans la clé, ceux qui
+naissent sur les terrains de la ville, jeu de base puis Towns and Towers) et qui naît dans le monde
+des raids. Une fois le village repéré et le camp posé, le plugin pose le **siège du pouvoir** du
+côté opposé au camp et **3 tours de la faction** (les deux côtés, et le côté du camp vers le coin
+le plus éloigné de lui), hors du village, sur la terre ferme (relief de 14 blocs au plus, jusqu'à
+deux reculs de 6 blocs), sans empiéter sur le camp. Gabarits tels quels, tournés au hasard, sans
+leurs occupants (chevaux, balistes, illageois des sièges d'ATi). La zone générée autour du village
+s'agrandit pour les contenir (plus grand gabarit + 20 blocs).
+
+**Défense** : faction des sièges ; garnison du village (nombre du niveau, moins ce que prennent
+tours et siège sur le maximum de 60 vivants), 3 + niveau ÷ 2 soldats par tour (étages et chemins
+de ronde), 4 gardes au siège et le **bailli** (« Bailli de l'Ost du Corbeau ») au rez-de-chaussée
+du siège. Bannière de la faction au sommet de chaque tour. Les villageois du village restent
+(bonus « épargner »).
+
+**Objectifs** : garnison, **tours prises** (une tour est prise quand toute sa garnison est tombée ;
+ses deux derniers soldats brillent), bannières (dont celles des tours), bailli, tenir la place
+(la cloche du village).
+
+**Écarts** : pas de routes vers les tours ; le style du village n'est plus celui du nom de la ville
+(Brumeval n'est plus Tudor) ; « au hasard » ne combine pas style, faction et siège ; zone générée
+plus grande, donc un repérage plus long (jusqu'à 90 blocs autour du village pour le fort de
+Haut-Bois).
+
+**Recul inversé des soldats** (signalé pendant les tests) : frappé, un soldat de faction était
+tiré vers celui qui frappait. Le recul de Citizens pour un PNJ de type joueur est remplacé par un
+recul à l'opposé du coup, et le soldat ne marche pas pendant une demi-seconde (il ne repart plus
+aussitôt vers son adversaire). Vaut aussi pour les sièges.
+
+**À tester en jeu** :
+1. `/city raid start brumeval force` (et une ville de neige, `hautefroide`) : repérage plus long,
+   village naturel, siège du côté opposé au camp, 3 tours autour, sans chevaux ni balistes, coffres
+   vides, aucun bloc « jigsaw » visible.
+2. Garnisons dans les tours et le siège, bannières de la faction au sommet des tours ; « Tours
+   prises 1/3 » quand une tour est vidée ; bailli lumineux dans le siège ; place tenue à la cloche.
+3. Chez Alderic : les villes ne sont plus grisées (niveau V).
+4. Frapper un soldat de faction (raid ou siège) : il recule à l'opposé, puis revient au combat.
+
+### Corrections après le test des raids légendaires (21/10/2026)
+
+- **Vaisseau ancien : 15 Wardens** au lieu d'un. Le complément d'un gabarit reprenait l'espèce la
+  plus nombreuse à bord, ici le Warden (le maître). Désormais le complément ne copie jamais le
+  maître, le chef ni un boss (Warden, Wither, gardien ancien, ravageur, toute créature à plus de
+  60 points de vie) ; sans autre modèle, il prend des soldats d'une faction. Le maître garde sa
+  vie de boss (pas de multiplicateur du niveau).
+- **Vaisseau du roi pirate : 257 bannières** à arracher. Bannières, cages et captifs sont plafonnés
+  à 3 + niveau (4 au niveau I, 10 au niveau VII) ; n'importe lesquels comptent.
+- **« Navire abordé » jamais rempli** : la vérification ne voyait que les joueurs en survie ou en
+  aventure (un administrateur en créatif n'était jamais compté), et demandait d'être « au sol »
+  selon le client. Désormais tout joueur engagé non spectateur compte pour les objectifs (aborder,
+  tenir), debout à bord : hors de l'eau, hors d'une barque, pas en vol, un bloc plein sous les
+  pieds. Les défenseurs, eux, ne visent toujours que les joueurs en survie ou en aventure.
+- **Défenseurs trop coriaces** (« même avec des armes puissantes, c'est très long ») : au niveau
+  VII, vie × 2,2 (× 3,3 avec la renommée) et armure de netherite pour les créatures qui n'en
+  avaient pas (60 à 70 % des coups absorbés), chef × 3 (le champion des sièges montait à 770
+  points de vie). Désormais (`config-version` 36, valeurs remplacées si elles n'ont pas été
+  modifiées) : vie × 1 à 1,5, dégâts × 1 à 1,3, armure au plus de fer (aucune aux niveaux I et II,
+  cuir III et IV, maille V et VI, fer VII) ; renommée : +5 % de vie par victoire, au plus +25 % ;
+  chef créature × 2, unité promue chef × 1,5, le champion des sièges garde sa vie (140). Nombre de
+  défenseurs et garnison inchangés.
+- **Skin du héraut** : `raids.camp.heraut-skin` (`config-version` 37), skin de mineskin.org
+  (`d6d121d0319f4aaf8c5bac2de7b8a7c5`), posé avant l'apparition ; valeur vide = skin de Minecraft.
+- **« Place tenue » qui n'avance pas** : la place n'était montrée nulle part, et sans cloche elle
+  était prise au centre de la boîte (souvent un toit ou un étage). Désormais : la cloche s'il y en
+  a une, sinon le plus proche sol à ciel ouvert du cœur (cour, place) ; cercle de particules au sol
+  (doré, rouge quand un défenseur est dedans) et colonne de lumière visible de loin, chaque
+  demi-seconde ; les défenseurs qui disputent la place brillent ; message à l'arrivée au camp.
+
+### Camps des mods, R7, R8 et R9 — codés le 21/10/2026 (tests en jeu à faire)
+
+Demandes après le test de R3 à R5 : le clic sur « Rassembler » met du temps à répondre (on
+reclique) ; un camp plus grand, de style camp, ou un camp existant des mods (camp de bandits) ;
+les expéditions en mer et ce qui manque ; une commande d'administration pour monter et descendre
+le niveau de la ville.
+
+**Code** : `RaidCamp` (modèles des mods, radeau, plateformes du Nether et de l'End), `RaidLair`
+(galerie des repaires enfouis, tour d'échelles des cibles flottantes), `RaidAssault` (navires,
+maître, tenir, défenseurs disparus), `RaidManager` (recherche différée, barques, mondes du Nether
+et de l'End), `RaidRun`, `RaidConfig`, `RaidParticipants` (barques), `RaidScreens` (retour au
+clic, objectifs), `CityCommand` et `CitySubCommand` (`/city niveau`), `config-version` 35
+(`raids.camp.modeles`, `raids.objectifs.tenir-secondes` et `tenir-rayon`, poids `aborder`,
+`maitre`, `tenir` ; fusion contrôlée hors jeu depuis une configuration en version 33 et en
+version 34).
+
+**Clic sur « Rassembler »** : la recherche du terrain (commande `/locate` du jeu, quelques secondes
+de fil principal) partait dans le même instant que le clic : le menu restait affiché pendant le
+temps d'arrêt. Désormais le menu se ferme, le joueur reçoit un titre et la cloche, l'annonce part
+(« le serveur peut marquer une courte pause »), et la recherche commence une demi-seconde plus
+tard. Un second clic trouve l'expédition déjà lancée.
+
+**Camp** : un modèle de `raids.camp.modeles` au hasard (par défaut `valarian_conquest:bandit_camp`
+et `valarian_conquest:aegis_camp`, 12 × 12 : tentes, feu de camp, lits, tonneaux), posé par l'API
+des structures de Paper **sans ses occupants** (ni bandits ni gardes), tourné au hasard, coffres et
+tonneaux vidés, sol comblé dessous ; seulement sur la terre ferme et un relief de 6 blocs au plus.
+Sinon le camp du plugin, agrandi à 7 × 7 (bordure de rondins, poteaux à lanterne, feu de camp,
+foin, tonneau, bannière de Valmont). La zone générée autour de la cible s'agrandit pour contenir
+le camp choisi.
+
+**Abordage (R7)** : sur l'eau, radeau de Valmont de 9 × 9 (bastingage ouvert au milieu de chaque
+côté, mât et bannière, lanternes) et une barque par joueur, plus une, amarrées autour
+(indestructibles, retirées au nettoyage). Objectif `aborder` : un joueur engagé pose le pied sur le
+navire, hors de l'eau et hors d'une barque. Postes des défenseurs et renforts sur la première place
+libre au-dessus de la mer (pont, cale ; jamais sur les voiles) ; le chef d'un navire est un
+« Capitaine » ; `remplacer` (raids.yml) retire l'équipage d'origine au profit de la faction.
+
+**Repaires (R8)** : objectif `maitre` obligatoire : la créature `maitre` de raids.yml présente dans
+la structure, sinon cherchée dans la boîte, sinon posée au cœur ; elle garde sa vie de boss, ne
+laisse rien et brille. **Repaires enfouis** : un puits à échelles (marqué d'un poteau à lanterne)
+descend du bord du camp, puis une galerie de 2 de haut, éclairée, mène à la première salle
+repérée (près d'une porte, d'un coffre, d'une cage) ; grottes, eau et lave traversées sont
+comblées de pierre. Postes et renforts à l'intérieur. Un défenseur, un chef ou un maître qui
+disparaît sans mourir (le Warden s'enterre) compte comme vaincu : aucun objectif ne devient
+impossible.
+
+**Tenir** (villes, châteaux) : un joueur engagé dans un rayon de 8 blocs autour de la cloche ou du
+cœur, sans défenseur dedans, fait avancer le compte (45 s) ; un défenseur qui revient le met en
+pause.
+
+**Cible flottante** (château dans le ciel) : tour d'échelles contre un pilier de pierre, du sol ou
+de l'eau jusqu'au bord de la structure le plus proche du camp.
+
+**Nether et End (R9)** : mondes `citycore_raids_nether` et `citycore_raids_end` créés au démarrage
+quand ils sont actifs, remis à zéro comme le monde de surface ; leurs cibles (forteresse, vestiges
+de bastion, citadelle maudite, cité de l'End) apparaissent chez Alderic. Camp : plateforme de 7 × 7
+près de la base de la cible (pierre noire et basalte, lanternes des âmes ; obsidienne et briques
+de l'End), sur le meilleur sol à 6 à 34 blocs de la boîte ; s'il n'y a que du vide ou de la lave,
+plateforme au plus près à la hauteur de la base et passerelle de 3 de large jusqu'à la cible.
+Postes sur la première place libre de la boîte (pas de toit de bedrock ni de vide). Les élytres
+de la nef de l'End partent avec les cadres vidés à la préparation.
+
+**Niveau de la ville** : `/city niveau [monter|descendre|<1-10>]` (`citycore.admin.ville`), pour
+les tests : change le chapitre sans payer de charte ni offrir de parcelles ; ferme les écrans des
+quêtes de la cité ouverts.
+
+**Écarts** :
+- **Mondes du Nether et de l'End** créés au démarrage, pas à la première demande : créer un monde
+  en jeu figerait le serveur. `raids.mondes.nether.active: false` (ou `end`) les retire.
+- **Porte** (`porte`, châteaux) : toujours pas suivie (entités de porte des mods, cassables ou
+  non : à vérifier en jeu).
+- **Villes fortifiées (R6)** : toujours grisées « bientôt » ; leur assemblage reposait sur
+  `/place`, abandonné. À repenser.
+- **Coffres vides** : voulu (§6.3) ; un butin de victoire reste possible (non fait).
+
+**À tester en jeu** :
+1. « Sonner le rassemblement » : le menu se ferme tout de suite, titre et cloche, puis la courte
+   pause ; un nouveau clic dit que l'expédition est en cours.
+2. Camp : un camp de bandits ou de l'Égide sans occupants, coffres vides, posé à plat ; sur un
+   terrain accidenté ou sans Valarian Conquest, le camp du plugin de 7 × 7. Héraut et
+   réapparition dans le camp, pas sur le feu.
+3. Abordage (`navire-pirate-maudit`, `bateau-pirate`, `galion`) : radeau, barques (une par joueur
+   + 1, incassables), défenseurs sur le pont, « Navire abordé » en posant le pied à bord, capitaine.
+4. Repaire de surface (`hutte-de-la-sorciere`, `cabane-de-l-apothicaire`) : maître lumineux,
+   défiance bloquée à 10 % tant qu'il vit ; repaire enfoui (`catacombes`, `monument-souterrain`) :
+   puits à échelles, galerie éclairée jusqu'à une salle, défenseurs à l'intérieur.
+5. Château (niveau VI) : « Place tenue » 45 s, pause quand un défenseur revient ; château dans le
+   ciel : tour d'échelles.
+6. Nether (`forteresse-du-nether`, `vestiges-de-bastion`) et End (`cite-de-l-end`) : mondes créés
+   au démarrage (temps dans la console), plateforme et passerelle, défenseurs dans la structure,
+   pas de dragon ; mort et réapparition sur la plateforme.
+7. `/city niveau`, `monter`, `descendre`, `3` : chapitre affiché, niveaux de raid débloqués en
+   conséquence chez Alderic.
+
+### R3, R4 et R5 — codées le 21/10/2026 (tests en jeu à faire)
+
+Constat du test de R1 : « le raid fonctionne, mais pas d'objectifs ni d'adversaires ». Le monde
+des raids n'a pas d'apparition naturelle de créatures (`doMobSpawning` coupé, §2.2) : une
+structure ne porte d'occupants que si son gabarit en contient. Les défenseurs sont donc ajoutés
+par le plugin, plus ou moins nombreux et forts selon le niveau.
+
+**Code** : `RaidAssault` (défenseurs, objectifs, renforts, chef, événements de l'assaut),
+`RaidProgress` (tables `raid_state` et `raid_results` : victoires, recharges, historique),
+`RaidRun` (défiance, objectifs), `RaidManager` (victoire, défaite, bilan, récompenses, barre,
+suivi des quêtes, accès des écrans), `RaidParticipants` (anti-exploitation), `RaidCommands`
+(`start … force`, `recharge`, `debloquer`), `EnemyArmy.spawnDefender` (soldat qui tient un poste),
+`QuestHUD.setRaid` (défiance et objectifs en tête du panneau de quêtes), `RaidScreens` (écrans
+d'Alderic illustrés et classiques), `MayorScreens` et `MayorGUI` (bouton Événements),
+`UiMenu.windowTitle` et `refresh` (menus classiques, compte vivant), `ValmontArt` (boutons
+Événements, Raids, Sièges, Fêtes, Rassembler, bannière Raids, dé « au hasard »),
+`config-version` 34 (`raids.defenseurs`, `force`, `objectifs`, `recompenses` ; contrôlé hors jeu
+sur la configuration du serveur ; les clés ajoutées gardent désormais leur commentaire).
+
+**Défenseurs (§5.3)** : nombre tiré entre les bornes du niveau × (1 + 0,5 × (joueurs − 1)), au
+plus 60 vivants ; ceux de la structure reçoivent la force du niveau (vie × 1 à 2,2, dégâts × 1 à
+1,6, armure de cuir à netherite pour ceux qui n'en ont pas, ni butin ni départ, pas de brûlure au
+soleil) et le reste est ajouté : cible `armee` (ou sans occupant hostile) → soldats d'une faction
+des sièges (armée ennemie à part de celle des sièges, palier du siège selon le niveau) ; cible
+`creatures` → ses créatures ; sinon des créatures du même genre que les occupants. Postes : au sol
+près des portes et de la cloche une fois sur deux (pas sur les toits), sinon au cœur de la boîte,
+jamais à moins de 14 blocs du camp. Toutes les 2 s, un défenseur sans cible s'en prend au joueur
+engagé le plus proche en vue (20 blocs) ; les 3 derniers de la garnison brillent.
+**Chef** (niveaux V à VII, villes, navires, ou `chef` de raids.yml) : lumineux, nommé (« Capitaine
+de l'Ost du Corbeau », « Chef … »), vie × 2,5 à 3, objectif obligatoire. **Renforts** (§5.4) :
+`renforts` vagues du niveau, sous 50 % (1 vague), 67/33 % (2), 75/50/25 % (3) de défiance : un
+quart de la garnison arrive du côté opposé au camp et marche sur le cœur de la cible.
+
+**Objectifs (§5.2)** : garnison (80 % abattus), cloche (sonnée sans défenseur à 16 blocs), bannières
+(arrachées), cages (niveau IV et plus, repaires ; neutralisées en dessous), captifs (allays,
+clic), chef. Un objectif dont la cible n'a pas l'élément est retiré ; à défaut, la garnison.
+Défiance = 100 % − la part pondérée des objectifs remplis (poids dans `raids.objectifs.poids`),
+au moins 10 % tant qu'un objectif obligatoire reste. Victoire : défiance à 0 → capitulation (les
+défenseurs restants disparaissent), titre, son. Défaite : chrono écoulé ou plus aucun joueur
+engagé ; rien de perdu, recharge de moitié.
+
+**Récompenses (§6.1)** : caisse de la ville et chaque combattant (parti au camp et resté jusqu'au
+bout, ou ayant abattu au moins un défenseur), × (1 + 15 % par bonus réussi : épargner, sans
+perte, éclair) × (1 + renommée : 5 % par victoire du niveau, au plus 25 %) ; la renommée rend aussi
+les défenseurs plus coriaces (+10 % de vie par victoire, au plus +50 %). Bilan dans le chat
+(durée, défiance, défenseurs abattus, objectifs, meilleurs combattants, bonus, gains).
+
+**Déblocage et recharge (§4.1, §6.2)** : un niveau s'ouvre au chapitre de la ville et après une
+victoire au niveau précédent ; après une expédition, recharge du niveau pour tout le serveur.
+`start … force` (administration) passe outre ; `recharge` les lève ; `debloquer <n>` compte une
+victoire à chaque niveau en dessous (le chapitre reste exigé).
+
+**Anti-exploitation (§6.3)** : aucun butin des créatures (l'expérience reste), rien ne tombe des
+blocs cassés ni des explosions, cadres et tableaux arrachés sans rien laisser, pas de commerce
+avec les villageois ; coffres, tonneaux et pots vidés (tables de butin retirées), cadres et
+porte-armures vidés, golems retirés à la préparation.
+
+**Écrans d'Alderic (§1.1)** : accueil de la mairie → bouton **Événements** (badge quand un raid
+est prêt) à la place d'**Agrandir**, passé dans le **Trésor** ; Événements (Raids, Sièges en
+consultation avec le calendrier, Fêtes « bientôt ») → Difficulté (7 niveaux : chiffre romain,
+cadenas, conditions cochées, nombre de cibles, victoires, recharge) → Cibles (grille paginée,
+filtres « toutes » + types du niveau, « au hasard », « prise ×N ») → Fiche (type, occupants, mods,
+objectifs, chrono, récompense et bonus, joueurs dans le cercle d'Alderic revus chaque seconde,
+« Sonner le rassemblement » grisé avec la raison). Sans le pack : mêmes écrans en menus
+classiques (case « Événements » du menu d'Alderic). Un joueur qui sonne le rassemblement ne voit
+pas le détail technique du repérage (envoyé à la console).
+
+**Écarts** :
+- **Cibles « bientôt »** : abordages (R7), repaires enfouis (R8) et villes fortifiées (R6)
+  restent visibles mais grisés chez Alderic (`start … force` reste possible en administration).
+- **Repérage à l'ouverture de la fiche** : pas fait. Une recherche coûte quelques secondes de fil
+  principal ; la lancer à chaque fiche ouverte serait pire que de la lancer au rassemblement. Le
+  repérage reste au signal (« les éclaireurs repèrent le terrain », avancement pour tous).
+- **Objectifs `porte`, `tenir`, `maitre`, `aborder`** : pas encore suivis (R6 à R8) ; retirés.
+- **Trophées** (bannière de la faction vaincue, trophée légendaire) : renvoyés à R10.
+- Le compte des joueurs du cercle se met à jour dans la fiche sans la rouvrir (objet vivant) ;
+  la barre de la fiche garde un texte fixe.
+
+**À tester en jeu — R3, R4, R5** :
+1. Mairie avec et sans pack : bouton Événements (badge), Agrandir dans le Trésor ; Événements →
+   Raids → Difficulté (cadenas, conditions, recharge) → Cibles (filtres, pages, au hasard) →
+   Fiche (compte du cercle en direct en entrant et sortant du cercle).
+2. Bouton grisé avec la raison : niveau fermé, recharge, raid en cours, siège ; « Sonner le
+   rassemblement » lance l'expédition (cloche, annonce) sans message technique au joueur.
+3. Assaut niveau I (`camp-de-bandits` ou un camp vanilla) : défenseurs présents (nombre, armure,
+   force), qui attaquent, ne brûlent pas au soleil, ne laissent rien ; objectifs dans le panneau de
+   quêtes et la barre « Défiance N % · mm:ss » ; garnison → victoire, capitulation, bilan et gains
+   (caisse et bourse).
+4. Village (niveau III) : cloche refusée tant qu'un défenseur est à 16 blocs, acceptée ensuite ;
+   bonus « épargner » perdu si un villageois est tué ; pas de commerce avec les villageois.
+5. Avant-poste (niveau II) et une cible `armee` : soldats d'une faction (PNJ) qui tiennent leur
+   poste puis attaquent ; bannières arrachées comptées ; rien ne tombe des blocs cassés.
+6. Niveau III ou plus : renforts sous 50 % de défiance (titre, cor) ; niveau V : chef lumineux
+   obligatoire (défiance bloquée à 10 % tant qu'il vit).
+7. Défaite au chrono (`raids.niveaux.1.chrono-minutes: 1`) : bilan sans gain, recharge de moitié ;
+   victoire : recharge entière, niveau suivant débloqué (au chapitre voulu) ; `recharge` et
+   `debloquer` en administration.
+8. Deux joueurs : plus de défenseurs (× 1,5) ; un joueur rentré au camp avant la fin sans avoir
+   abattu personne n'est pas payé.
 
 ### R1 — codée le 21/10/2026 (tests en jeu à faire)
 

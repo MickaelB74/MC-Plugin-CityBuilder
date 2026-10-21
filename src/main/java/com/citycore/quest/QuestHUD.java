@@ -17,6 +17,7 @@ import org.bukkit.scoreboard.*;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static com.citycore.ui.UiLayout.*;
 
@@ -111,6 +112,15 @@ public class QuestHUD {
     /** Liste des joueurs à renvoyer quand le suivi accroché change (en-tête et pied, CityCoreHUD). */
     public void setTabRefresher(Consumer<Player> tabRefresher) {
         this.tabRefresher = tabRefresher;
+    }
+
+    /** Expédition en cours (plan « Raids ») : défiance et objectifs en tête du suivi, vide sinon. */
+    private Function<Player, List<UiHud.Row>> raidRows = p -> List.of();
+    private Function<Player, List<String>> raidLines = p -> List.of();
+
+    public void setRaid(Function<Player, List<UiHud.Row>> rows, Function<Player, List<String>> lines) {
+        this.raidRows = rows;
+        this.raidLines = lines;
     }
 
     private boolean hiddenByMod(CityNPC npc) {
@@ -369,7 +379,7 @@ public class QuestHUD {
     private List<String> buildLines(Player player) {
         UUID uuid  = player.getUniqueId();
         Set<String> hidden = untracked(player);
-        List<String> lines = new ArrayList<>();
+        List<String> lines = new ArrayList<>(raidLines.apply(player)); // expédition en cours d'abord
 
         // Une seule requête pour savoir quels PNJ ont une quête active
         Set<String> active = questManager.getActiveQuestKeys(uuid);
@@ -545,7 +555,7 @@ public class QuestHUD {
     private List<UiHud.Row> buildRows(Player player, int maxRows) {
         UUID uuid = player.getUniqueId();
         Set<String> hidden = untracked(player);
-        List<UiHud.Row> rows = new ArrayList<>();
+        List<UiHud.Row> rows = new ArrayList<>(raidRows.apply(player)); // expédition en cours d'abord
         Set<String> active = questManager.getActiveQuestKeys(uuid);
         if (active.isEmpty()) return rows;
 

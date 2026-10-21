@@ -266,6 +266,28 @@ public class DatabaseManager {
             )
         """);
 
+        // Raids : victoires et recharge de chaque niveau (déblocage, renommée), historique des expéditions
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS raid_state (
+                niveau           INTEGER PRIMARY KEY,
+                victoires        INTEGER NOT NULL DEFAULT 0,
+                recharge_jusqu_a INTEGER NOT NULL DEFAULT 0
+            )
+        """);
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS raid_results (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                cible           TEXT    NOT NULL,
+                niveau          INTEGER NOT NULL,
+                resultat        TEXT    NOT NULL,
+                joueurs         INTEGER NOT NULL,
+                duree           INTEGER NOT NULL,
+                defiance_finale INTEGER NOT NULL,
+                bonus           TEXT    NOT NULL,
+                date            INTEGER NOT NULL
+            )
+        """);
+
         stmt.close();
     }
 

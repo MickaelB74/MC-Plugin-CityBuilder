@@ -72,6 +72,14 @@ public final class ConfigUpdater {
      *      par rayon-recherche et marge, en-tête de la section réécrit.
      * 33 : raids, phase R1 (départ, camp, sécurité des joueurs) : raids.camp, rassemblement,
      *      bilan-secondes, joueurs et niveaux s'ajoutent sous raids sans ligne à corriger.
+     * 34 : raids, phases R4 et R5 (assaut) : raids.defenseurs, force, objectifs et recompenses
+     *      s'ajoutent sous raids.
+     * 35 : raids, camps des mods et phases R7 à R9 : raids.camp.modeles, raids.objectifs.tenir-*
+     *      s'ajoutent ; poids des objectifs complétés (aborder, maitre, tenir).
+     * 36 : raids, défenseurs moins coriaces (test des raids légendaires) : raids.force (vie de 1 à
+     *      1,5, armure de fer au plus) et la force gagnée par victoire (5 %, au plus 25 %).
+     * 37 : raids.camp.heraut-skin (skin du héraut du camp) s'ajoute sous raids.camp.
+     * 38 : villes fortifiées (R6) : poids de l'objectif « tours » dans raids.objectifs.poids.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -153,12 +161,29 @@ public final class ConfigUpdater {
                                     + "        - {bloc: \"irons_spellbooks:scroll_forge\", nom: \"forge à parchemins\"}\n"
                                     + "        - {bloc: \"irons_spellbooks:alchemist_cauldron\", nom: \"chaudron d'alchimiste\"}\n",
                             "batiments.ateliers.gandalf (bonus d'Iron's Spells)"}),
+            35, List.<String[]>of(
+                    new String[]{"(?m)^" + java.util.regex.Pattern.quote(
+                            "    poids: {garnison: 3, cloche: 1, bannieres: 1, cages: 1, liberer: 1, chef: 2}") + "$",
+                            "    poids: {garnison: 3, cloche: 1, bannieres: 1, cages: 1, liberer: 1, chef: 2, aborder: 1, maitre: 2, tenir: 1}",
+                            "raids.objectifs.poids (aborder, maitre, tenir)"}),
             17, List.<String[]>of(
                     new String[]{"(?m)^    skins: \\[\\]$",
                             "    skins:\n"
                                     + "      - {name: \"\", value: \"\", signature: \"\"}\n"
                                     + "      - {name: \"\", value: \"\", signature: \"\"}\n"
                                     + "      - {name: \"\", value: \"\", signature: \"\"}"}));
+
+    /** Suite de UPDATED_LINES (Map.of s'arrête à dix entrées). */
+    private static final java.util.Map<Integer, List<String[]>> LATER_LINES = java.util.Map.of(
+            36, List.<String[]>of(
+                    new String[]{java.util.regex.Pattern.quote("  force:\n" + "    1: {vie: 1.0, degats: 1.0, armure: aucune}\n" + "    2: {vie: 1.1, degats: 1.0, armure: cuir}\n" + "    3: {vie: 1.25, degats: 1.1, armure: maille}\n" + "    4: {vie: 1.4, degats: 1.2, armure: fer}\n" + "    5: {vie: 1.6, degats: 1.3, armure: fer}\n" + "    6: {vie: 1.8, degats: 1.4, armure: diamant}\n" + "    7: {vie: 2.2, degats: 1.6, armure: netherite}\n"), "  force:\n" + "    1: {vie: 1.0, degats: 1.0, armure: aucune}\n" + "    2: {vie: 1.0, degats: 1.0, armure: aucune}\n" + "    3: {vie: 1.1, degats: 1.1, armure: cuir}\n" + "    4: {vie: 1.2, degats: 1.15, armure: cuir}\n" + "    5: {vie: 1.3, degats: 1.2, armure: maille}\n" + "    6: {vie: 1.4, degats: 1.25, armure: maille}\n" + "    7: {vie: 1.5, degats: 1.3, armure: fer}\n", "raids.force (défenseurs moins coriaces)"},
+                    new String[]{"(?m)^" + java.util.regex.Pattern.quote("  recompenses: {bonus: 0.15, renommee-par-victoire: 0.05, renommee-max: 0.25, force-par-victoire: 0.10, force-max: 0.5}") + "$", "  recompenses: {bonus: 0.15, renommee-par-victoire: 0.05, renommee-max: 0.25, force-par-victoire: 0.05, force-max: 0.25}",
+                            "raids.recompenses (force par victoire 5 %, au plus 25 %)"}),
+            38, List.<String[]>of(
+                    new String[]{"(?m)^" + java.util.regex.Pattern.quote(
+                            "    poids: {garnison: 3, cloche: 1, bannieres: 1, cages: 1, liberer: 1, chef: 2, aborder: 1, maitre: 2, tenir: 1}") + "$",
+                            "    poids: {garnison: 3, cloche: 1, bannieres: 1, cages: 1, liberer: 1, chef: 2, aborder: 1, maitre: 2, tenir: 1, tours: 2}",
+                            "raids.objectifs.poids (tours)"}));
 
     private ConfigUpdater() {}
 
@@ -286,7 +311,9 @@ public final class ConfigUpdater {
         for (String section : replaced) updated = removeSection(updated, section);
         // Anciennes valeurs par défaut remplacées (seulement si elles n'ont pas été modifiées)
         for (int v = fileVersion + 1; v <= jarVersion; v++) {
-            for (String[] change : UPDATED_LINES.getOrDefault(v, List.of())) {
+            List<String[]> changes = new java.util.ArrayList<>(UPDATED_LINES.getOrDefault(v, List.of()));
+            changes.addAll(LATER_LINES.getOrDefault(v, List.of()));
+            for (String[] change : changes) {
                 String before = updated;
                 updated = updated.replaceFirst(change[0], Matcher.quoteReplacement(change[1]));
                 // Libellé du journal : la première ligne seulement (une liste en compte plusieurs)
@@ -324,6 +351,12 @@ public final class ConfigUpdater {
         String withAteliers = addMissingGrandChildren(updated, lines, user, "batiments", "ateliers");
         if (!withAteliers.equals(updated)) added.add("batiments.ateliers (nouveaux personnages)");
         updated = withAteliers;
+        // Raids : nouveaux réglages du camp (modèles des mods) et des objectifs (tenir la place)
+        for (String sub : new String[]{"camp", "objectifs"}) {
+            String with = addMissingGrandChildren(updated, lines, user, "raids", sub);
+            if (!with.equals(updated)) added.add("raids." + sub + " (nouveaux réglages)");
+            updated = with;
+        }
         if (append.length() > 0) updated = updated.stripTrailing() + "\n" + append;
         return updated;
     }
@@ -359,6 +392,7 @@ public final class ConfigUpdater {
     private static String addMissingChildren(String text, String[] jarLines, YamlConfiguration user, String section) {
         if (!user.isConfigurationSection(section)) return text;
         List<String> missing = new ArrayList<>();
+        List<String> comments = new ArrayList<>();                    // commentaire juste au-dessus d'une clé
         boolean inside = false, copying = false;
         Pattern child = Pattern.compile("^  ([A-Za-z0-9_-]+):");
         for (String line : jarLines) {
@@ -368,11 +402,18 @@ public final class ConfigUpdater {
             Matcher m = child.matcher(line);
             if (m.find()) {
                 copying = !user.contains(section + "." + m.group(1));
-                if (copying) missing.add(line);
+                if (copying) {
+                    missing.addAll(comments);                         // la clé ajoutée garde son commentaire
+                    missing.add(line);
+                }
+                comments.clear();
             } else if (copying && line.startsWith("   ")) {
                 missing.add(line);                                    // suite de la clé ajoutée
             } else if (!line.startsWith("   ")) {
                 copying = false;                                      // commentaire de la section
+                if (line.trim().startsWith("#")) comments.add(line); else comments.clear();
+            } else {
+                comments.clear();
             }
         }
         if (missing.isEmpty()) return text;
