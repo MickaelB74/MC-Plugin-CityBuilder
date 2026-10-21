@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 38
+config-version: 39
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -3176,7 +3176,8 @@ raids:
   camp:
     distance: 32            # blocs entre le bord de la cible et le camp (point de réapparition)
     heraut-skin: {value: "ewogICJ0aW1lc3RhbXAiIDogMTc4MzU5MTA5OTM2NCwKICAicHJvZmlsZUlkIiA6ICIxYjkzYjI5MjhkMjI0MDQxYjU0ZjI3ZjM2YjU5MGViZCIsCiAgInByb2ZpbGVOYW1lIiA6ICJtYW51ZHJpbmtzIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlL2MwMDc0ZTc5ZGQ1MTE0Y2Q3YmJkYjFjMDdhYTViZTQwMjk5NzRlMWM5ZTU0MmE5NGY3YTIyOGNlYTE3NTM3MWIiLAogICAgICAibWV0YWRhdGEiIDogewogICAgICAgICJtb2RlbCIgOiAic2xpbSIKICAgICAgfQogICAgfQogIH0KfQ==", signature: "eX2ENyhwvYSxdUSXom+fpqYle4hz/dkGsH0lWO/sl7lS3qJp1bLLbT03bAWzRnJSzoqFuAyxK3GYO1b4EsdCr6rk8TlihfmvltMgImhVn9qVeCLmjVU8OxHZrv+f13+7+XqId90NIVDZW9TYK2u1p1mGW8x5BMo6RS3M6Hx/LsBvuvXXq0s+FJKEQ5HIasOt0k/N2aGtgUq7Me0738fbY+pw3jiKQrq6Dj6G3xkVuWATdyZ7/EcsaPd7QZRl5wPvABX8v1a3K82Fh5SXFyuL0HY8ywvVVSfygFR6sgO+xD3HeTSduP4ZkHjQGg/cvdH+bor67pKpPfpvMT37tPzOZY7DrRjEXy2/SayAE4jHb+Y9z0ppc+k9V3Mlf9virHjENcciUUO+TwqG/cm/BzpmE5f2Lq7x566gewT4A1HQjbYdAxca/8XvuFHrFbq1L9C8jPGS89a/9NeMYW4s1ouVDcNJKSJxXwTZtPA366hw8Swfy0X0qBywfb5IGcdy7oTZrpXdgt2NgfW50G5hLXvqs/GGvkaKTw4gHygDOJ0gVLA/WOv/XOrXT1uCDbYem+tTKhKTaMFCO2PvldntTekqTKAXB3eN1vBlfiFKULlexVmBJmNjqCMQlUkQEoCEWBARpWFELjVNFoFzqA3xKdAkO61IxNbQaQcJVElBpdxF8Ak="}   # skin du héraut du camp (mineskin.org) ; value vide = skin de Minecraft
-    modeles: [valarian_conquest:bandit_camp, valarian_conquest:aegis_camp]   # camps des mods (un au hasard, sans occupants, coffres vidés) ; [] ou absents : camp du plugin
+    modeles: [valarian_conquest:bandit_camp]   # camp sur la terre ferme : gabarit d'un mod (un au hasard, sans occupants, coffres vidés) ; [] : camp du plugin
+    navires: [{id: "kaisyn:ships/village_ocean/pieces/small_ship/small_ship_4", flottaison: 2}, {id: "kaisyn:ships/village_ocean/pieces/escort/escort_1", flottaison: 1}, {id: "kaisyn:ships/village_ocean/pieces/escort/escort_2", flottaison: 1}]   # camp sur l'eau : petit bateau d'un mod (un au hasard) ; flottaison = couches du gabarit sous la surface ; [] : radeau du plugin
   rassemblement: {rayon: 10, secondes: 30, joueurs-min: 1}   # cercle autour d'Alderic, compte à rebours, joueurs requis
   bilan-secondes: 20        # temps pour souffler après la fin, avant le retour de chacun à Valmont
   joueurs:

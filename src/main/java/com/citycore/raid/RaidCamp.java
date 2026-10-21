@@ -31,11 +31,12 @@ import java.util.logging.Logger;
  * point de réapparition des joueurs morts. Posé à {@code distance} blocs du bord de la boîte de la
  * cible (hors de portée des archers postés aux murs), du côté le plus plat, face à la cible.
  *
- * Un camp d'un mod d'abord (raids.camp.modeles : camp de bandits, camp de l'Égide de Valarian
- * Conquest…) : son gabarit est posé tel quel, sans ses occupants, coffres et tonneaux vidés, sur
- * un sol comblé. Sur un terrain trop accidenté ou sans modèle : le camp du plugin, un plancher de
- * 7 × 7 avec feu de camp, lanternes et bannière de Valmont. Sur l'eau (abordages, R7) : le radeau
- * de Valmont, 9 × 9 avec bastingage, mât et bannière, et des places d'amarrage pour les barques.
+ * Sur la terre ferme, un camp d'un mod (raids.camp.modeles : le camp de bandits de Valarian
+ * Conquest) : son gabarit est posé tel quel, sans ses occupants, coffres et tonneaux vidés, sur un
+ * sol comblé. Sur un terrain très accidenté ou sans modèle : le camp du plugin, un plancher de
+ * 7 × 7. Sur l'eau (abordages, R7) : un petit bateau d'un mod (raids.camp.navires : bateaux du
+ * village sur l'eau de Towns and Towers), sa coque dans l'eau ; sans modèle, le radeau de Valmont.
+ * Autour, des places d'amarrage pour les barques.
  * Le monde des raids est jetable : le camp disparaît avec lui.
  *
  * Les chunks doivent être chargés (le site est généré avec une marge qui couvre le camp).
@@ -56,8 +57,12 @@ final class RaidCamp {
     /** Étiquette des barques du radeau (retirées au nettoyage, indestructibles). */
     static final String TAG_CAMP = "citycore.raid.camp";
 
-    /** Gabarit de camp d'un mod, chargé au lancement de l'expédition. */
-    record Model(String id, Structure structure) {
+    /**
+     * Gabarit de camp d'un mod, chargé au lancement de l'expédition.
+     *
+     * @param waterline bateau : couches sous la surface de l'eau ; 0 pour un camp sur la terre ferme
+     */
+    record Model(String id, Structure structure, int waterline) {
         int width()  { return structure.getSize().getBlockX(); }
         int height() { return structure.getSize().getBlockY(); }
         int depth()  { return structure.getSize().getBlockZ(); }
@@ -68,8 +73,8 @@ final class RaidCamp {
     /** Demi-côté du plancher du camp du plugin (7 × 7) et du radeau (9 × 9). */
     private static final int HALF = 3;
     private static final int RAFT = 4;
-    /** Relief au-delà duquel un gabarit n'est pas posé (il flotterait ou s'enterrerait). */
-    private static final int MAX_RELIEF = 6;
+    /** Relief au-delà duquel un gabarit n'est pas posé (sol comblé jusqu'à 14 blocs dessous). */
+    private static final int MAX_RELIEF = 12;
 
     private RaidCamp() {}
 
@@ -84,7 +89,7 @@ final class RaidCamp {
             if (key == null) continue;
             try {
                 Structure s = Bukkit.getStructureManager().loadStructure(key, false);
-                if (s != null && s.getSize().getBlockX() > 0 && s.getSize().getBlockZ() > 0) return new Model(id, s);
+                if (s != null && s.getSize().getBlockX() > 0 && s.getSize().getBlockZ() > 0) return new Model(id, s, 0);
             } catch (RuntimeException e) {
                 log.fine("⚔ [Raids] Modèle de camp " + id + " illisible : " + e.getMessage());
             }
@@ -92,8 +97,19 @@ final class RaidCamp {
         return null;
     }
 
+    /** Un petit bateau au hasard parmi ceux que le serveur connaît, ou null (radeau du plugin). */
+    static Model pickBoat(List<RaidConfig.Boat> boats) {
+        List<RaidConfig.Boat> order = new ArrayList<>(boats);
+        Collections.shuffle(order);
+        for (RaidConfig.Boat b : order) {
+            Structure s = RaidTemplates.load(b.id());
+            if (s != null) return new Model(b.id(), s, b.waterline());
+        }
+        return null;
+    }
+
     /** Choisit le côté et pose le camp ; null si aucun côté n'est dans des chunks chargés. */
-    static Camp build(World w, BoundingBox box, int distance, Model model) {
+    static Camp build(World w, BoundingBox box, int distance, Model model, Model boat) {
         if (w.getEnvironment() != World.Environment.NORMAL) return buildOther(w, box, distance);
         double cx = box.getCenterX(), cz = box.getCenterZ();
         int reach = model != null ? model.reach() : HALF;
@@ -119,12 +135,18 @@ final class RaidCamp {
         }
         if (best == null) return null;
         int x = best[0], z = best[1], floorY = best[2], water = best[3], relief = best[4];
-        if (model != null && water == 0 && relief <= MAX_RELIEF) {
+        int side = (2 * reach + 1) * (2 * reach + 1);
+        // Terre ferme (quelques flaques tolérées) : le camp du mod
+        if (model != null && water <= side / 10 && relief <= MAX_RELIEF) {
             Camp c = placeModel(w, x, z, floorY, model, cx, cz);
             if (c != null) return c;
         }
-        int side = (2 * reach + 1) * (2 * reach + 1);
         boolean raft = water > side / 2;
+        // Sur l'eau : le petit bateau d'un mod
+        if (raft && boat != null) {
+            Camp c = placeBoat(w, x, z, floorY, boat, cx, cz);
+            if (c != null) return c;
+        }
         List<Location> moorings = List.of();
         if (raft) moorings = layRaft(w, x, z, floorY);
         else lay(w, x, z, floorY);
@@ -183,6 +205,57 @@ final class RaidCamp {
             banner.getBlock().setType(Material.YELLOW_BANNER, false);
         }
         return new Camp(spawn, herald, false, model.id(), List.of());
+    }
+
+    /**
+     * Petit bateau d'un mod sur l'eau, centré sur (x, z) : sa coque trempe de {@code waterline}
+     * couches sous la surface ({@code waterY}), l'eau revient autour, son intérieur reste sec.
+     * Point de départ sur le pont, héraut à côté ; places d'amarrage tout autour.
+     */
+    private static Camp placeBoat(World w, int x, int z, int waterY, Model boat, double cx, double cz) {
+        BoundingBox placed = RaidTemplates.place(w, boat.structure(), x, z, waterY - boat.waterline(),
+                RaidTemplates.randomRotation(), waterY);
+        if (placed == null) return null;
+        // Pont : la plus basse place libre au-dessus de l'eau, au plus près du milieu
+        Location spawn = null;
+        for (int ring = 0; ring <= 6 && spawn == null; ring++) {
+            for (int dx = -ring; dx <= ring && spawn == null; dx++) {
+                for (int dz = -ring; dz <= ring && spawn == null; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
+                    for (Location at : RaidTemplates.standsIn(w, x + dx, z + dz, placed)) {
+                        if (at.getBlockY() > waterY) { spawn = at; break; }
+                    }
+                }
+            }
+        }
+        if (spawn == null) return null;
+        face(spawn, cx, cz);
+        Location herald = null;
+        for (int ring = 1; ring <= 4 && herald == null; ring++) {
+            for (int dx = -ring; dx <= ring && herald == null; dx++) {
+                for (int dz = -ring; dz <= ring && herald == null; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
+                    for (Location at : RaidTemplates.standsIn(w, spawn.getBlockX() + dx, spawn.getBlockZ() + dz, placed)) {
+                        if (Math.abs(at.getBlockY() - spawn.getBlockY()) <= 1) { herald = at; break; }
+                    }
+                }
+            }
+        }
+        if (herald == null) herald = spawn.clone();
+        herald.setDirection(spawn.toVector().subtract(herald.toVector()));
+        herald.setPitch(0f);
+        // Amarrage : sur l'eau, à deux blocs de la coque, autour du bateau
+        List<Location> moorings = new ArrayList<>();
+        int x0 = (int) placed.getMinX() - 2, x1 = (int) placed.getMaxX() + 1;
+        int z0 = (int) placed.getMinZ() - 2, z1 = (int) placed.getMaxZ() + 1;
+        int mxc = (x0 + x1) / 2, mzc = (z0 + z1) / 2;
+        int[][] spots = {{x0, mzc}, {x1, mzc}, {mxc, z0}, {mxc, z1}, {x0, z0 + 3}, {x1, z1 - 3}, {x0, z1 - 3}, {x1, z0 + 3},
+                {x0 + 3, z0}, {x1 - 3, z1}};
+        for (int[] s : spots) {
+            Block b = w.getBlockAt(s[0], waterY, s[1]);
+            if (b.isLiquid()) moorings.add(b.getLocation().add(0.5, 1, 0.5));
+        }
+        return new Camp(spawn, herald, true, boat.id(), moorings);
     }
 
     /**

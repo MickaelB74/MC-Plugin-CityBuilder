@@ -42,6 +42,15 @@ public final class RaidConfig {
     public final int campDistance;
     /** Gabarits de camp des mods (un au hasard parmi ceux présents), vide = camp du plugin. */
     public final List<String> campModels;
+    /** Petits bateaux des mods pour le camp sur l'eau (un au hasard), vide = radeau du plugin. */
+    public final List<Boat> campBoats;
+
+    /**
+     * Bateau du camp sur l'eau.
+     *
+     * @param waterline couches du gabarit sous la surface de l'eau (la coque qui trempe)
+     */
+    public record Boat(String id, int waterline) {}
     /** Skin du héraut du camp : {value, signature} (mineskin.org), ou null (skin de Minecraft). */
     public final String[] heraldSkin;
     /** Rassemblement : rayon du cercle autour d'Alderic, durée du compte à rebours, joueurs requis. */
@@ -124,8 +133,22 @@ public final class RaidConfig {
         String skinValue = skin == null ? "" : skin.getString("value", "").trim();
         heraldSkin = skinValue.isEmpty() ? null : new String[]{skinValue, skin.getString("signature", "").trim()};
         campModels = camp == null || !camp.contains("modeles")
-                ? List.of("valarian_conquest:bandit_camp", "valarian_conquest:aegis_camp")
+                ? List.of("valarian_conquest:bandit_camp")
                 : List.copyOf(camp.getStringList("modeles"));
+        List<Boat> boats = new java.util.ArrayList<>();
+        if (camp == null || !camp.contains("navires")) {
+            boats.add(new Boat("kaisyn:ships/village_ocean/pieces/small_ship/small_ship_4", 2));
+            boats.add(new Boat("kaisyn:ships/village_ocean/pieces/escort/escort_1", 1));
+            boats.add(new Boat("kaisyn:ships/village_ocean/pieces/escort/escort_2", 1));
+        } else {
+            for (Map<?, ?> m : camp.getMapList("navires")) {
+                Object id = m.get("id"), line = m.get("flottaison");
+                if (id == null) continue;
+                int wl = line instanceof Number n ? n.intValue() : 1;
+                boats.add(new Boat(id.toString().trim(), Math.max(0, Math.min(8, wl))));
+            }
+        }
+        campBoats = List.copyOf(boats);
         ConfigurationSection gather = root.getConfigurationSection("rassemblement");
         gatherRadius  = Math.max(3, gather == null ? 10 : gather.getInt("rayon", 10));
         gatherSeconds = Math.max(5, gather == null ? 30 : gather.getInt("secondes", 30));

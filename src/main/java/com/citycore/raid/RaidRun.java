@@ -45,8 +45,9 @@ final class RaidRun {
     /** Garnison de chaque tour (une tour est prise quand la sienne est abattue), tours prises. */
     final java.util.List<Set<UUID>> towerGarrisons = new java.util.ArrayList<>();
     final Set<Integer> towersTaken = new java.util.HashSet<>();
-    /** Gabarit de camp choisi au lancement (null : camp du plugin). */
+    /** Gabarits de camp choisis au lancement : sur la terre ferme, sur l'eau (null : camp du plugin). */
     RaidCamp.Model campModel;
+    RaidCamp.Model boatModel;
     /** Joueurs partis au camp, encore engagés (ni rentrés ni partis d'eux-mêmes). */
     final Set<UUID> enrolled = new LinkedHashSet<>();
     final Map<UUID, Integer> deaths = new HashMap<>();

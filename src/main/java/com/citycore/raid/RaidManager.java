@@ -577,7 +577,8 @@ public final class RaidManager {
                 + "§6… §8(le serveur peut marquer une courte pause)");
         // Camp d'un mod (camp de bandits…) : la zone générée autour de la cible doit le contenir
         r.campModel = RaidCamp.pick(config.campModels, plugin.getLogger());
-        int reach = r.campModel != null ? r.campModel.reach() : 4;
+        r.boatModel = RaidCamp.pickBoat(config.campBoats); // camp sur l'eau (abordages)
+        int reach = Math.max(r.campModel != null ? r.campModel.reach() : 4, r.boatModel != null ? r.boatModel.reach() : 5);
         int margin = Math.max(config.margin, config.campDistance + reach + 6);
         if (target.city() != null) {
             // Tours et siège sont posés hors du village : la zone générée doit les contenir
@@ -616,7 +617,7 @@ public final class RaidManager {
         r.site = s.site();
         r.arena = s.arena();
         r.siteKey = s.key();
-        r.camp = RaidCamp.build(r.world, s.site().box(), config.campDistance, r.campModel);
+        r.camp = RaidCamp.build(r.world, s.site().box(), config.campDistance, r.campModel, r.boatModel);
         if (r.camp == null) {
             tell(sender, "§c❌ Expédition annulée : pas de place pour le camp autour de la cible.");
             cleanup(r, "pas de place pour le camp");
@@ -773,7 +774,7 @@ public final class RaidManager {
                 if (r.target.underground() && r.lairEntry != null) {
                     p.sendMessage("§7⚔ Le repaire est sous terre : un puits à échelles, marqué d'une lanterne, descend du camp.");
                 } else if (r.camp.water()) {
-                    p.sendMessage("§7⚓ Des barques sont amarrées au radeau : à l'abordage !");
+                    p.sendMessage("§7⚓ Des barques sont amarrées autour du bateau : à l'abordage !");
                 } else if (r.target.floating()) {
                     p.sendMessage("§7⚔ La cible flotte dans le ciel : une tour d'échelles, marquée d'une lanterne, y monte depuis le sol.");
                 }

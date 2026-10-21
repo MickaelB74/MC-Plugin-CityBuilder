@@ -80,6 +80,8 @@ public final class ConfigUpdater {
      *      1,5, armure de fer au plus) et la force gagnée par victoire (5 %, au plus 25 %).
      * 37 : raids.camp.heraut-skin (skin du héraut du camp) s'ajoute sous raids.camp.
      * 38 : villes fortifiées (R6) : poids de l'objectif « tours » dans raids.objectifs.poids.
+     * 39 : camps des raids : le camp de bandits seul sur la terre ferme (raids.camp.modeles), un
+     *      petit bateau d'un mod sur l'eau (raids.camp.navires, ajouté sous raids.camp).
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -183,7 +185,10 @@ public final class ConfigUpdater {
                     new String[]{"(?m)^" + java.util.regex.Pattern.quote(
                             "    poids: {garnison: 3, cloche: 1, bannieres: 1, cages: 1, liberer: 1, chef: 2, aborder: 1, maitre: 2, tenir: 1}") + "$",
                             "    poids: {garnison: 3, cloche: 1, bannieres: 1, cages: 1, liberer: 1, chef: 2, aborder: 1, maitre: 2, tenir: 1, tours: 2}",
-                            "raids.objectifs.poids (tours)"}));
+                            "raids.objectifs.poids (tours)"}),
+            39, List.<String[]>of(
+                    new String[]{"(?m)^" + java.util.regex.Pattern.quote("    modeles: [valarian_conquest:bandit_camp, valarian_conquest:aegis_camp]   # camps des mods (un au hasard, sans occupants, coffres vidés) ; [] ou absents : camp du plugin") + "$", "    modeles: [valarian_conquest:bandit_camp]   # camp sur la terre ferme : gabarit d'un mod (un au hasard, sans occupants, coffres vidés) ; [] : camp du plugin",
+                            "raids.camp.modeles (camp de bandits seul)"}));
 
     private ConfigUpdater() {}
 

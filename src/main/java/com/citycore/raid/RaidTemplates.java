@@ -59,6 +59,16 @@ final class RaidTemplates {
      * @return sa boîte dans le monde, ou null si la pose a échoué
      */
     static BoundingBox place(World w, Structure s, int x, int z, int floorY, StructureRotation rot) {
+        return place(w, s, x, z, floorY, rot, -1);
+    }
+
+    /**
+     * Comme {@link #place}, pour un bateau quand {@code waterY} est la hauteur de la surface de
+     * l'eau (sinon -1) : rien n'est comblé dessous, et l'air que le gabarit laisse sous la surface
+     * hors de la coque redevient de l'eau (le bateau trempe dans l'eau, son intérieur reste sec).
+     */
+    static BoundingBox place(World w, Structure s, int x, int z, int floorY, StructureRotation rot, int waterY) {
+        boolean boat = waterY >= 0;
         int sx = s.getSize().getBlockX(), sz = s.getSize().getBlockZ(), h = s.getSize().getBlockY();
         boolean swap = rot == StructureRotation.CLOCKWISE_90 || rot == StructureRotation.COUNTERCLOCKWISE_90;
         int fw = swap ? sz : sx, fd = swap ? sx : sz;      // emprise une fois tourné
@@ -79,10 +89,10 @@ final class RaidTemplates {
         }
         for (int bx = mx; bx < mx + fw; bx++) {
             for (int bz = mz; bz < mz + fd; bz++) {
-                // Couche du bas vide : sol ; dessous, trou d'une pente comblé de terre
+                // Couche du bas vide : sol ; dessous, trou d'une pente comblé de terre (pas pour un bateau)
                 Block ground = w.getBlockAt(bx, floorY, bz);
-                if (ground.getType().isAir()) ground.setType(Material.GRASS_BLOCK, false);
-                for (int dy = 1; dy <= 10; dy++) {
+                if (!boat && ground.getType().isAir()) ground.setType(Material.GRASS_BLOCK, false);
+                for (int dy = 1; dy <= 14 && !boat; dy++) {
                     Block below = w.getBlockAt(bx, floorY - dy, bz);
                     if (below.getType().isSolid() && !below.isLiquid()) break;
                     below.setType(Material.DIRT, false);
@@ -91,7 +101,7 @@ final class RaidTemplates {
                     Block b = w.getBlockAt(bx, by, bz);
                     Material m = b.getType();
                     if (m == Material.JIGSAW) {
-                        b.setType(by == floorY ? Material.DIRT : Material.AIR, false); // raccord au terrain
+                        b.setType(by == floorY && !boat ? Material.DIRT : Material.AIR, false); // raccord au terrain
                         continue;
                     }
                     if (m.isAir() || !(b.getState() instanceof Container)) continue;
@@ -105,7 +115,35 @@ final class RaidTemplates {
                 }
             }
         }
+        if (boat) refill(w, mx, mz, fw, fd, floorY, waterY);
         return new BoundingBox(mx, floorY, mz, mx + fw, floorY + h, mz + fd);
+    }
+
+    /**
+     * Sous la surface, couche par couche : l'air joignable depuis le bord de l'emprise (hors de la
+     * coque) redevient de l'eau ; l'air enfermé par la coque (cale, cabine) reste sec.
+     */
+    private static void refill(World w, int mx, int mz, int fw, int fd, int fromY, int waterY) {
+        for (int y = fromY; y <= waterY; y++) {
+            boolean[][] seen = new boolean[fw][fd];
+            java.util.ArrayDeque<int[]> queue = new java.util.ArrayDeque<>();
+            for (int i = 0; i < fw; i++) for (int j = 0; j < fd; j++) {
+                if (i == 0 || j == 0 || i == fw - 1 || j == fd - 1) queue.add(new int[]{i, j});
+            }
+            while (!queue.isEmpty()) {
+                int[] c = queue.poll();
+                int i = c[0], j = c[1];
+                if (i < 0 || j < 0 || i >= fw || j >= fd || seen[i][j]) continue;
+                seen[i][j] = true;
+                Block b = w.getBlockAt(mx + i, y, mz + j);
+                if (!b.getType().isAir() && !b.isLiquid()) continue; // coque : on s'arrête là
+                if (b.getType().isAir()) b.setType(Material.WATER, false);
+                queue.add(new int[]{i + 1, j});
+                queue.add(new int[]{i - 1, j});
+                queue.add(new int[]{i, j + 1});
+                queue.add(new int[]{i, j - 1});
+            }
+        }
     }
 
     /**

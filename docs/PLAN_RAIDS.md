@@ -1181,6 +1181,14 @@ ses deux derniers soldats brillent), bannières (dont celles des tours), bailli,
 plus grande, donc un repérage plus long (jusqu'à 90 blocs autour du village pour le fort de
 Haut-Bois).
 
+**Camps (demande du 21/10/2026)** : sur la terre ferme, le camp de bandits seul
+(`raids.camp.modeles`), posé plus souvent (relief de 12 blocs au plus, sol comblé jusqu'à 14
+blocs, quelques flaques tolérées). Sur l'eau, plus de radeau du plugin : un petit bateau de
+Towns and Towers tiré au sort (`raids.camp.navires` : `small_ship_4`, `escort_1`, `escort_2` du
+village sur l'eau), coque dans l'eau de `flottaison` couches, l'eau remise autour de la coque et
+l'intérieur sec ; départ et héraut sur le pont ; barques amarrées autour, comme avant. Sans
+bateau disponible, le radeau reste en secours. `config-version` 39.
+
 **Recul inversé des soldats** (signalé pendant les tests) : frappé, un soldat de faction était
 tiré vers celui qui frappait. Le recul de Citizens pour un PNJ de type joueur est remplacé par un
 recul à l'opposé du coup, et le soldat ne marche pas pendant une demi-seconde (il ne repart plus
