@@ -629,6 +629,40 @@ public final class PersonalQuestCatalog {
         );
     }
 
+    /** Les six bières de Brewery (la chope vide à poser, brewery:beer_mug, n'en est pas). */
+    private static final String BEERS = "brewery:beer_wheat,brewery:beer_hops,brewery:beer_barley,"
+            + "brewery:beer_oat,brewery:beer_nettle,brewery:beer_haley";
+
+    /**
+     * Gambrinus (Let's Do Brewery) : la première bière, le houblon, une tournée chez Rosalie, la
+     * tente de la fête de la bière, les trois whiskys du maître et la Bière noire.
+     */
+    public static Map<Integer, List<NPCPersonalQuest>> gambrinus() {
+        return Map.of(
+                1, List.of(NPCPersonalQuest.deliver("gambrinus_first_mug", "§6🍺 La première chope",
+                        "Rapporter une bière brassée dans une cuve de brassage (n'importe laquelle des six).", Material.HONEY_BOTTLE,
+                        Delivery.of(BEERS, 1, "bière"), 100)),
+                2, List.of(NPCPersonalQuest.deliver("gambrinus_wild_hops", "§a🌿 Le houblon sauvage",
+                                "Rapporter 4 plants de houblon sauvage, cueillis à la cisaille dans les taïgas.", Material.VINE,
+                                Delivery.of("brewery:wild_hops", 4, "plants de houblon sauvage"), 180),
+                        of("gambrinus_round", "§c🍻 Une tournée chez Rosalie",
+                                "Entrer le soir dans la taverne de la ville, une bière du mod dans votre sac.", Material.CAKE,
+                                MOVE, all(inBuildingNamed("taverne"), timeBetween(12000, 23000), carrying(BEERS)), 180)),
+                3, List.of(of("gambrinus_brewfest", "§e🎪 La fête de la bière",
+                        "Trouver la tente de la fête de la bière, dressée dans les plaines.", Material.YELLOW_BANNER,
+                        MOVE, inStructures(Set.of("brewery:brewfest_tent")), 300)),
+                4, List.of(NPCPersonalQuest.deliver("gambrinus_three_masters", "§6🥃 Les trois maîtres",
+                        "Rapporter les trois whiskys qui font la Bière noire : JoJannik, Lilitu Single Malt et MaggoAllan.",
+                        Material.GLASS_BOTTLE,
+                        Delivery.of("brewery:whiskey_jojannik", 1, "JoJannik")
+                                .and("brewery:whiskey_lilitusinglemalt", 1, "Lilitu Single Malt")
+                                .and("brewery:whiskey_maggoallan", 1, "MaggoAllan"), 450)),
+                5, List.of(NPCPersonalQuest.deliver("gambrinus_dark_brew", "§8🍾 La Bière noire",
+                        "Rapporter une Bière noire, brassée dans une cuve en netherite.", Material.DRAGON_BREATH,
+                        Delivery.of("brewery:dark_brew", 1, "Bière noire"), 900))
+        );
+    }
+
     /** Geppetto (Handcrafted et Furniture) : le bois, les meubles, une maison, l'horloge, Pinocchio. */
     public static Map<Integer, List<NPCPersonalQuest>> geppetto() {
         return Map.of(

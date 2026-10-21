@@ -63,6 +63,7 @@ public final class UiPortraits {
         BACKDROPS.put(CityNPC.ACHAB, "pf_port");
         BACKDROPS.put(CityNPC.OBELIX, "pf_taverne");
         BACKDROPS.put(CityNPC.MUSASHI, "pf_route");
+        BACKDROPS.put(CityNPC.GAMBRINUS, "pf_taverne");
         BACKDROPS.put(CityNPC.GEPPETTO, "pf_atelier");
         BACKDROPS.put(CityNPC.RAGNAR, "pf_port");
         BACKDROPS.put(CityNPC.JEANNE, "pf_mairie");

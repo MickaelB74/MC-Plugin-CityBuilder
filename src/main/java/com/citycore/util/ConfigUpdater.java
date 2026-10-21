@@ -60,6 +60,8 @@ public final class ConfigUpdater {
      * 27 : l'atelier de Gandalf compte en bonus les blocs d'Iron's Spells quand le mod est là.
      * 28 : barème « grande ville » des parcelles : emplacements moins chers, plus d'emplacements
      *      offerts à la fondation.
+     * 29 : Gambrinus (Let's Do Brewery) : sa section, son atelier et la clé mod-integrations.brewery
+     *      s'ajoutent comme toute section nouvelle, sans ligne à corriger.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(

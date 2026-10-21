@@ -94,7 +94,7 @@ public final class ArtisanScreens {
 
     public boolean openMain(Player p) {
         if (!kit.active(p)) return false;
-        return kit.show(switch (data.getState(npc)) {
+        return kit.show(switch (com.citycore.npc.TestActivation.menuState(npc, data.getState(npc), p)) {
             case WANDERER -> new Wanderer(p);
             // Sans logis (bâtiment supprimé) : même écran qu'à l'arrivée, la gestion attend un atelier
             case ARRIVED, HOMELESS -> new Arrived(p);

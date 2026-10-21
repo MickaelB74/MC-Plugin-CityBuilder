@@ -108,14 +108,15 @@ public class VillagerGUI {
        ========================= */
 
     public void open(Player player) {
+        // Activé pour les tests (/city npc … activer) : menu complet pour un administrateur, sans atelier
+        NPCState state = com.citycore.npc.TestActivation.menuState(npcType, dataManager.getState(npcType), player);
         // Installé mais lié à un mod absent : un dialogue remplace le menu (recrutement et
         // installation restent possibles, voir ModIntegrations)
-        if (!isAvailable() && dataManager.getState(npcType) == NPCState.ASSIGNED) {
+        if (!isAvailable() && state == NPCState.ASSIGNED) {
             explainUnavailable(player);
             return;
         }
         if (themed != null && themed.openMain(player)) return; // joueur équipé du pack
-        NPCState state = dataManager.getState(npcType);
         switch (state) {
             case WANDERER -> openWanderer(player);
             case ARRIVED  -> openArrived(player);

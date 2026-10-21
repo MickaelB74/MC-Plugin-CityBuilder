@@ -86,6 +86,12 @@ public class VillagerListener implements Listener {
         notificationManager.clearNotification(player.getUniqueId(), type,
                 plugin.getServer(), npcManager);
 
+        // Activé pour les tests : menu complet tout de suite, sans rencontre ni suivi vers la ville
+        if (com.citycore.npc.TestActivation.applies(type, player)) {
+            gui.open(player);
+            return;
+        }
+
         // Stop la balade si en ville sans logis (ARRIVED ou HOMELESS) — face au joueur
         if (dataManager.getState(type).needsHome() && npc != null) {
             npc.getNavigator().cancelNavigation();

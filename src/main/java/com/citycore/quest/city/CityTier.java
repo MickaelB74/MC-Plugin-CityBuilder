@@ -144,7 +144,8 @@ public enum CityTier {
                     "§6Alderic §f: §oRosalie tenait le Chaudron Doré, la taverne où buvaient toutes les guildes. Retrouvons-la, et sa louche avec.",
                     "§6Alderic §f: §oLes nuits sont dangereuses : sécurisons les abords avant tout.",
                     "§6Alderic §f: §oUn colosse traverse les forêts avec un menhir sur le dos. Il dit qu'il n'est pas gros.",
-                    "§6Alderic §f: §oEt un étranger en robe de voyage a désarmé trois brigands avec un sabre de bois."
+                    "§6Alderic §f: §oEt un étranger en robe de voyage a désarmé trois brigands avec un sabre de bois.",
+                    "§6Alderic §f: §oOn parle aussi d'un roi sans couronne qui cueille le houblon des taïgas. Il dit avoir inventé la bière."
             ),
             List.of(
                     claim("t4_claim", "§6Le bourg s'étend",
@@ -176,7 +177,11 @@ public enum CityTier {
                     recruit("b4_musashi", "§c★ La voie du sabre",
                             "§8[Bonus] §7Un rōnin au chapeau de paille défie les brigands des routes. Gagnez son respect.",
                             CityNPC.MUSASHI, 700,
-                            Biome.BAMBOO_JUNGLE, Biome.CHERRY_GROVE, Biome.WINDSWEPT_HILLS, Biome.MEADOW).asOptional()
+                            Biome.BAMBOO_JUNGLE, Biome.CHERRY_GROVE, Biome.WINDSWEPT_HILLS, Biome.MEADOW).asOptional(),
+                    recruit("b4_gambrinus", "§e★ Le roi de la bière",
+                            "§8[Bonus] §7Un roi en tablier de brasseur cueille le houblon des taïgas. Offrez-lui une brasserie près de la taverne.",
+                            CityNPC.GAMBRINUS, 650,
+                            Biome.TAIGA, Biome.OLD_GROWTH_PINE_TAIGA, Biome.OLD_GROWTH_SPRUCE_TAIGA, Biome.PLAINS).asOptional()
             ),
             1500, 18),
 

@@ -75,9 +75,9 @@ public class CityTabCompleter implements TabCompleter {
             return switch (args[0].toLowerCase()) {
                 case "deposit"  -> List.of("100", "500", "1000", "5000");
                 case "create"   -> new ArrayList<>(); // la ville s'appelle Valmont : rien à saisir
-                case "npc"      -> Arrays.stream(CityNPC.values())
+                case "npc"      -> java.util.stream.Stream.concat(java.util.stream.Stream.of("tous"), Arrays.stream(CityNPC.values())
                         .filter(n -> n != CityNPC.MAYOR)
-                        .map(n -> n.tag.replace("citycore_", ""))
+                        .map(n -> n.tag.replace("citycore_", "")))
                         .collect(Collectors.toList());
                 case "quests"   -> List.of("toggle", "recits");
                 case "locate", "localiser", "ou", "où" -> com.citycore.ui.screens.LocateScreens.names().stream()
@@ -114,12 +114,15 @@ public class CityTabCompleter implements TabCompleter {
         if (args.length == 3) {
             return switch (args[0].toLowerCase()) {
                 case "npc" -> {
+                    if (args[1].equalsIgnoreCase("tous") || args[1].equalsIgnoreCase("all")) {
+                        yield List.of("activer", "desactiver");
+                    }
                     boolean validType = Arrays.stream(CityNPC.values())
                             .filter(n -> n != CityNPC.MAYOR)
                             .anyMatch(n -> n.tag.replace("citycore_", "")
                                     .equalsIgnoreCase(args[1]));
                     yield validType
-                            ? List.of("spawn", "levelUp", "levelDown", "remove")
+                            ? List.of("spawn", "levelUp", "levelDown", "remove", "activer", "desactiver", "menu")
                             : new ArrayList<>();
                 }
                 // Joueurs : seulement le nom à inspecter (le reste est réservé à citycore.admin.batiments)

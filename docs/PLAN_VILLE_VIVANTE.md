@@ -19,6 +19,7 @@ sièges par vagues, fêtes, soldats de la garde. Pas de monuments ni d'autre ges
 | — | Emplois : les habitants travaillent pour les artisans (hors phase) | 3, 6 | moyenne à grosse | **codée, à tester en jeu** |
 | — | Animations Epic Fight des PNJ (mod serveur compagnon, hors phase) | — | petite à moyenne | **codée, à tester en jeu** |
 | — | Légendes liées aux mods : 8 nouvelles légendes, Gandalf au chapitre VI, contenu facultatif (hors phase, voir `docs/INTEGRATION_MODS.md`) | 4 (récit de siège de Musashi) | grosse | **codée, à tester en jeu** |
+| — | Gambrinus, barman du chapitre IV (Let's Do Brewery) | — | moyenne | **codée, à tester en jeu** |
 
 L'ordre suit les dépendances : en ville, les joueurs et les artisans ne peuvent pas être blessés,
 donc un siège n'a d'enjeu que s'il y a des habitants à protéger. Les soldats sont formés à partir

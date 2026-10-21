@@ -58,6 +58,7 @@ public class ProgressionService {
         ICONS.put(CityNPC.ACHAB, Material.COD_BUCKET);
         ICONS.put(CityNPC.OBELIX, Material.COOKED_PORKCHOP);
         ICONS.put(CityNPC.MUSASHI, Material.BAMBOO);
+        ICONS.put(CityNPC.GAMBRINUS, Material.HONEY_BOTTLE);
         ICONS.put(CityNPC.GEPPETTO, Material.ARMOR_STAND);
         ICONS.put(CityNPC.RAGNAR, Material.SPRUCE_BOAT);
         ICONS.put(CityNPC.JEANNE, Material.WHITE_BANNER);

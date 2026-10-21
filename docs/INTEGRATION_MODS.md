@@ -13,6 +13,7 @@ Les personnages qui en profitent :
 | Jack Sparrow | III | Tax' Ocean Villager (`taxov`) | requis |
 | Obélix | IV | Wilder Nature (`wildernature`) **et** Farmer's Delight (`farmersdelight`) | les deux requis |
 | Miyamoto Musashi | IV | Epic Fight (`epicfight`) | requis |
+| Gambrinus | IV | Let's Do Brewery (`brewery`, qui installe Farm & Charm `farm_and_charm`) | requis |
 | Geppetto | V | Handcrafted (`handcrafted`) **et** Furniture (`furniture`) | les deux requis |
 | Gandalf | VI | Iron's Spells 'n Spellbooks (`irons_spellbooks`) | facultatif : magie vanilla sans lui |
 | Ragnar | VII | Small Ships (`smallships`) | requis |
@@ -25,7 +26,8 @@ Les personnages qui en profitent :
 Versions analysées (jars du serveur, 20/10/2026) : Tough As Nails 10.1.0.13, Tide 2.0.3, Wilder
 Nature 1.1.8, Farmer's Delight 1.2.10, Epic Fight 21.17.3.1, Handcrafted 4.0.3, Furniture 1.1.10,
 Iron's Spells 3.15.4, Small Ships 2.0.0-b2.1, Valarian Conquest 4.2, Mowzie's Mobs 1.7.5,
-Mo' Structures 1.6.0, ATi Structures 1.4.4, Dragon Mounts Remastered 1.9.2, Tax' Ocean Villager 4.0.1.
+Mo' Structures 1.6.0, ATi Structures 1.4.4, Dragon Mounts Remastered 1.9.2, Tax' Ocean Villager 4.0.1 ;
+le 21/10/2026, Let's Do Brewery 2.1.13 et Farm & Charm 1.1.29 (identifiants lus dans leurs registres).
 Chaque identifiant d'objet, de bloc, de créature et de structure de `config.yml` et des récits a été
 vérifié dans ces jars.
 
@@ -71,6 +73,21 @@ mod-integrations:
   dmr: off     # auto = détection | on = forcer présent | off = forcer absent
   tide: auto   # Capitaine Achab
 ```
+
+**Tester les menus sans atelier** (permission `citycore.admin.pnj`) :
+
+| Commande | Effet |
+|---|---|
+| `/city npc <id> activer` | un clic droit d'administrateur sur le personnage ouvre son menu complet (vente, entrepôt, boutique, quêtes, récits, gestion), quel que soit son état, sans rencontre ni suivi vers la ville |
+| `/city npc <id> menu` | ouvre ce menu à distance (en jeu), même si le personnage n'est pas encore apparu ; active le test pour la session |
+| `/city npc <id> desactiver` | revient au comportement normal |
+| `/city npc tous activer` / `desactiver` | tous les personnages d'un coup |
+
+Rien n'est enregistré (`TestActivation`, en mémoire) : l'état réel ne change pas, donc pas d'étape
+de recrutement validée, ni emplois, ni besoins ; les joueurs sans la permission gardent le menu
+normal ; tout s'efface au redémarrage. Les menus montrent « Aucun atelier » là où il en faut un.
+Avec un mod requis absent, le dialogue d'explication remplace toujours le menu. `/city npc <id>
+levelUp` monte le rang pour voir toute la boutique.
 
 ## Objets de mods dans config.yml
 
@@ -138,6 +155,7 @@ partagés par la ville. Skins intégrés au plugin (MineSkin).
 | Capitaine Achab | rivière, plage, rivage (300–600) | `Baleiniere` | rapporter une truite de ruisseau, une anguille des cavernes, un cœlacanthe, un espadon de feu, le Deep Blue |
 | Obélix | forêt, forêt sombre, taïga (300–600) | `Hutte_gauloise` | 5 sangliers ; trophée de cerf ; jambon laqué (festin) ; 3 ravageurs ; trophée de bison |
 | Miyamoto Musashi | bambous, cerisaie, collines, prairie (350–700) | `Dojo` | monstres tués bokken en main, tachi en main ; 20 assaillants pendant un siège ; ravageur, wither squelettes à l'uchigatana |
+| Gambrinus | taïgas, plaines (325–650) | `Brasserie` | une bière ; 4 plants de houblon sauvage, et une tournée le soir dans la taverne une bière en poche ; tente de la fête de la bière ; JoJannik, Lilitu Single Malt et MaggoAllan ; Bière noire |
 | Geppetto | forêts, prairie (300–600) | `Echoppe_d_ebeniste` | 16 bûches de cerisier ; 4 chaises ; habitation meublée (6 blocs de meubles) ; horloge comtoise ; porte-armure + bûche de cerisier renommée |
 | Gandalf | plaines, tournesols, forêt (350–700) | `Tour_du_mage` | avec le mod : pyromancien, cryomancien, nécromancien, Roi Mort, Écho de Tyros ; sans : récits vanilla |
 | Ragnar | plages enneigées, rivages (400–800) | `Chantier_naval` | à bord d'un navire ; en drakkar à plus de 1 000 blocs ; 5 monstres aux boulets de canon ; océan gelé de nuit ; grand gardien depuis une galère ou un brick |
@@ -172,6 +190,43 @@ partagés par la ville. Skins intégrés au plugin (MineSkin).
 | 11. Adoubement de Valarian Conquest | repli : un bâtiment de la ville nommé « Cathédrale », coiffé du grand heaume à croix d'or (l'adoubement est une variable du mod, non exposée) |
 | 12. Objets portant des données de mod | fait (`components`) — parchemins et livres de compétence à vérifier en jeu |
 
+### Gambrinus, le barman (Let's Do Brewery, 21/10/2026)
+
+Légende ★ du chapitre IV, à côté de la taverne de Rosalie (demande du 21/10/2026, hors brief).
+Le roi légendaire de la bière ; skin MineSkin « Brewer » (brasseur barbu, tablier de cuir).
+
+- **Rachète tous les consommables du mod** (25) : les 6 bières, les 9 whiskys, la Bière noire et les
+  9 plats (bretzel, pain d'épices, jarret de porc, saucisse, poulet frit, demi-poulet, purée,
+  salade de pommes de terre, boulettes). Il ne rachète ni houblon, ni céréales séchées, ni levure.
+- **Vend de quoi produire**, dans l'ordre de la production : houblon et cordes de Farm & Charm (le
+  houblon grimpe aux cordes), levure, graines d'orge (rang 1) ; cuve de brassage en bois, silo en
+  bois, graines d'avoine et de maïs, comptoir, bancs, table (2) ; cuve en cuivre (qui demande sinon
+  un gabarit de garde des avant-postes), silo en cuivre, hachoir, cuisinière, saladier, grand fût
+  (3) ; marmite, rôtissoire, tenues de la fête de la bière (la tenue complète protège de l'ivresse),
+  buffets et desserte (4) ; cuve en netherite, bannière des brasseurs, « La chope du roi Gambrinus »
+  (une bière de son stock, nommée) (5). Pas de laine à motifs : elle est dans `#minecraft:wool`,
+  que Robinson rachète.
+- **Prix** : un brassin dure 60 s (réglage du mod) et donne 1 à 5 boissons selon les événements
+  réussis (sifflet, four, minuteur) ; une bière se rachète 1,25 coin, un whisky de la cuve en cuivre
+  2,5, de la cuve en netherite 5, la Bière noire 12. Les plats tirés d'un seul ingrédient vendu
+  en boutique se rachètent moins cher que lui : demi-poulet 0,5 (Rosalie vend le poulet cuit 0,875),
+  purée 0,375 (pomme de terre cuite 0,625). Contrôle d'arbitrage hors ligne : aucune nouvelle alerte.
+- **Réserves et machines des mods** : la marque « non revendable » des réserves suit l'artisanat,
+  les fours, la forge, le tailleur de pierre et les blocs posés (`TagPropagation`), pas les machines
+  des mods (silo, hachoir, marmite, cuve de brassage), dont les événements ne passent pas par
+  Bukkit. Du blé pris chez Hélène peut donc finir en whisky revendable. D'où des prix qui paient
+  le travail du brasseur (temps du brassin, cuves, houblon que personne ne rachète) et non le grain ou
+  la viande, des capacités bornées (16 à 256), et des prix qui baissent à mesure que l'entrepôt se
+  remplit. À surveiller en jeu.
+- **Quêtes** : principales (bières, houblon, bretzels, pain d'épices, bière d'ortie, saucisses ou
+  jarrets, whiskys de la cuve en cuivre) ; spéciales (houblon sauvage, bière de Haley, whiskys de la
+  cuve en netherite, Bière noire, pillards, Booze — l'élémental de bière né d'un brassin raté ou d'une
+  Bière noire lancée —, sorcières).
+- **Atelier** `Brasserie` : chaudron, 4 tonneaux, fourneau (vanilla) ; en bonus les cuves de
+  brassage, le comptoir et le grand fût du mod.
+- **Mise à jour de config.yml** (version 29) : la section `gambrinus`, son atelier et la clé
+  `mod-integrations.brewery` s'ajoutent ; fusion testée sur le `config.yml` du serveur (v27 → 29).
+
 Nouveaux types de récits :
 
 - **« Rapporter… »** (`NPCPersonalQuest.deliver`, déclencheur `DELIVER`) : les objets se remettent
@@ -182,7 +237,7 @@ Nouveaux types de récits :
   par page avec des flèches.
 
 Écran des progrès (touche L) : la hauteur de chaque ligne suit le chapitre le plus fourni (trois
-légendes au chapitre X) ; la bulle d'une légende nomme son ou ses mods et signale un mod requis absent.
+légendes aux chapitres IV et X) ; la bulle d'une légende nomme son ou ses mods et signale un mod requis absent.
 
 Mise à jour de config.yml (version 27) : les sections des huit légendes, leurs ateliers et les
 treize mods s'ajoutent ; `gandalf` et `robin` sont remplacées (l'ancienne version reste dans la copie

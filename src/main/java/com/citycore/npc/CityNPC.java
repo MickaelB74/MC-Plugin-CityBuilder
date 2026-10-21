@@ -1006,6 +1006,49 @@ public enum CityNPC {
             "epicfight"
     ),
 
+    // Chapitre IV — Let's Do Brewery (bières, whiskys, cuisine de brasserie), à côté de la taverne de Rosalie
+    GAMBRINUS(
+            "citycore_gambrinus",
+            "§eGambrinus",
+            "Roi de la bière",
+            "gambrinus",
+            "ewogICJ0aW1lc3RhbXAiIDogMTYyMzc2MzQ1NTg0NCwKICAicHJvZmlsZUlkIiA6ICIyNDBiYThlMzNlN2M0YzE0ODhiNzJmYmU1Njg2ZjhlNyIsCiAgInByb2ZpbGVOYW1lIiA6ICJQbGF4Q3JhZnRzIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzk3ZjIxMzRjMTY2MDUwNzdhMDI2M2YzM2UyNGQ2MmE2M2MzNjA2Mzg0MWM5NWNkMmIyZDg3YWEzZGRkZThjM2MiCiAgICB9CiAgfQp9",
+            "a98p96rkQckXX93UzJ1VUz7uhAr7FPgETAat/uPLemca2X2+RtPGcuatY38UAr+wAJJa7Y9A1ydHmoUkTdjMRsKkXO+FHw3AiaPoG9oLP+ttb7+SYUaXqolvzxDNp/GG5uN35UIWjs3cftQKEW20f2/WrSqbCTKExpxOuALHzCAe1yd4X11x6sWpRakxpWTKQEWiXWLNtGBAa8AG9JBiWCoY5jd25h4xImFWVN79se2yjrYLc3YKkVxJDQRrc0+ddH0qQI2TbmQUSl4NbLqAOq4Am5T+255vgU0wT+0i6FlPGNyvEdlkSJjq8T4TA0fMy9/Kfch8dsIv6wrB4J3Jioo8qdRhZ1zDZMW3sMggMRTbxP+Ql+twyQt+ItZih4aPwpAVMu7dfaQJmya8coBalpv7qQ7TeewQqS77kIOV7DFWvscknMCKgEOpwXelB+qYYPhdvegFhmJo4WFlszOY0Dlvj6yFTP6o3WjQgU1Z+0CYxK4HeEPBe3PmD34azOGVTws1eKp8C41R0KNl+dsTInNxKljLI+t75/draZfIpcIr62Jj/OvDOPbNpiBTTrvRr9Z8vPI8KsgZ7B3AfdV8QYnj92AmMOEw8zJLCIXYUQA35cCfaZcYUoWf7u4rVzFHfBPTDLZw7aXW9UROjhGvfyQi+81fdVVgy3OXp9dQ/E4=",
+            List.of(
+                    "Roi de Flandre, dit la légende,",
+                    "et inventeur de la bière.",
+                    "Il a troqué sa couronne contre",
+                    "un tablier et un comptoir."
+            ),
+            Map.of(
+                    "first_meeting", List.of(
+                            "§eGambrinus §f: §oHolà ! Gambrinus, roi de Flandre... Roi de la bière, surtout. Le reste du royaume, je l'ai bu.",
+                            "§eGambrinus §f: §oVotre tavernière sert une honnête cervoise. Mais une ville sans brasserie, c'est une chope à moitié vide. Emmenez-moi !"
+                    ),
+                    "city_arrival", List.of(
+                            "§eGambrinus §f: §oUne taverne, des gosiers secs, et pas un brasseur. On va arranger ça.",
+                            "§eGambrinus §f: §oIl me faut une cuve, des fûts et un comptoir. Pas trop loin de chez Rosalie : on se renverra les clients."
+                    ),
+                    "building_assign", List.of(
+                            "§eGambrinus §f: §oUne brasserie ! Je sens déjà le houblon.",
+                            "§eGambrinus §f: §oApportez-moi vos bières, vos whiskys et vos bretzels : je les sers au comptoir. Et je vous vends de quoi brasser."
+                    ),
+                    "building_assign_unavailable", List.of(
+                            "§eGambrinus §f: §oPas de houblon, pas de cuve de brassage... Que voulez-vous que je serve ? De l'eau ?",
+                            "§eGambrinus §f: §oJe tiens le comptoir, mais je n'ai rien à vous vendre."
+                    ),
+                    "mod_missing", List.of(
+                            "§eGambrinus §f: §oPas un pied de houblon dans tout le royaume, pas une cuve, pas un alambic. Un roi sans bière !",
+                            "§eGambrinus §f: §oJe tiens compagnie à Rosalie. Mais je n'ai rien à vous vendre."
+                    ),
+                    "level_up", List.of(
+                            "§eGambrinus §f: §oÀ la vôtre ! La cave s'agrandit : j'ai de nouvelles cuves pour vous."
+                    )
+            ),
+            PersonalQuestCatalog.gambrinus(),
+            "brewery"
+    ),
+
     // Chapitre V — Handcrafted et Furniture (mobilier) : les deux mods requis
     GEPPETTO(
             "citycore_geppetto",

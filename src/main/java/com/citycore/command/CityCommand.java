@@ -104,6 +104,13 @@ public class CityCommand implements CommandExecutor {
         this.modIntegrations = modIntegrations;
     }
 
+    /** Menus des habitants, ouverts sans atelier par /city npc <type> menu (tests, admin). */
+    private java.util.Map<CityNPC, VillagerGUI> npcMenus = java.util.Map.of();
+
+    public void setNpcMenus(java.util.Map<CityNPC, VillagerGUI> npcMenus) {
+        this.npcMenus = npcMenus;
+    }
+
     /** Parcelles de la ville sur les cartes JourneyMap (/city carte, admin). */
     private com.citycore.city.CityMapExport mapExport;
 
@@ -738,6 +745,28 @@ public class CityCommand implements CommandExecutor {
                         return true;
                     }
 
+                    // Tests : tous les habitants d'un coup (menus complets sans atelier, voir TestActivation)
+                    if (args[1].equalsIgnoreCase("tous") || args[1].equalsIgnoreCase("all")) {
+                        String action = args[2].toLowerCase();
+                        if (!action.equals("activer") && !action.equals("desactiver")) {
+                            sender.sendMessage("§c❌ Avec §ftous§c : §factiver§c ou §fdesactiver§c.");
+                            return true;
+                        }
+                        boolean on = action.equals("activer");
+                        int changed = 0;
+                        for (CityNPC n : CityNPC.values()) {
+                            if (n == CityNPC.MAYOR) continue;
+                            if (on ? com.citycore.npc.TestActivation.enable(n)
+                                    : com.citycore.npc.TestActivation.disable(n)) changed++;
+                        }
+                        sender.sendMessage(on
+                                ? "§a✅ Menus de test activés pour tous les habitants §7(" + changed + " de plus)§a. "
+                                        + "§7Un clic droit d'administrateur ouvre leur menu complet, sans atelier ; "
+                                        + "§f/city npc <type> menu §7l'ouvre à distance. Rien n'est enregistré."
+                                : "§a✅ Menus de test désactivés §7(" + changed + " habitant(s))§a.");
+                        return true;
+                    }
+
                     CityNPC target = Arrays.stream(CityNPC.values())
                             .filter(n -> n != CityNPC.MAYOR)
                             .filter(n -> n.tag.replace("citycore_", "")
@@ -801,8 +830,35 @@ public class CityCommand implements CommandExecutor {
                             sender.sendMessage("§a✅ §e" + target.displayName
                                     + " §asupprimé et remis à zéro !");
                         }
+                        // Tests : menu complet sans atelier, pour les administrateurs, sans rien enregistrer
+                        case "activer" -> {
+                            com.citycore.npc.TestActivation.enable(target);
+                            sender.sendMessage("§a✅ Menu de test activé pour " + target.displayName
+                                    + "§a. §7Un clic droit d'administrateur ouvre son menu complet, sans atelier"
+                                    + (npcManager.isSpawned(target) ? "" : " §8(pas encore apparu : §f/city npc "
+                                            + args[1].toLowerCase() + " spawn§8 ou §fmenu§8)")
+                                    + "§7. Rien n'est enregistré.");
+                        }
+                        case "desactiver" -> sender.sendMessage(com.citycore.npc.TestActivation.disable(target)
+                                ? "§a✅ Menu de test désactivé pour " + target.displayName + "§a."
+                                : "§7Le menu de test de " + target.displayName + " §7n'était pas activé.");
+                        case "menu" -> {
+                            if (inGameOnly(sender, player)) return true;
+                            VillagerGUI menu = npcMenus.get(target);
+                            if (menu == null) {
+                                player.sendMessage("§c❌ Menu indisponible pour " + target.displayName + "§c.");
+                                return true;
+                            }
+                            // Activé pour la session : les retours entre écrans restent sur le menu complet
+                            if (com.citycore.npc.TestActivation.enable(target)) {
+                                player.sendMessage("§7Menu de test activé pour " + target.displayName
+                                        + " §8(/city npc " + args[1].toLowerCase() + " desactiver)§7.");
+                            }
+                            menu.open(player);
+                        }
                         default -> sender.sendMessage(
-                                "§c❌ Actions : §fspawn§c, §flevelUp§c, §flevelDown§c, §fremove");
+                                "§c❌ Actions : §fspawn§c, §flevelUp§c, §flevelDown§c, §fremove§c, "
+                                        + "§factiver§c, §fdesactiver§c, §fmenu");
                     }
                 }
 

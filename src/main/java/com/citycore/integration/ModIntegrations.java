@@ -50,6 +50,8 @@ public final class ModIntegrations {
         SMALL_SHIPS("smallships", "Small Ships", null, "smallships:sail", null),
         VALARIAN_CONQUEST("valarian_conquest", "Valarian Conquest", null, "valarian_conquest:templar_sword", null),
         MOWZIES_MOBS("mowziesmobs", "Mowzie's Mobs", "mowziesmobs:kill_foliaath", "mowziesmobs:wrought_axe", null),
+        // Let's Do Brewery dépend de Farm & Charm (silo, levure, cordes) : le mod suffit comme témoin
+        BREWERY("brewery", "Let's Do Brewery", "brewery:main/root", "brewery:hops", "brewery:brewfest_tent"),
         // Mods de structures : ni objet ni succès, on cherche une de leurs structures
         MO_STRUCTURES("mostructures", "Mo' Structures", null, null, "mostructures:sphinx"),
         ATI_STRUCTURES("ati_structures", "ATi Structures", null, null, "ati_structures:ancient_temple");

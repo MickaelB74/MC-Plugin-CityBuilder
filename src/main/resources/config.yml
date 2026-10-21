@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 28
+config-version: 29
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -96,6 +96,7 @@ mod-integrations:
   smallships: auto         # Small Ships : Ragnar (chapitre VII)
   valarian_conquest: auto  # Valarian Conquest : Jeanne d'Arc (chapitre VIII)
   mowziesmobs: auto        # Mowzie's Mobs : Hercule (chapitre X)
+  brewery: auto            # Let's Do Brewery (avec Farm & Charm) : Gambrinus (chapitre IV)
   mostructures: auto       # Mo' Structures : récits en plus pour Indiana Jones
   ati_structures: auto     # ATi Structures : récits en plus pour Indiana Jones
 
@@ -2130,6 +2131,130 @@ musashi:
         - {entity: WITHER_SKELETON, base-amount: 8, value: 8, min-level: 4}
 
 # ============================================================
+#  ★ GAMBRINUS — roi de la bière, barman (bonus, chapitre IV)
+#  Requiert Let's Do Brewery (brewery), qui installe aussi Farm & Charm : sans lui, il se recrute
+#  et s'installe sans commercer. Il rachète tout ce qui se boit et se mange du mod (6 bières,
+#  9 whiskys, la Bière noire, 9 plats de brasserie) et vend de quoi produire, rang après rang :
+#  houblon et cordes (le houblon grimpe aux cordes), levure et graines, puis silos et cuves de
+#  brassage (bois, cuivre, netherite), cuisines de Farm & Charm, mobilier de taverne et tenues
+#  de la fête de la bière.
+#  Les machines des mods (silo, hachoir, marmite, cuve) ne transmettent pas la marque des
+#  réserves : les prix ne paient que le travail du brasseur, pas le blé ni la viande.
+# ============================================================
+gambrinus:
+  xp-per-stack: 1
+  xp-per-coin: 1
+  level-thresholds: {2: 500, 3: 2000, 4: 5500, 5: 12000}
+  sell-prices:
+    # Bières (cuve en bois : houblon, céréale séchée au silo, levure ; 1 à 5 chopes par brassin)
+    "brewery:beer_wheat": {price: 10, quantity: 8, capacity: 256}
+    "brewery:beer_barley": {price: 10, quantity: 8, capacity: 256}
+    "brewery:beer_oat": {price: 10, quantity: 8, capacity: 256}
+    "brewery:beer_hops": {price: 10, quantity: 8, capacity: 256}
+    "brewery:beer_nettle": {price: 10, quantity: 8, capacity: 256}
+    "brewery:beer_haley": {price: 12, quantity: 4, capacity: 64}       # chorus éclaté (l'End)
+    # Whiskys (cuve en cuivre : deux céréales séchées et la levure)
+    "brewery:whiskey_maggoallan": {price: 10, quantity: 4, capacity: 128}
+    "brewery:whiskey_carrasconlabel": {price: 10, quantity: 4, capacity: 128}
+    "brewery:whiskey_lilitusinglemalt": {price: 10, quantity: 4, capacity: 128}
+    "brewery:whiskey_jojannik": {price: 10, quantity: 4, capacity: 128}
+    "brewery:whiskey_cristelwalker": {price: 10, quantity: 4, capacity: 128}
+    "brewery:whiskey_ak": {price: 10, quantity: 4, capacity: 128}
+    "brewery:whiskey_highland_hearth": {price: 10, quantity: 4, capacity: 128}
+    # Cuve en netherite : deux whiskys, et la Bière noire (trois whiskys)
+    "brewery:whiskey_jamesons_malt": {price: 10, quantity: 2, capacity: 64}
+    "brewery:whiskey_smokey_reverie": {price: 10, quantity: 2, capacity: 64}
+    "brewery:dark_brew": {price: 12, quantity: 1, capacity: 16}
+    # Cuisine de brasserie (cuisinière, hachoir, marmite, rôtissoire et saladier de Farm & Charm)
+    "brewery:pretzel": {price: 6, quantity: 8, capacity: 256}
+    "brewery:gingerbread": {price: 6, quantity: 8, capacity: 256}
+    "brewery:pork_knuckle": {price: 10, quantity: 4, capacity: 128}
+    "brewery:sausage": {price: 8, quantity: 4, capacity: 128}
+    "brewery:fried_chicken": {price: 10, quantity: 4, capacity: 128}
+    "brewery:dumplings": {price: 6, quantity: 4, capacity: 128}
+    "brewery:potato_salad": {price: 6, quantity: 8, capacity: 128}
+    "brewery:half_chicken": {price: 4, quantity: 8, capacity: 128}
+    "brewery:mashed_potatoes": {price: 3, quantity: 8, capacity: 128}
+  shop:
+    # 1 : de quoi lancer une houblonnière et une première cuvée
+    1:
+      - {material: "brewery:hops", price: 6, quantity: 4, supply: {max: 16, restock-minutes: 30}}
+      - {material: "farm_and_charm:rope", price: 4, quantity: 6, supply: {max: 24, restock-minutes: 30}}
+      - {material: "farm_and_charm:yeast", price: 4, quantity: 12, supply: {max: 48, restock-minutes: 30}}
+      - {material: "farm_and_charm:barley_seeds", price: 4, quantity: 8, supply: {max: 32, restock-minutes: 30}}
+      - {material: "brewery:breathalyzer", price: 6, quantity: 1, supply: {max: 2, restock-minutes: 120}}
+    # 2 : la brasserie (cuve en bois, silo pour sécher les céréales) et le comptoir
+    2:
+      - {material: "brewery:wooden_brewingstation", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "farm_and_charm:silo_wood", price: 25, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+      - {material: "farm_and_charm:oat_seeds", price: 4, quantity: 8, supply: {max: 32, restock-minutes: 30}}
+      - {material: "farm_and_charm:kernels", price: 6, quantity: 8, supply: {max: 32, restock-minutes: 30}}
+      - {material: "brewery:bar_counter", price: 12, quantity: 2, supply: {max: 8, restock-minutes: 120}}
+      - {material: "brewery:bench", price: 8, quantity: 2, supply: {max: 8, restock-minutes: 120}}
+      - {material: "brewery:table", price: 8, quantity: 1, supply: {max: 4, restock-minutes: 120}}
+    # 3 : les whiskys (cuve en cuivre, sans le gabarit de garde des avant-postes) et la cuisine
+    3:
+      - {material: "brewery:copper_brewingstation", price: 220, quantity: 1, supply: {max: 1, restock-minutes: 1440}}
+      - {material: "farm_and_charm:silo_copper", price: 80, quantity: 1, supply: {max: 1, restock-minutes: 720}}
+      - {material: "farm_and_charm:mincer", price: 40, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "farm_and_charm:stove", price: 60, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "farm_and_charm:crafting_bowl", price: 30, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "brewery:barrel_main", price: 30, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+    # 4 : la fête de la bière (tenues : ivresse sans effet avec la tenue complète), cuisine et mobilier
+    4:
+      - {material: "farm_and_charm:cooking_pot", price: 50, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "farm_and_charm:roaster", price: 70, quantity: 1, supply: {max: 1, restock-minutes: 480}}
+      - {material: "brewery:brewfest_hat", price: 25, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:brewfest_regalia", price: 35, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:brewfest_trousers", price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:brewfest_boots", price: 20, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:brewfest_hat_red", price: 25, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:brewfest_blouse", price: 35, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:brewfest_dress", price: 30, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:brewfest_shoes", price: 20, quantity: 1, supply: {max: 1, restock-minutes: 240}}
+      - {material: "brewery:cabinet", price: 20, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+      - {material: "brewery:wall_cabinet", price: 15, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+      - {material: "brewery:sideboard", price: 20, quantity: 1, supply: {max: 2, restock-minutes: 240}}
+    # 5 : le maître brasseur
+    5:
+      - {material: "brewery:netherite_brewingstation", price: 900, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - {material: "brewery:brewery_banner", price: 350, quantity: 1, supply: {max: 1, restock-minutes: 10080}}
+      - material: "brewery:beer_hops"
+        price: 30
+        quantity: 1
+        requires: {"brewery:beer_hops": 1}
+        supply: {max: 2, restock-minutes: 240}
+        name: "§6La chope du roi Gambrinus"
+        lore:
+          - "§7Tirée au fût par le roi lui-même."
+          - "§7Il jure qu'elle est meilleure servie par lui."
+  quests:
+    quantity-multiplier: {1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3}
+    main:
+      xp-reward-per-level: 25
+      objectives-count: 2
+      item-pool:
+        - {material: "brewery:beer_wheat,brewery:beer_barley,brewery:beer_oat,brewery:beer_hops", nom: "Bières (blé, orge, avoine ou houblon)", base-amount: 6}
+        - {material: "brewery:hops", base-amount: 16, value: 0.4}
+        - {material: "brewery:pretzel", base-amount: 8}
+        - {material: "brewery:gingerbread", base-amount: 8}
+        - {material: "brewery:beer_nettle", base-amount: 6, min-level: 2}
+        - {material: "brewery:sausage,brewery:pork_knuckle", nom: "Saucisses ou jarrets de porc", base-amount: 4, min-level: 2}
+        - {material: "brewery:whiskey_maggoallan,brewery:whiskey_carrasconlabel,brewery:whiskey_lilitusinglemalt,brewery:whiskey_jojannik,brewery:whiskey_cristelwalker,brewery:whiskey_ak,brewery:whiskey_highland_hearth", nom: "Whiskys de la cuve en cuivre", base-amount: 3, min-level: 3}
+    special:
+      xp-reward-per-level: 60
+      objectives-count: 2
+      item-pool:
+        - {material: "brewery:wild_hops", base-amount: 4, value: 2}
+        - {material: "brewery:beer_haley", base-amount: 2, min-level: 3}
+        - {material: "brewery:whiskey_jamesons_malt,brewery:whiskey_smokey_reverie", nom: "Whiskys de la cuve en netherite", base-amount: 1, min-level: 4}
+        - {material: "brewery:dark_brew", base-amount: 1, min-level: 5}
+      entity-pool:
+        - {entity: PILLAGER, nom: "Pillards (« des voleurs de fûts »)", base-amount: 6, value: 3}
+        - {entity: "brewery:beer_elemental", base-amount: 2, value: 6, min-level: 2}
+        - {entity: WITCH, base-amount: 2, value: 5, min-level: 3}
+
+# ============================================================
 #  ★ GEPPETTO — maître ébéniste (bonus, chapitre V)
 #  Requiert Handcrafted (handcrafted) ET Furniture (furniture) : s'il en manque un, il se recrute
 #  et s'installe sans commercer. Le bois et le mobilier.
@@ -2956,6 +3081,15 @@ batiments:
         - {bloc: "farmersdelight:tatami", nom: "tatami"}
         - {bloc: "LANTERN,SOUL_LANTERN", nom: "lanterne"}
         - {bloc: "POTTED_AZALEA_BUSH,POTTED_FLOWERING_AZALEA_BUSH", nom: "azalée en pot"}
+    gambrinus:
+      requis:
+        - {bloc: "#cauldrons", nombre: 1, nom: "cuve", pluriel: "cuves"}
+        - {bloc: BARREL, nombre: 4, nom: "fût", pluriel: "fûts"}
+        - {bloc: FURNACE, nombre: 1, nom: "four à malt", pluriel: "fours à malt"}
+      bonus:
+        - {bloc: "brewery:*_brewingstation", nom: "cuve de brassage"}
+        - {bloc: "brewery:bar_counter", nom: "comptoir"}
+        - {bloc: "brewery:barrel_main,brewery:barrel_main_head,brewery:barrel_right,brewery:barrel_head_right", nom: "grand fût"}
     geppetto:
       requis:
         - {bloc: CRAFTING_TABLE, nombre: 1, nom: "établi"}

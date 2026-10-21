@@ -54,7 +54,8 @@ public class BuildingCreation {
             Map.entry("gandalf", "Tour_du_mage"), Map.entry("geralt", "Antre_du_sorceleur"),
             Map.entry("harold", "Nid_de_dragon"), Map.entry("robinson", "Cabane_du_naufrage"),
             Map.entry("achab", "Baleiniere"), Map.entry("obelix", "Hutte_gauloise"),
-            Map.entry("musashi", "Dojo"), Map.entry("geppetto", "Echoppe_d_ebeniste"),
+            Map.entry("musashi", "Dojo"), Map.entry("gambrinus", "Brasserie"),
+            Map.entry("geppetto", "Echoppe_d_ebeniste"),
             Map.entry("ragnar", "Chantier_naval"), Map.entry("jeanne", "Quartier_general"),
             Map.entry("hercule", "Palestre"));
 

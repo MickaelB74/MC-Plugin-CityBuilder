@@ -331,6 +331,7 @@ public class CityCore extends JavaPlugin {
         // ── NPCs génériques ───────────────────────────────────────
         List<QuestGUI>    questGUIs    = new ArrayList<>();
         List<QuestConfig> questConfigs = new ArrayList<>();
+        Map<CityNPC, VillagerGUI> npcMenus = new EnumMap<>(CityNPC.class); // /city npc <type> menu
 
         for (CityNPC npcType : CityNPC.values()) {
             if (npcType == CityNPC.MAYOR) continue;
@@ -343,6 +344,7 @@ public class CityCore extends JavaPlugin {
                     npcDataManager, npcManager, playerDataManager, market, this);
             gui.setIntegrations(modIntegrations); // habitant lié à un mod absent : pas de menu
             gui.setInspector(buildingInspector);
+            npcMenus.put(npcType, gui);
             QuestConfig    questConfig = new QuestConfig(this, npcType.skinId, market);
             questConfigs.add(questConfig);
 
@@ -438,6 +440,7 @@ public class CityCore extends JavaPlugin {
         cityCommand.setCityQuestManager(cityQuestManager);
         cityCommand.setCityAdvancements(cityAdvancements);
         cityCommand.setModIntegrations(modIntegrations); // /city mods
+        cityCommand.setNpcMenus(npcMenus);               // /city npc <type> menu (tests, admin)
         cityCommand.setUiPack(uiPack);
         // Journal de quêtes illustré (/city quests : onglets Suivi et Récits) ; menu classique sans le pack
         com.citycore.ui.screens.QuestTrackingScreen questJournal =
