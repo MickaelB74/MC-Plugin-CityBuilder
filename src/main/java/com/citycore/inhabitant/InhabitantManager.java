@@ -968,6 +968,7 @@ public class InhabitantManager implements Listener {
             npc.data().set(NPC.Metadata.DROPS_ITEMS, false);
             npc.data().set(NPC.Metadata.PATHFINDER_OPEN_DOORS, inh.state != State.SOLDAT); // les gardes restent dehors
             npc.data().set(NPC_KEY, inh.id);
+            NpcGestures.prepare(npc); // pas de balancement de bras à l'apparition (Epic Fight)
             boolean uniformed = inh.state == State.SOLDAT && inh.uniform >= 0 && !uniforms.isEmpty();
             if (uniformed) uniforms.apply(npc, Math.floorMod(inh.uniform, uniforms.size()));
             else skins.apply(npc, skins.size() == 0 || inh.skin < 0 ? -1 : Math.floorMod(inh.skin, skins.size()));
@@ -982,6 +983,7 @@ public class InhabitantManager implements Listener {
         if (!npc.isSpawned()) {
             if (!sleeping.contains(inh.id)) clearSleep(npc); // disparu en dormant (chunk déchargé) : il réapparaît debout
             npc.spawn(at);
+            NpcGestures.clearLeftovers(npc); // geste posé avant sa disparition : jamais rejoué sans cible
         }
         npc.getNavigator().getDefaultParameters().speedModifier(inh.state == State.SOLDAT ? guard.patrolSpeed() : walkSpeed);
         GuardConfig.Role role = inh.state == State.SOLDAT ? guard.role(inh.role) : null;

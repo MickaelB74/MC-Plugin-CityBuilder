@@ -202,6 +202,9 @@ public class CityCore extends JavaPlugin {
         com.citycore.siege.EventCalendar calendar = new com.citycore.siege.EventCalendar(this);
         calendar.register("siege", siege.asEvent());
         calendar.start();
+        // Pas de siège pendant une expédition (plan « Raids ») : refusé, ou reporté de 30 min au calendrier
+        siege.setBlocker(() -> raids == null ? null : raids.blocksSiege());
+        calendar.setPostponer(() -> raids == null ? null : raids.blocksSiege());
 
         // ── Besoins et satisfaction des habitants (phase 6) ──────
         // Repas et soins à l'aube (entrepôts d'Hélène, Rosalie, Anselme), sécurité (garde, sièges),
@@ -250,10 +253,18 @@ public class CityCore extends JavaPlugin {
         // ── Raids (plan « Raids ») : monde réservé, grille d'emplacements, catalogue raids.yml ──
         // Un tick plus tard : registres des structures et des créatures complets, mondes chargés
         raids = new com.citycore.raid.RaidManager(this, databaseManager);
-        getServer().getPluginManager().registerEvents(raids, this); // personne ne se réveille dans le monde des raids
+        raids.setSiegeRunning(siege::running); // pas d'expédition pendant un siège
+        // Sécurité des joueurs dans le monde des raids : retours, mort, téléportations, commandes, héraut
+        getServer().getPluginManager().registerEvents(raids.participants(), this);
         Bukkit.getScheduler().runTask(this, raids::start);
         modIntegrations.setRaidLine(raids::modLine); // /city mods : « Raids : N cibles » par mod
         // Retour de secours (déconnexion, plantage, arrêt…) : à deux pas d'Alderic, face à lui
+        // Rassemblement autour d'Alderic : où il se tient, et il cesse de suivre un joueur
+        raids.setMayor(() -> {
+            net.citizensnpcs.api.npc.NPC mayor = npcManager.getNPC(CityNPC.MAYOR);
+            if (mayor == null) return null;
+            return mayor.isSpawned() && mayor.getEntity() != null ? mayor.getEntity().getLocation() : mayor.getStoredLocation();
+        }, () -> Bukkit.getOnlinePlayers().forEach(p -> npcManager.stopFollowing(p, CityNPC.MAYOR)));
         raids.setMayorSpot(() -> {
             net.citizensnpcs.api.npc.NPC mayor = npcManager.getNPC(CityNPC.MAYOR);
             if (mayor == null) return null;

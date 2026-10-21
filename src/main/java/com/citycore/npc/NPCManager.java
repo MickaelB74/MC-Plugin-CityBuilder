@@ -1,5 +1,6 @@
 package com.citycore.npc;
 
+import com.citycore.inhabitant.NpcGestures;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.EntityTarget;
 import net.citizensnpcs.api.npc.NPC;
@@ -59,8 +60,13 @@ public class NPCManager {
 
             applyMovement(npc); // PNJ créés par une version précédente du plugin
             applySkin(npc, type); // skin ajouté depuis dans config.yml (npc-skins)
+            NpcGestures.prepare(npc); // pas de balancement de bras à l'apparition (Epic Fight)
             if (!npc.isSpawned() && npc.getStoredLocation() != null) {
                 npc.spawn(npc.getStoredLocation());
+            }
+            // Geste resté posé à l'arrêt du serveur (Citizens remet les étiquettes) : jamais rejoué
+            if (NpcGestures.clearLeftovers(npc)) {
+                plugin.getLogger().info("  → Geste resté en attente retiré : " + type.displayName);
             }
 
             plugin.getLogger().info("  → Restauré : " + type.displayName);
@@ -99,6 +105,7 @@ public class NPCManager {
         hologram.addLine(type.hologramLine());
 
         applyMovement(npc);
+        NpcGestures.prepare(npc);
         npc.spawn(location);
 
         // Refresh SkinsRestorer pour les clients crackés

@@ -18,12 +18,14 @@ import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.types.StaticAnimation;
 import yesman.epicfight.api.asset.AssetAccessor;
 import yesman.epicfight.gameasset.Animations;
 import yesman.epicfight.network.EpicFightNetworkManager;
 import yesman.epicfight.network.common.AbstractAnimatorControl;
 import yesman.epicfight.network.server.SPAnimatorControl;
+import yesman.epicfight.network.server.SPChangeLivingMotion;
 import yesman.epicfight.network.server.SPChangePlayerMode;
 import yesman.epicfight.network.server.SPUpdatePlayerInput;
 import yesman.epicfight.world.capabilities.EpicFightCapabilities;
@@ -48,7 +50,14 @@ import java.util.UUID;
  *   <li>arrivée d'un joueur près d'un PNJ : il reçoit aussitôt le mode combat et l'état actuel ;</li>
  *   <li>gestes : le plugin pose une étiquette sur le PNJ (« citycore.geste.attaque » ou
  *       « citycore.geste.tir ») ; le mod la retire et joue l'enchaînement de l'arme tenue ou son
- *       animation de tir. Affichage seulement : les dégâts restent ceux du plugin.</li>
+ *       animation de tir. Affichage seulement : les dégâts restent ceux du plugin. Une étiquette
+ *       déjà posée quand le PNJ est vu pour la première fois (restée à l'arrêt du serveur, remise
+ *       par Citizens à sa réapparition) est retirée sans être jouée ;</li>
+ *   <li>remise à zéro : peu après l'arrivée d'un joueur, puis pour un PNJ immobile et sans geste
+ *       depuis un moment, ses animations sont recalculées chez les joueurs qui le voient (même
+ *       paquet qu'Epic Fight à l'arrivée d'un joueur). Chez Epic Fight, tout balancement de bras
+ *       lance une animation de frappe (« creuser ») qui pouvait rester bloquée en boucle, surtout
+ *       à la connexion après un redémarrage : elle s'arrête ainsi.</li>
  * </ul>
  * Un PNJ = une entité joueur du serveur absente de la liste des joueurs connectés.
  */
@@ -66,6 +75,11 @@ final class NpcAnimator {
     private static final int RUN_IN_TICKS = 3, RUN_OUT_TICKS = 6;
     /** Envoi de l'état à un joueur qui arrive : quelques ticks après l'apparition du PNJ chez lui. */
     private static final int SYNC_DELAY = 3;
+    /**
+     * Remise à zéro chez ce joueur : après le balancement de bras que Citizens envoie à l'apparition
+     * d'un PNJ (un tick plus tard, 6 ticks de geste).
+     */
+    private static final int RESET_DELAY = 12;
     /** Sans coup pendant 2 s, l'enchaînement repart du premier coup. */
     private static final int COMBO_RESET_TICKS = 40;
     /** Plus de 4 blocs en un tick : téléportation, pas un déplacement. */
@@ -81,16 +95,22 @@ final class NpcAnimator {
         int stillTicks, fastTicks, slowTicks;
         float forward, strafe;      // dernières « touches » envoyées
         int combo, lastAttackTick = Integer.MIN_VALUE / 2;
+        int lastGestureTick, lastResetTick; // dernier geste joué, dernière remise à zéro
 
-        NpcState(ServerPlayer npc) {
+        NpcState(ServerPlayer npc, int tick) {
             this.npc = npc;
             this.lastX = npc.getX();
             this.lastZ = npc.getZ();
+            this.lastGestureTick = tick;
+            this.lastResetTick = tick;
         }
     }
 
-    /** Envoi différé de l'état d'un PNJ à un joueur qui vient de le voir apparaître. */
-    private record PendingSync(UUID viewer, int npcId, int due) {}
+    /**
+     * Envoi différé à un joueur qui vient de voir apparaître un PNJ : état (mode combat, « touches »),
+     * ou remise à zéro de ses animations (reset).
+     */
+    private record PendingSync(UUID viewer, int npcId, int due, boolean reset) {}
 
     private final Map<Integer, NpcState> npcs = new HashMap<>();
     private final List<PendingSync> pending = new ArrayList<>();
@@ -130,17 +150,26 @@ final class NpcAnimator {
             } catch (Throwable t) {
                 warnOnce("geste", t);
             }
+            try {
+                idleReset(s);
+            } catch (Throwable t) {
+                warnOnce("remise", t);
+            }
         }
         flushPending(server);
     }
 
-    /** Un joueur commence à voir un PNJ : mode combat et état actuel lui sont envoyés. */
+    /**
+     * Un joueur commence à voir un PNJ : mode combat et état actuel lui sont envoyés, puis ses
+     * animations sont remises à zéro chez lui.
+     */
     @SubscribeEvent
     public void onStartTracking(PlayerEvent.StartTracking event) {
         if (!(event.getTarget() instanceof ServerPlayer npc) || !(event.getEntity() instanceof ServerPlayer viewer)) return;
         if (!Settings.EF_ENABLED.get() || !isNpc(npc)) return;
-        npcs.computeIfAbsent(npc.getId(), id -> new NpcState(npc));
-        pending.add(new PendingSync(viewer.getUUID(), npc.getId(), tick + SYNC_DELAY));
+        track(npc);
+        pending.add(new PendingSync(viewer.getUUID(), npc.getId(), tick + SYNC_DELAY, false));
+        pending.add(new PendingSync(viewer.getUUID(), npc.getId(), tick + RESET_DELAY, true));
     }
 
     @SubscribeEvent
@@ -180,15 +209,31 @@ final class NpcAnimator {
     private void scan(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity e : level.getAllEntities()) {
-                if (e instanceof ServerPlayer p && !npcs.containsKey(p.getId()) && isNpc(p)) {
-                    npcs.put(p.getId(), new NpcState(p));
-                }
+                if (e instanceof ServerPlayer p && !npcs.containsKey(p.getId()) && isNpc(p)) track(p);
             }
         }
         if (Settings.LOG.get() && npcs.size() != lastLoggedCount) {
             lastLoggedCount = npcs.size();
             CityCoreCompanion.LOGGER.info("{} PNJ animé(s) pour Epic Fight", npcs.size());
         }
+    }
+
+    /**
+     * Suit un PNJ (s'il ne l'est pas déjà). Vu pour la première fois, il ne doit jouer aucun geste
+     * ancien : une étiquette déjà posée (restée à l'arrêt du serveur, remise par Citizens à sa
+     * réapparition) est retirée sans être jouée.
+     */
+    private NpcState track(ServerPlayer npc) {
+        NpcState s = npcs.get(npc.getId());
+        if (s != null) return s;
+        s = new NpcState(npc, tick);
+        npcs.put(npc.getId(), s);
+        boolean stale = npc.removeTag(TAG_ATTACK);
+        stale |= npc.removeTag(TAG_SHOT);
+        if (stale && Settings.LOG.get()) {
+            CityCoreCompanion.LOGGER.info("PNJ {} : geste resté en attente retiré sans être joué", npc.getGameProfile().getName());
+        }
+        return s;
     }
 
     /* ───────────────────────── Déplacements ───────────────────────── */
@@ -270,8 +315,14 @@ final class NpcAnimator {
     private void gestures(NpcState s) {
         ServerPlayer npc = s.npc;
         if (npc.getTags().isEmpty()) return;
-        if (npc.removeTag(TAG_ATTACK) && Settings.ATTACKS.get()) attack(s);
-        if (npc.removeTag(TAG_SHOT) && Settings.SHOTS.get()) shot(s);
+        if (npc.removeTag(TAG_ATTACK)) {
+            s.lastGestureTick = tick;
+            if (Settings.ATTACKS.get()) attack(s);
+        }
+        if (npc.removeTag(TAG_SHOT)) {
+            s.lastGestureTick = tick;
+            if (Settings.SHOTS.get()) shot(s);
+        }
     }
 
     /** Coup : animation suivante de l'enchaînement de l'arme tenue. */
@@ -318,6 +369,40 @@ final class NpcAnimator {
         return present(Animations.FIST_AUTO1, Animations.FIST_AUTO2, Animations.FIST_AUTO3);
     }
 
+    /* ───────────────────────── Remise à zéro ───────────────────────── */
+
+    /**
+     * PNJ immobile, sans geste depuis le délai réglé (remiseAZero) : ses animations sont remises à
+     * zéro chez les joueurs qui le voient. Un PNJ qui travaille ou s'entraîne (gestes réguliers) ou
+     * qui marche n'est pas concerné.
+     */
+    private void idleReset(NpcState s) {
+        int period = Settings.RESET_SECONDS.get() * 20;
+        if (period <= 0 || s.moving) return;
+        if (tick - s.lastGestureTick < period || tick - s.lastResetTick < period) return;
+        s.lastResetTick = tick;
+        SPChangeLivingMotion reset = resetPacket(s.npc);
+        if (reset == null) return;
+        broadcast(s.npc, reset);
+        if (Settings.LOG.get()) CityCoreCompanion.LOGGER.info("PNJ {} : animations remises à zéro (immobile)", s.npc.getGameProfile().getName());
+    }
+
+    /**
+     * Paquet de remise à zéro : les animations « de vie » du PNJ telles que le serveur les connaît
+     * (repos, marche… selon l'objet tenu), celui qu'Epic Fight envoie lui-même quand un joueur
+     * commence à voir le PNJ. Chez le joueur, il arrête les animations superposées en cours (une
+     * frappe bloquée en boucle, par exemple) et l'animation est recalculée d'après l'état réel du
+     * PNJ. null si le PNJ n'a pas de données Epic Fight.
+     */
+    private static SPChangeLivingMotion resetPacket(ServerPlayer npc) {
+        ServerPlayerPatch patch = EpicFightCapabilities.getServerPlayerPatchAsOptional(npc).orElse(null);
+        if (patch == null) return null;
+        Animator animator = patch.getAnimator();
+        SPChangeLivingMotion msg = new SPChangeLivingMotion(npc.getId());
+        msg.putEntries(animator.getLivingAnimations().entrySet());
+        return msg;
+    }
+
     /** Animations disponibles parmi celles données (une animation non chargée est ignorée). */
     @SafeVarargs
     private static List<AssetAccessor<? extends StaticAnimation>> present(AssetAccessor<? extends StaticAnimation>... anims) {
@@ -328,7 +413,10 @@ final class NpcAnimator {
 
     /* ───────────────────────── Envois ───────────────────────── */
 
-    /** Joueurs arrivés près d'un PNJ : mode combat (si réglé) puis « touches » actuelles. */
+    /**
+     * Joueurs arrivés près d'un PNJ : mode combat (si réglé) puis « touches » actuelles ; un peu
+     * plus tard, remise à zéro de ses animations chez eux.
+     */
     private void flushPending(MinecraftServer server) {
         if (pending.isEmpty()) return;
         for (Iterator<PendingSync> it = pending.iterator(); it.hasNext(); ) {
@@ -339,6 +427,12 @@ final class NpcAnimator {
             NpcState s = npcs.get(p.npcId());
             if (viewer == null || s == null || s.npc.isRemoved()) continue;
             try {
+                if (p.reset()) {
+                    SPChangeLivingMotion reset = resetPacket(s.npc);
+                    if (reset != null) EpicFightNetworkManager.sendToPlayer(reset, viewer);
+                    s.lastResetTick = tick;
+                    continue;
+                }
                 if (Settings.FORCE_EPIC_MODE.get()) {
                     EpicFightNetworkManager.sendToPlayer(new SPChangePlayerMode(s.npc.getId(), PlayerPatch.PlayerMode.EPICFIGHT), viewer);
                 }

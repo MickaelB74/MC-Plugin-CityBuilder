@@ -70,6 +70,8 @@ public final class ConfigUpdater {
      *      repérées) : grille, familles de terrain et contrôle du relief retirés (sections
      *      raids.terrain et raids.familles), espacement des recherches 4096, rayon-prepare remplacé
      *      par rayon-recherche et marge, en-tête de la section réécrit.
+     * 33 : raids, phase R1 (départ, camp, sécurité des joueurs) : raids.camp, rassemblement,
+     *      bilan-secondes, joueurs et niveaux s'ajoutent sous raids sans ligne à corriger.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(

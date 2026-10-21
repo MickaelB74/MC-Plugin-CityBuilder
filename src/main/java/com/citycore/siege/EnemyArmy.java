@@ -192,6 +192,7 @@ public final class EnemyArmy implements Listener {
         npc.data().set(NPC.Metadata.DROPS_ITEMS, false);
         npc.data().set(NPC.Metadata.PATHFINDER_OPEN_DOORS, false); // une porte fermée protège les habitants
         if (champion) npc.data().set(NPC.Metadata.GLOWING, true);
+        com.citycore.inhabitant.NpcGestures.prepare(npc); // pas de balancement de bras à l'apparition (Epic Fight)
         skins.apply(npc, skins.isEmpty() ? -1 : skins.nextIndex());
         Equipment eq = npc.getOrAddTrait(Equipment.class);
         eq.set(Equipment.EquipmentSlot.HAND, item(unit.weapon()));

@@ -183,6 +183,13 @@ public final class SiegeManager implements Listener {
     }
 
     /** Prévenu de l'issue de chaque siège mené jusqu'au bout : (victoire, palier). */
+    /** Raison d'empêcher un siège de commencer (expédition en cours, plan « Raids »), ou null. */
+    private java.util.function.Supplier<String> blocker = () -> null;
+
+    public void setBlocker(java.util.function.Supplier<String> blocker) {
+        this.blocker = blocker;
+    }
+
     public void setResultListener(java.util.function.BiConsumer<Boolean, Integer> listener) {
         this.resultListener = listener;
     }
@@ -250,6 +257,8 @@ public final class SiegeManager implements Listener {
      */
     public String begin(Integer forcedTier, boolean manual, SiegeConfig.Kind forcedKind) {
         if (running()) return "Un siège est déjà en cours.";
+        String blocked = blocker.get();
+        if (blocked != null) return "Pas de siège maintenant : " + blocked + ".";
         if (Bukkit.getOnlinePlayers().isEmpty()) return "Aucun joueur connecté.";
         reload();
         World w = cityWorld();

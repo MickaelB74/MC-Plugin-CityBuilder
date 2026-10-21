@@ -1,6 +1,6 @@
 # Plan « Raids » — les expéditions de Valmont
 
-Conception arrêtée le 21/10/2026 ; R0 et R2 codées le 21/10/2026 (tests en jeu à faire, §12).
+Conception arrêtée le 21/10/2026 ; R0, R1 et R2 codées le 21/10/2026 (tests en jeu à faire, §12).
 Ce document se suffit à lui-même : chaque phase (R0 à R10) se commande dans un nouveau prompt,
 par exemple :
 
@@ -16,7 +16,7 @@ Documents liés : `docs/PLAN_VILLE_VIVANTE.md` (sièges, garde, besoins, calendr
 | Phase | Contenu | Dépend de | Taille | État |
 |---|---|---|---|---|
 | R0 | Prototype technique : monde des raids, pose des structures, observation | — | petite | codée, test en jeu à faire |
-| R1 | Monde, allers-retours et sécurité des joueurs | R0 | grosse | à faire |
+| R1 | Monde, allers-retours et sécurité des joueurs | R0 | grosse | codée, test en jeu à faire |
 | R2 | Catalogue des cibles et vérification des mods | R0 | moyenne | codée, test en jeu à faire |
 | R3 | Écrans d'Alderic : Événements → Raid → Difficulté → Cibles → Fiche | R1, R2 | moyenne | à faire |
 | R4 | L'assaut : défiance, objectifs, chrono, victoire, récompenses (niveaux I à III, terre) | R3 | grosse | à faire |
@@ -996,8 +996,8 @@ le désert, une cible de neige dans la neige ; le camp est à côté de la struc
 des archers ; mort (chute, noyade, monstre) → réapparition au camp avec tout l'inventaire et
 l'expérience, sans rien laisser au sol ; mort pendant le bilan ; un lit utilisé dans le monde des
 raids ne change pas le point d'apparition ; déconnexion et retour ; arrêt du serveur en plein raid
-puis reconnexion (retour à la position d'origine) ; `/home`, `/tpa` bloqués ; retraite par le
-héraut ; plus aucune entité du raid après la fin ; siège impossible pendant un raid.
+puis reconnexion (retour auprès d'Alderic, décision du 21/10/2026) ; `/home`, `/tpa` bloqués ;
+retraite par le héraut ; plus aucune entité du raid après la fin ; siège impossible pendant un raid.
 
 ### R2 — Catalogue et vérification des mods
 
@@ -1134,6 +1134,65 @@ Dialogues d'Alderic et du héraut, trophées, succès dans l'écran des progrès
 ---
 
 ## 12. Journal de réalisation
+
+### R1 — codée le 21/10/2026 (tests en jeu à faire)
+
+**Code** : `RaidRun` (raid en cours : étapes `PREPARATION → RASSEMBLEMENT → ASSAUT → BILAN`),
+`RaidCamp` (camp), `RaidHerald` (héraut), `RaidParticipants` (sécurité des joueurs, table
+`raid_returns`) ; `RaidManager` (déroulé, repérage commun aux essais et aux expéditions),
+`RaidCommands` (`start`, `stop`, `quitter`), `RaidConfig` (`camp`, `rassemblement`,
+`bilan-secondes`, `joueurs`, `niveaux`) ; `SiegeManager.setBlocker`, `EventCalendar.setPostponer`,
+`DatabaseManager` (`raid_returns`), `CityCore` (branchements : position d'Alderic, il cesse de
+suivre), `config-version` 33 (sous-sections ajoutées sous `raids`, contrôlé hors jeu sur une
+copie de la configuration du serveur).
+
+**Déroulé** : `/city raid start <cible> [ici]` (clé de `raids.yml` ou structure) → les éclaireurs
+repèrent et génèrent le site (avancement dans la barre d'action de tous), camp et héraut posés →
+rassemblement de 30 s autour d'Alderic (ou de l'administrateur avec `ici`) : annonce, titre,
+cloche, Alderic cesse de suivre, cercle doré de 10 blocs, compte à rebours → les joueurs du cercle
+(même monde, vivants, pas spectateurs) sont enrôlés, leur position notée, et partent au camp face
+à la cible (cor) ; moins de `joueurs-min` : annulée → assaut au chrono du niveau (barre rouge
+« ⚔ cible · mm:ss » ; pas d'objectifs avant R4) → bilan de 20 s → chacun rentre à sa position
+d'origine (auprès d'Alderic si elle est perdue) → nettoyage (héraut, barre, occupants étiquetés
+de la cible, tickets). Plus aucun joueur engagé dans le monde : fin anticipée.
+
+**Écarts et précisions** :
+- **Camp** : plancher de 5 × 5 posé par le plugin (radeau sur l'eau), feu de camp et bannière
+  jaune (or de Valmont), du côté le plus plat des huit côtés et coins à `camp.distance` du bord de
+  la boîte ; pas de `valarian_conquest:neutral_tent_camp` (il faudrait `/place`, abandonné).
+- **Héraut** : PNJ Citizens d'un registre en mémoire ; une réplique (deux lignes de barre
+  d'action), puis un bouton « [Battre en retraite] » / « [Rentrer à Valmont] » qui lance
+  `/city raid quitter` (commande joueur).
+- **Retours** : `raid_returns` vidée au démarrage (raid interrompu : retour auprès d'Alderic) ;
+  joueur hors ligne à la fin : sa ligne est effacée, il revient auprès d'Alderic ; mort au moment
+  du retour : il rentre à sa réapparition.
+- **Entrée et commandes** : l'administration (`citycore.admin.raid`) n'est ni bloquée à l'entrée
+  ni pour les commandes (tests) ; un joueur engagé qui sort par un autre moyen est considéré comme
+  rentré. Liste des commandes refusées complétée (`tpyes`, `warps`, `tpo`, `tppos`, `tphere`).
+- **Sièges** : `/city siege start` refusé pendant une expédition ; un siège du calendrier est
+  reporté de 30 min (annonce), autant de fois que nécessaire. Pas d'expédition pendant un siège.
+- **Sites préparés d'avance** : pas encore ; le repérage se fait au lancement (la recherche
+  occupe le fil principal quelques secondes). À faire avec la fiche d'Alderic (R3) : repérer dès
+  l'ouverture de la fiche.
+- `niveaux` (§4.1, §6.1) est déjà dans `config.yml` ; R1 n'en lit que le chrono.
+
+**À tester en jeu — R1** :
+1. `/city raid start <clé>` (par exemple `village-plains`, `camp-de-bandits`,
+   `commanderie-du-temple`) : messages des éclaireurs, avancement, camp à côté de la structure,
+   hors de portée des archers ; héraut sur le camp.
+2. Rassemblement : annonce, cercle doré autour d'Alderic, compte à rebours ; départ à 2 joueurs
+   dont un hors du cercle (seul celui du cercle part) ; `start … ici` autour de soi.
+3. Mort (chute, noyade, monstre) → réapparition au camp avec tout l'inventaire et l'expérience,
+   rien au sol, invulnérable un instant ; mort pendant le bilan → rentre avec les autres.
+4. Un lit utilisé dans le monde des raids ne change pas le point d'apparition ; pas de portail.
+5. `/home`, `/tpa`, `/spawn` refusés à un joueur (pas à un administrateur) ; entrée par `/tp`
+   refusée à un joueur.
+6. Retraite par le héraut (bouton) ; fin au chrono (`raids.niveaux.1.chrono-minutes: 1` pour
+   aller vite) ; bilan de 20 s ; retour à la position d'origine ; plus aucun occupant ni héraut.
+7. Déconnexion pendant l'assaut puis retour : au camp ; après la fin : auprès d'Alderic. Arrêt
+   du serveur en plein raid puis reconnexion : auprès d'Alderic.
+8. `/city siege start` refusé pendant une expédition ; `/city raid start` refusé pendant un
+   siège ; `/city raid stop` à chaque étape.
 
 ### R0 revue — génération naturelle (21/10/2026)
 

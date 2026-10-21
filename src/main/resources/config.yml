@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 32
+config-version: 33
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -3152,8 +3152,12 @@ dialogues:
 #  naturel non exploré le plus proche d'un point de départ neuf est repéré (recherche de
 #  /locate), puis sa zone est générée en tâche de fond. Le monde est jetable : jeté à l'arrêt du
 #  serveur (sans sauvegarde), recréé de zéro au démarrage (reinitialiser-au-demarrage).
-#  Administration (citycore.admin.raid) : /city raid essai <structure> | zones | tp [essai] |
-#  retour | purge | catalogue [niveau] | inconnues.
+#  Départ : rassemblement autour d'Alderic (rayon, secondes) ; les joueurs dans le cercle partent
+#  au camp, à côté de la cible ; un joueur mort y réapparaît avec tout son inventaire. Retraite :
+#  le héraut du camp. Fin : au bout du chrono (niveaux), puis bilan et retour de chacun chez lui.
+#  Joueurs : /city raid (expédition en cours) | quitter.
+#  Administration (citycore.admin.raid) : /city raid start <cible> [ici] | stop | essai <structure> |
+#  zones | tp [essai] | retour | purge | catalogue [niveau] | inconnues.
 # ============================================================
 raids:
   active: true
@@ -3169,3 +3173,21 @@ raids:
     marge: 32               # blocs générés autour de la boîte de la cible (abords, camp)
     heure: 6000             # heure fixe des mondes des raids (6000 = midi, 18000 = minuit)
     difficulte: NORMAL      # PEACEFUL, EASY, NORMAL ou HARD
+  camp:
+    distance: 32            # blocs entre le bord de la cible et le camp (point de réapparition)
+  rassemblement: {rayon: 10, secondes: 30, joueurs-min: 1}   # cercle autour d'Alderic, compte à rebours, joueurs requis
+  bilan-secondes: 20        # temps pour souffler après la fin, avant le retour de chacun à Valmont
+  joueurs:
+    invulnerable-reapparition-secondes: 3   # après une mort, au camp (inventaire et expérience toujours gardés)
+    # Commandes refusées dans le monde des raids (sauf administration) : on rentre par le héraut du camp
+    commandes-bloquees: [sethome, home, homes, back, spawn, tpa, tpahere, tpaccept, tpyes, warp, warps, tp, tpo, tppos, tphere]
+  # Niveaux (PLAN_RAIDS §4.1, §6.1) : chapitre requis, défenseurs pour un joueur, chrono, vagues de
+  # renfort, recharge, récompense (caisse de la ville, et par joueur). Phase R1 : seul le chrono sert.
+  niveaux:
+    1: {nom: "Escarmouche", chapitre: 2, defenseurs: [3, 6], chrono-minutes: 6, renforts: 0, recharge-minutes: 30, caisse: 100, joueur: 15}
+    2: {nom: "Coup de main", chapitre: 3, defenseurs: [5, 12], chrono-minutes: 8, renforts: 0, recharge-minutes: 45, caisse: 150, joueur: 25}
+    3: {nom: "Expédition", chapitre: 4, defenseurs: [8, 15], chrono-minutes: 10, renforts: 1, recharge-minutes: 60, caisse: 220, joueur: 35}
+    4: {nom: "Assaut", chapitre: 5, defenseurs: [15, 25], chrono-minutes: 15, renforts: 1, recharge-minutes: 90, caisse: 300, joueur: 50}
+    5: {nom: "Offensive", chapitre: 6, defenseurs: [20, 35], chrono-minutes: 18, renforts: 2, recharge-minutes: 120, caisse: 400, joueur: 70}
+    6: {nom: "Grande offensive", chapitre: 8, defenseurs: [25, 45], chrono-minutes: 20, renforts: 3, recharge-minutes: 180, caisse: 520, joueur: 90}
+    7: {nom: "Légende", chapitre: 10, defenseurs: [30, 60], chrono-minutes: 25, renforts: 3, recharge-minutes: 360, caisse: 700, joueur: 120}

@@ -250,6 +250,22 @@ public class DatabaseManager {
             )
         """);
 
+        // Raids : position de chaque joueur parti en expédition, pour le ramener chez lui à la fin
+        // (vidée au démarrage : après un plantage, retour auprès d'Alderic)
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS raid_returns (
+                uuid       TEXT PRIMARY KEY,
+                world      TEXT    NOT NULL,
+                x          REAL    NOT NULL,
+                y          REAL    NOT NULL,
+                z          REAL    NOT NULL,
+                yaw        REAL    NOT NULL,
+                pitch      REAL    NOT NULL,
+                raid_id    INTEGER NOT NULL,
+                started_at INTEGER NOT NULL
+            )
+        """);
+
         stmt.close();
     }
 

@@ -65,8 +65,17 @@ public final class EventCalendar {
     private ZoneId zone = ZoneId.systemDefault();
     private int announceMinutes = 5;
 
+    /** Report d'un événement prévu (une expédition est en cours) : raison, ou null. */
+    private java.util.function.Supplier<String> postponer = () -> null;
+    /** Durée d'un report (PLAN_RAIDS §6.2 : 30 min). */
+    private static final long POSTPONE_TICKS = 30L * 60 * 20;
+
     public EventCalendar(JavaPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    public void setPostponer(java.util.function.Supplier<String> postponer) {
+        this.postponer = postponer;
     }
 
     /** Déclare un type d'événement : « siege » → le gestionnaire des sièges. */
@@ -166,6 +175,13 @@ public final class EventCalendar {
                 Bukkit.broadcastMessage("§7⚔ " + event.label() + " annulé : " + online + " joueur" + (online > 1 ? "s" : "")
                         + " connecté" + (online > 1 ? "s" : "") + ", il en faut " + slot.minPlayers() + ".");
             }
+            return;
+        }
+        String wait = postponer.get();
+        if (wait != null) {
+            // Une expédition est partie : l'événement attend son retour (nouvel essai dans 30 min)
+            Bukkit.broadcastMessage("§c⚔ " + event.label() + " reporté de 30 minutes : §7" + wait + ".");
+            Bukkit.getScheduler().runTaskLater(plugin, () -> launch(slot, event), POSTPONE_TICKS);
             return;
         }
         String err = event.start();

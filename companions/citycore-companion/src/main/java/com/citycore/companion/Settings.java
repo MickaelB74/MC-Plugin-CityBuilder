@@ -20,6 +20,7 @@ public final class Settings {
     public static final ModConfigSpec.DoubleValue  RUN_MIN;
     public static final ModConfigSpec.BooleanValue ATTACKS;
     public static final ModConfigSpec.BooleanValue SHOTS;
+    public static final ModConfigSpec.IntValue     RESET_SECONDS;
     public static final ModConfigSpec.BooleanValue FORCE_EPIC_MODE;
     public static final ModConfigSpec.BooleanValue LOG;
 
@@ -48,6 +49,9 @@ public final class Settings {
                 .define("attaques", true);
         SHOTS = b.comment("Tirs des archers et arbalétriers : animation de tir de l'arme tenue")
                 .define("tirs", true);
+        RESET_SECONDS = b.comment("Remise à zéro (secondes) de l'animation d'un PNJ immobile sans geste depuis ce délai, chez",
+                        "les joueurs qui le voient : un geste resté bloqué en boucle s'arrête ; 0 = jamais")
+                .defineInRange("remiseAZero", 20, 0, 600);
         b.pop();
         FORCE_EPIC_MODE = b.comment("Annonce les PNJ en mode combat d'Epic Fight (modèle et animations d'Epic Fight)")
                 .define("modeCombat", true);

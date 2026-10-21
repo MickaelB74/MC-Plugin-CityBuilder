@@ -348,6 +348,16 @@ contre paper-api seul ; il parle au mod par un canal neutre :
 
 Chaque module est facultatif et isolé : sans son mod, aucune de ses classes n'est chargée.
 Réglages du mod : `config/citycore_companion.toml` (sections `epicfight` et `journeymap`).
+
+**Gestes bloqués en boucle (Epic Fight)** : chez Epic Fight, tout balancement de bras d'un PNJ
+lance une animation de frappe (« creuser ») qui pouvait rester bloquée chez un joueur — des PNJ
+frappant dans le vide sans fin, surtout à la connexion après un redémarrage. Trois garde-fous :
+avec Epic Fight, `NpcGestures.prepare` coupe le balancement de bras que Citizens fait faire à
+chaque apparition d'un PNJ (`reset-yaw-on-spawn`, par PNJ) ; `NpcGestures.clearLeftovers` retire
+à la restauration et à la réapparition les étiquettes de geste restées posées (Citizens les garde
+dans son trait `scoreboardtrait`) ; le mod retire sans la jouer une étiquette trouvée sur un PNJ
+qu'il voit pour la première fois et remet à zéro les animations d'un PNJ chez un joueur peu après
+qu'il le voit apparaître, puis quand le PNJ reste immobile sans geste (`epicfight.gestes.remiseAZero`).
 Construction, installation et réglages détaillés : `companions/citycore-companion/README.md`.
 
 ### Parcelles de la ville sur la carte JourneyMap

@@ -27,7 +27,15 @@ et le laisse glisser dans sa pose d'attente.
 - annonce les PNJ en mode combat d'Epic Fight à chaque joueur qui les voit apparaître ;
 - joue les gestes signalés par le plugin (étiquettes `citycore.geste.attaque` et
   `citycore.geste.tir`) : enchaînement de l'arme tenue, animation de tir de l'arc ou de
-  l'arbalète. Affichage seulement : les dégâts restent ceux du plugin.
+  l'arbalète. Affichage seulement : les dégâts restent ceux du plugin. Une étiquette déjà posée
+  quand le PNJ est vu pour la première fois (restée à l'arrêt du serveur, remise par Citizens à sa
+  réapparition) est retirée sans être jouée ;
+- remet à zéro les animations d'un PNJ chez un joueur peu après qu'il le voit apparaître, puis
+  chez tous ceux qui le voient quand il reste immobile et sans geste (`epicfight.gestes.remiseAZero`).
+  Chez Epic Fight, tout balancement de bras lance une animation de frappe (« creuser ») qui pouvait
+  rester bloquée en boucle, surtout à la connexion après un redémarrage : elle s'arrête ainsi.
+  Le plugin retire de son côté le balancement de bras que Citizens fait faire aux PNJ à leur
+  apparition (réglage `reset-yaw-on-spawn`) quand Epic Fight est présent.
 
 Un PNJ = une entité joueur présente dans un monde mais absente de la liste des joueurs connectés.
 
@@ -103,6 +111,7 @@ Dépendances de compilation (aucune n'est recopiée dans le jar) :
 | `epicfight.deplacements.course` | 0.24 | vitesse à partir de laquelle il court ; 0 = jamais |
 | `epicfight.gestes.attaques` | true | coups animés (gardes, soldats ennemis) |
 | `epicfight.gestes.tirs` | true | tirs animés (archers, arbalétriers) |
+| `epicfight.gestes.remiseAZero` | 20 | secondes sans geste ni déplacement avant de remettre à zéro les animations d'un PNJ (un geste bloqué en boucle s'arrête) ; 0 = jamais |
 | `epicfight.modeCombat` | true | annonce les PNJ en mode combat d'Epic Fight |
 | `epicfight.journal` | false | journal détaillé pour les tests (PNJ trouvés, marche/arrêt, gestes) |
 | `journeymap.actif` | true | false : la ville disparaît des cartes, plus rien n'est envoyé |
