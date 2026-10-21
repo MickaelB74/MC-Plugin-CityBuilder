@@ -136,6 +136,13 @@ public class CityCommand implements CommandExecutor {
         this.buildingInspector = buildingInspector;
     }
 
+    /** Raids (plan « Raids ») : /city raid. */
+    private com.citycore.raid.RaidCommands raids;
+
+    public void setRaids(com.citycore.raid.RaidCommands raids) {
+        this.raids = raids;
+    }
+
     /** Prototype de la phase 0 (/city proto) : PNJ blessables, foule, combat. Temporaire. */
     private com.citycore.debug.NpcPrototype prototype;
 
@@ -719,6 +726,12 @@ public class CityCommand implements CommandExecutor {
                         }
                         default -> sender.sendMessage("§cUsage : /city " + sub.usageFor(sender));
                     }
+                }
+
+                // ── /city raid (plan « Raids ») ──────────────────
+                // État pour tous ; essais, emplacements, catalogue : admin (citycore.admin.raid)
+                case RAID -> {
+                    if (raids != null) raids.handle(sender, player, args, admin);
                 }
 
                 // ── /city proto (phase 0, temporaire ; admin : citycore.admin.proto) ──

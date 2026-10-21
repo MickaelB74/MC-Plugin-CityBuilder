@@ -67,6 +67,7 @@ public class CityCore extends JavaPlugin {
     private com.citycore.jobs.JobsManager jobs;
     private com.citycore.city.CityChunkLoader chunkLoader;
     private com.citycore.city.CityMapExport   mapExport;
+    private com.citycore.raid.RaidManager     raids;
 
     @Override
     public void onEnable() {
@@ -245,6 +246,31 @@ public class CityCore extends JavaPlugin {
         mapExport = new com.citycore.city.CityMapExport(this, cityManager);
         cityManager.addClaimListener(mapExport::requestExport);
         mapExport.start();
+
+        // ── Raids (plan « Raids ») : monde réservé, grille d'emplacements, catalogue raids.yml ──
+        // Un tick plus tard : registres des structures et des créatures complets, mondes chargés
+        raids = new com.citycore.raid.RaidManager(this, databaseManager);
+        getServer().getPluginManager().registerEvents(raids, this); // personne ne se réveille dans le monde des raids
+        Bukkit.getScheduler().runTask(this, raids::start);
+        modIntegrations.setRaidLine(raids::modLine); // /city mods : « Raids : N cibles » par mod
+        // Retour de secours (déconnexion, plantage, arrêt…) : à deux pas d'Alderic, face à lui
+        raids.setMayorSpot(() -> {
+            net.citizensnpcs.api.npc.NPC mayor = npcManager.getNPC(CityNPC.MAYOR);
+            if (mayor == null) return null;
+            org.bukkit.Location at = mayor.isSpawned() && mayor.getEntity() != null
+                    ? mayor.getEntity().getLocation() : mayor.getStoredLocation();
+            if (at == null || at.getWorld() == null) return null;
+            int[][] around = {{2, 0}, {-2, 0}, {0, 2}, {0, -2}, {2, 2}, {-2, -2}, {2, -2}, {-2, 2}};
+            for (int[] d : around) {
+                org.bukkit.Location spot = com.citycore.util.GroundFinder.standAt(at.getWorld(),
+                        at.getBlockX() + d[0], at.getBlockY(), at.getBlockZ() + d[1]);
+                if (spot == null) continue;
+                spot.setDirection(at.toVector().subtract(spot.toVector()));
+                spot.setPitch(0f);
+                return spot;
+            }
+            return at.clone();
+        });
 
         // ── Emplois : les habitants travaillent pour les artisans (annexes de travail) ──
         jobs = new com.citycore.jobs.JobsManager(this, buildingManager, buildingInspector, npcDataManager, market, inhabitants);
@@ -461,6 +487,8 @@ public class CityCore extends JavaPlugin {
         cityCommand.setNeeds(needs);
         cityCommand.setJobs(jobs);
         cityCommand.setMapExport(mapExport);
+        com.citycore.raid.RaidCommands raidCommands = new com.citycore.raid.RaidCommands(raids);
+        cityCommand.setRaids(raidCommands);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);
@@ -470,6 +498,7 @@ public class CityCore extends JavaPlugin {
         cityTabCompleter.setBuildingCreation(buildingCreation);
         cityTabCompleter.setInhabitants(inhabitants);
         cityTabCompleter.setUiPack(uiPack); // garde : former et renvoyer en commande seulement sans les écrans illustrés
+        cityTabCompleter.setRaids(raidCommands);
         cityCmd.setTabCompleter(cityTabCompleter);
 
         // ── Summit — instancié APRÈS QuestListener ────────────────
@@ -505,6 +534,7 @@ public class CityCore extends JavaPlugin {
     public void onDisable() {
         if (prototype != null) prototype.clear(); // PNJ et zombies du prototype : rien ne doit rester
         if (siege != null) siege.shutdown();             // assaillants retirés : rien ne reste dans le monde
+        if (raids != null) raids.shutdown();             // monde des raids jeté sans sauvegarde (recréé au démarrage)
         if (chunkLoader != null) chunkLoader.shutdown(); // chunks de la ville rendus
         if (inhabitants != null) inhabitants.shutdown(); // recréés depuis la base au prochain démarrage
         if (cityHUD != null) cityHUD.stop();

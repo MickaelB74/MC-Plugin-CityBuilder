@@ -43,6 +43,13 @@ public class CityTabCompleter implements TabCompleter {
         this.uiPack = uiPack;
     }
 
+    /** Raids : complétion de /city raid (actions d'administration). */
+    private com.citycore.raid.RaidCommands raids;
+
+    public void setRaids(com.citycore.raid.RaidCommands raids) {
+        this.raids = raids;
+    }
+
     public CityTabCompleter(CityManager cityManager,
                             BuildingManager buildingManager, NPCManager npcManager) {
         this.cityManager     = cityManager;
@@ -68,6 +75,8 @@ public class CityTabCompleter implements TabCompleter {
         CitySubCommand sub = CitySubCommand.fromLabel(args[0]);
         if (sub == null || !CityPermissions.canUse(player, sub)) return new ArrayList<>();
         boolean admin = CityPermissions.isAdmin(player, sub);
+        // /city raid … : actions d'administration seulement (consultation sans argument)
+        if (sub == CitySubCommand.RAID) return raids == null ? new ArrayList<>() : raids.complete(args, admin);
         // Former, renvoyer (garde) : chez Roland ; en commande sans les écrans illustrés seulement
         boolean guardByCommand = admin || uiPack == null || !uiPack.isReady(player);
 

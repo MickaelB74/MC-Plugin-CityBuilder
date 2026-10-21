@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 29
+config-version: 32
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -97,8 +97,12 @@ mod-integrations:
   valarian_conquest: auto  # Valarian Conquest : Jeanne d'Arc (chapitre VIII)
   mowziesmobs: auto        # Mowzie's Mobs : Hercule (chapitre X)
   brewery: auto            # Let's Do Brewery (avec Farm & Charm) : Gambrinus (chapitre IV)
-  mostructures: auto       # Mo' Structures : récits en plus pour Indiana Jones
-  ati_structures: auto     # ATi Structures : récits en plus pour Indiana Jones
+  mostructures: auto       # Mo' Structures : récits en plus pour Indiana Jones ; cibles des raids
+  ati_structures: auto     # ATi Structures : récits en plus pour Indiana Jones ; cibles des raids
+  # Mods de structures des raids (raids.yml) : sans eux, leurs cibles sont masquées
+  t_and_t: auto            # Towns and Towers : villages, avant-postes et villes des raids
+  medieval_buildings: auto # Medieval Buildings : fort, tour de guet et nef des raids
+  supplementaries: auto    # Supplementaries : galion des raids
 
 # ============================================================
 #  ÉCONOMIE DES PNJ
@@ -3139,3 +3143,29 @@ batiments:
 dialogues:
   largeur: 58   # sans le pack : caractères au plus par morceau (interface à l’échelle 4 en 1080p : environ 75)
   largeur-pixels: 400   # avec le pack : largeur d’une ligne en pixels d’interface (écran à l’échelle 4 en 1080p : 479)
+
+# ============================================================
+#  RAIDS — les expéditions de Valmont (plan « Raids », docs/PLAN_RAIDS.md)
+#  Les cibles (catalogue : raids.yml) se prennent dans un monde réservé aux raids, jamais autour
+#  de la ville. Ce monde génère ses structures comme un monde neuf : chaque cible y naît telle que
+#  son mod la fait apparaître, sur son terrain, adaptée au relief. Pour un raid, l'exemplaire
+#  naturel non exploré le plus proche d'un point de départ neuf est repéré (recherche de
+#  /locate), puis sa zone est générée en tâche de fond. Le monde est jetable : jeté à l'arrêt du
+#  serveur (sans sauvegarde), recréé de zéro au démarrage (reinitialiser-au-demarrage).
+#  Administration (citycore.admin.raid) : /city raid essai <structure> | zones | tp [essai] |
+#  retour | purge | catalogue [niveau] | inconnues.
+# ============================================================
+raids:
+  active: true
+  mondes:
+    # Monde de surface : toutes les cibles sauf celles du Nether et de l'End (graine fixe)
+    surface: {nom: citycore_raids, graine: 20261021}
+    # Mondes du Nether et de l'End (créés à la première demande) ; active: false = leurs cibles sont masquées
+    nether: {active: true, nom: citycore_raids_nether, graine: 20261022}
+    end: {active: true, nom: citycore_raids_end, graine: 20261023}
+    reinitialiser-au-demarrage: true   # false : le monde est gardé (les exemplaires déjà pris ne ressortent pas)
+    espacement: 4096        # blocs entre les points de départ de deux recherches successives
+    rayon-recherche: 100    # rayon (chunks) de la recherche d'un exemplaire naturel de la cible
+    marge: 32               # blocs générés autour de la boîte de la cible (abords, camp)
+    heure: 6000             # heure fixe des mondes des raids (6000 = midi, 18000 = minuit)
+    difficulte: NORMAL      # PEACEFUL, EASY, NORMAL ou HARD

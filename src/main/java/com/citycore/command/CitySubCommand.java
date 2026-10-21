@@ -74,6 +74,10 @@ public enum CitySubCommand {
             "Garde de la ville : formations, gardes en patrouille, gardes de test",
             Rights.mixed(ADMIN_HABITANTS).alsoConsole().forPlayers("garde [list]",
                     "Garde de la ville (formations : chez Roland, Actions → La garde)"), "guard"),
+    RAID("raid", "raid [essai <structure>|zones|tp [essai]|retour|purge|catalogue [niveau]|inconnues]",
+            "Raids (expéditions de Valmont) : état ; essais (exemplaire naturel repéré et généré), catalogue, structures inconnues",
+            Rights.mixed(ADMIN_RAID).alsoConsole().forPlayers("raid", "Expédition en cours"),
+            "raids", "expedition", "expédition"),
     PROTO("proto", "proto <habitant|soldat|former|zombie|foule|tps|skins|clear>",
             "Prototype temporaire : PNJ blessables, foule, combat",
             Rights.admin(ADMIN_PROTO));

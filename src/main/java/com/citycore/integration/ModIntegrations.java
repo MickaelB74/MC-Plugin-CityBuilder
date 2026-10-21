@@ -54,7 +54,12 @@ public final class ModIntegrations {
         BREWERY("brewery", "Let's Do Brewery", "brewery:main/root", "brewery:hops", "brewery:brewfest_tent"),
         // Mods de structures : ni objet ni succès, on cherche une de leurs structures
         MO_STRUCTURES("mostructures", "Mo' Structures", null, null, "mostructures:sphinx"),
-        ATI_STRUCTURES("ati_structures", "ATi Structures", null, null, "ati_structures:ancient_temple");
+        ATI_STRUCTURES("ati_structures", "ATi Structures", null, null, "ati_structures:ancient_temple"),
+        // Mods de structures des raids (raids.yml) ; les structures de Towns and Towers sont sous
+        // « towns_and_towers » et ses pools sous « kaisyn », pas sous l'identifiant du mod
+        TOWNS_AND_TOWERS("t_and_t", "Towns and Towers", null, null, "towns_and_towers:village_meadow"),
+        MEDIEVAL_BUILDINGS("medieval_buildings", "Medieval Buildings", null, null, "medieval_buildings:fort"),
+        SUPPLEMENTARIES("supplementaries", "Supplementaries", null, null, "supplementaries:galleon");
 
         /** Identifiant du mod (espace de noms de ses objets et succès). */
         public final String id;
@@ -84,9 +89,13 @@ public final class ModIntegrations {
 
     /**
      * Espaces de noms secondaires d'un mod : les soldats de Valarian Conquest sont déclarés sous
-     * « ethans_custom_mod », dans le même jar.
+     * « ethans_custom_mod », dans le même jar ; Towns and Towers range ses structures sous
+     * « towns_and_towers » et ses pièces de village sous « kaisyn ».
      */
-    private static final Map<String, String> NAMESPACE_ALIASES = Map.of("ethans_custom_mod", "valarian_conquest");
+    private static final Map<String, String> NAMESPACE_ALIASES = Map.of(
+            "ethans_custom_mod", "valarian_conquest",
+            "towns_and_towers", "t_and_t",
+            "kaisyn", "t_and_t");
 
     /** Détection en cours (une seule instance par démarrage), lue par le contenu facultatif. */
     private static volatile ModIntegrations active;
@@ -97,6 +106,12 @@ public final class ModIntegrations {
     private final Map<Mod, Boolean> present = new EnumMap<>(Mod.class);
     /** Comment chaque mod a été jugé (pour /city mods). */
     private final Map<Mod, String> how = new EnumMap<>(Mod.class);
+    /** Ligne « Raids : N cibles » d'un mod pour /city mods (null = jeu de base) ; vide = aucune. */
+    private java.util.function.Function<String, String> raidLine = id -> "";
+
+    public void setRaidLine(java.util.function.Function<String, String> raidLine) {
+        this.raidLine = raidLine;
+    }
 
     public ModIntegrations(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -311,6 +326,8 @@ public final class ModIntegrations {
             String mode = plugin.getConfig().getString("mod-integrations." + mod.id, "auto");
             lines.add((on ? "§a✔ " : "§c✘ ") + "§f" + mod.displayName + " §8(" + mod.id + ", " + mode + ") §7— "
                     + (on ? "présent" : "absent") + " §8(" + reason(mod) + ")");
+            String raids = raidLine.apply(mod.id);
+            if (raids != null && !raids.isEmpty()) lines.add("   §7• " + raids);
             for (CityNPC npc : CityNPC.values()) {
                 String name = org.bukkit.ChatColor.stripColor(npc.displayName);
                 if (requiredMods(npc).contains(mod)) {
@@ -322,6 +339,8 @@ public final class ModIntegrations {
                 }
             }
         }
+        String base = raidLine.apply(null);
+        if (base != null && !base.isEmpty()) lines.add("§7Minecraft (jeu de base) — " + base);
         return lines;
     }
 

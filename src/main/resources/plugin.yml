@@ -31,7 +31,11 @@ permissions:
       citycore.admin.eco: true
       citycore.admin.habitants: true
       citycore.admin.evenements: true
-      citycore.admin.proto: true
+      citycore.admin.raid: true
+      citycore.admin.raid:
+    description: "Raids : essais de pose, emplacements, catalogue, structures inconnues, remise à zéro du monde des raids (/city raid)"
+    default: op
+  citycore.admin.proto: true
   citycore.admin.ville:
     description: "Fondation (create), parcelles (claim, unclaim), agrandissement (expand) et caisse (deposit) en commande, sans Alderic"
     default: op

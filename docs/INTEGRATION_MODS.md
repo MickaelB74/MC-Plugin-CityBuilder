@@ -55,8 +55,9 @@ Au démarrage, chaque mod est jugé **présent** si l'une de ses traces est visi
 
 1. un de ses objets témoins (`tide:brook_trout`, `epicfight:uchigatana`…) ;
 2. un de ses succès (`dmr:main`, `irons_spellbooks:irons_spellbooks/root`…) ;
-3. une de ses structures (Mo' Structures et ATi Structures, qui n'ajoutent ni objet ni succès :
-   `mostructures:sphinx`, `ati_structures:ancient_temple`) ;
+3. une de ses structures (mods de structures, qui n'ajoutent ni objet ni succès :
+   `mostructures:sphinx`, `ati_structures:ancient_temple`, `towns_and_towers:village_meadow`,
+   `medieval_buildings:fort`, `supplementaries:galleon`) ;
 4. la liste des mods du chargeur (NeoForge, Forge ou Fabric), lue par réflexion.
 
 La console l'indique avec les personnages concernés, par exemple :
@@ -73,6 +74,23 @@ mod-integrations:
   dmr: off     # auto = détection | on = forcer présent | off = forcer absent
   tide: auto   # Capitaine Achab
 ```
+
+### Mods de structures des raids (21/10/2026)
+
+Les cibles des raids (catalogue `raids.yml`, voir `docs/PLAN_RAIDS.md`) viennent des structures
+de neuf mods et du jeu de base. Trois mods n'avaient pas encore de clé : **Towns and Towers**
+(`t_and_t`, structures sous `towns_and_towers`, pièces de village sous `kaisyn`), **Medieval
+Buildings** (`medieval_buildings`) et **Supplementaries** (`supplementaries`, pour son galion).
+Les mods requis par une cible se déduisent des espaces de noms de ses structures et créatures
+(`towns_and_towers` et `kaisyn` → `t_and_t`, `ethans_custom_mod` → `valarian_conquest`).
+
+Une cible dont un mod, une structure, une créature ou le terrain manque est **masquée** ; la
+console en fait le bilan au démarrage (« ⚔ Raids : 168 cibles et 8 villes, N disponibles ; … »).
+`/city mods` ajoute sous chaque mod une ligne « Raids : N cibles (M disponibles) », et une ligne
+pour le jeu de base. `mod-integrations: t_and_t: off` masque les 58 cibles de Towns and Towers et
+les 8 villes fortifiées. Contrôle détaillé (permission `citycore.admin.raid`) :
+`/city raid catalogue [niveau]` ; structures du serveur ni au catalogue ni écartées :
+`/city raid inconnues`.
 
 **Tester les menus sans atelier** (permission `citycore.admin.pnj`) :
 

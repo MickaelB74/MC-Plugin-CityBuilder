@@ -62,6 +62,14 @@ public final class ConfigUpdater {
      *      offerts à la fondation.
      * 29 : Gambrinus (Let's Do Brewery) : sa section, son atelier et la clé mod-integrations.brewery
      *      s'ajoutent comme toute section nouvelle, sans ligne à corriger.
+     * 30 : raids (plan « Raids ») : section raids et clés mod-integrations des mods de structures
+     *      (t_and_t, medieval_buildings, supplementaries), ajoutées sans ligne à corriger ; le
+     *      catalogue est dans un fichier à part (raids.yml, fusionné par sa propre version).
+     * 31 : relief toléré des emplacements des raids relevé (16 → 50 blocs ; sommets 48 → 80).
+     * 32 : raids par génération naturelle (les cibles naissent avec le monde des raids et y sont
+     *      repérées) : grille, familles de terrain et contrôle du relief retirés (sections
+     *      raids.terrain et raids.familles), espacement des recherches 4096, rayon-prepare remplacé
+     *      par rayon-recherche et marge, en-tête de la section réécrit.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -95,6 +103,35 @@ public final class ConfigUpdater {
                             "#  - Le stock est la réserve de la ville : on s’y sert gratuitement (menu Entrepôt) ;\n"
                                     + "#    ce qu’on y prend, et ce qu’on en fabrique, reste non revendable.",
                             "commentaire de la section npc-economy"}),
+            32, List.<String[]>of(
+                    new String[]{"(?m)^#  RAIDS — les expéditions de Valmont[^\\r\\n]*\\r?\\n(?:#  [^\\r\\n]*\\r?\\n)+",
+                            "#  RAIDS — les expéditions de Valmont (plan « Raids », docs/PLAN_RAIDS.md)\n"
+                                    + "#  Les cibles (catalogue : raids.yml) se prennent dans un monde réservé aux raids, jamais autour\n"
+                                    + "#  de la ville. Ce monde génère ses structures comme un monde neuf : chaque cible y naît telle que\n"
+                                    + "#  son mod la fait apparaître, sur son terrain, adaptée au relief. Pour un raid, l'exemplaire\n"
+                                    + "#  naturel non exploré le plus proche d'un point de départ neuf est repéré (recherche de\n"
+                                    + "#  /locate), puis sa zone est générée en tâche de fond. Le monde est jetable : jeté à l'arrêt du\n"
+                                    + "#  serveur (sans sauvegarde), recréé de zéro au démarrage (reinitialiser-au-demarrage).\n"
+                                    + "#  Administration (citycore.admin.raid) : /city raid essai <structure> | zones | tp [essai] |\n"
+                                    + "#  retour | purge | catalogue [niveau] | inconnues.\n",
+                            "commentaire de la section raids"},
+                    new String[]{"(?m)^    reinitialiser-au-demarrage: true   # false : le monde est gardé, les emplacements utilisés sont notés en base \\(jamais repris\\)",
+                            "    reinitialiser-au-demarrage: true   # false : le monde est gardé (les exemplaires déjà pris ne ressortent pas)",
+                            "commentaire de raids.mondes.reinitialiser-au-demarrage"},
+                    new String[]{"(?m)^    espacement: 1024(?=\\s)[^\\r\\n]*",
+                            "    espacement: 4096        # blocs entre les points de départ de deux recherches successives",
+                            "raids.mondes.espacement (4096)"},
+                    new String[]{"(?m)^    rayon-prepare: 160(?=\\s)[^\\r\\n]*",
+                            "    rayon-recherche: 100    # rayon (chunks) de la recherche d'un exemplaire naturel de la cible\n"
+                                    + "    marge: 32               # blocs générés autour de la boîte de la cible (abords, camp)",
+                            "raids.mondes.rayon-recherche et marge"},
+                    new String[]{"(?m)^  terrain:\\r?\\n(?:    [^\\r\\n]*(?:\\r?\\n|$))+", "", "raids.terrain (retirée)"},
+                    new String[]{"(?m)^  # Familles de terrain[^\\r\\n]*\\r?\\n(?:  # [^\\r\\n]*\\r?\\n)*  familles:\\r?\\n(?:    [^\\r\\n]*(?:\\r?\\n|$))+",
+                            "", "raids.familles (retirée)"}),
+            31, List.<String[]>of(
+                    new String[]{"(?m)^    relief-max: 16(?=\\s)", "    relief-max: 50", "raids.terrain.relief-max (50)"},
+                    new String[]{"(?m)^    relief-max-familles: \\{sommets: 48,", "    relief-max-familles: {sommets: 80,",
+                            "raids.terrain.relief-max-familles (sommets 80)"}),
             28, List.<String[]>of(
                     new String[]{"(?m)^  base-price: 150(?=\\s)", "  base-price: 50", "city-expand.base-price (50)"},
                     new String[]{"(?m)^  multiplier: 1\\.08(?=\\s)", "  multiplier: 1.03", "city-expand.multiplier (1,03)"},
@@ -272,7 +309,7 @@ public final class ConfigUpdater {
         if (!withGuard.equals(updated)) added.add("soldats (garde)");
         updated = withGuard;
         // Nouveaux réglages des sièges (types, armée ennemie…), du calendrier, des dialogues… : ajoutés sous leur section
-        for (String section : new String[]{"sieges", "evenements", "besoins", "emplois", "npc-economy", "dialogues"}) {
+        for (String section : new String[]{"sieges", "evenements", "besoins", "emplois", "npc-economy", "dialogues", "raids"}) {
             String with = addMissingChildren(updated, lines, user, section);
             if (!with.equals(updated)) added.add(section + " (nouveaux réglages)");
             updated = with;

@@ -36,6 +36,8 @@ public final class CityPermissions {
     public static final String ADMIN_HABITANTS  = "citycore.admin.habitants";
     /** Sièges et calendrier des événements : lancer, arrêter, recharger. */
     public static final String ADMIN_EVENEMENTS = "citycore.admin.evenements";
+    /** Raids : essais de pose, emplacements, catalogue, remise à zéro du monde des raids. */
+    public static final String ADMIN_RAID       = "citycore.admin.raid";
     /** Prototype de la phase 0 (et ses messages de suivi). */
     public static final String ADMIN_PROTO      = "citycore.admin.proto";
 

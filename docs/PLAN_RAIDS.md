@@ -1,7 +1,8 @@
 # Plan « Raids » — les expéditions de Valmont
 
-Conception arrêtée le 21/10/2026 ; **rien n'est codé**. Ce document se suffit à lui-même : chaque
-phase (R0 à R10) se commande dans un nouveau prompt, par exemple :
+Conception arrêtée le 21/10/2026 ; R0 et R2 codées le 21/10/2026 (tests en jeu à faire, §12).
+Ce document se suffit à lui-même : chaque phase (R0 à R10) se commande dans un nouveau prompt,
+par exemple :
 
 > Lis `docs/PLAN_RAIDS.md` et code la phase R2. Respecte les règles communes, termine par la
 > liste « À tester en jeu » et mets à jour le tableau d'avancement.
@@ -14,9 +15,9 @@ Documents liés : `docs/PLAN_VILLE_VIVANTE.md` (sièges, garde, besoins, calendr
 
 | Phase | Contenu | Dépend de | Taille | État |
 |---|---|---|---|---|
-| R0 | Prototype technique : monde des raids, pose des structures, observation | — | petite | à faire |
+| R0 | Prototype technique : monde des raids, pose des structures, observation | — | petite | codée, test en jeu à faire |
 | R1 | Monde, allers-retours et sécurité des joueurs | R0 | grosse | à faire |
-| R2 | Catalogue des cibles et vérification des mods | R0 | moyenne | à faire |
+| R2 | Catalogue des cibles et vérification des mods | R0 | moyenne | codée, test en jeu à faire |
 | R3 | Écrans d'Alderic : Événements → Raid → Difficulté → Cibles → Fiche | R1, R2 | moyenne | à faire |
 | R4 | L'assaut : défiance, objectifs, chrono, victoire, récompenses (niveaux I à III, terre) | R3 | grosse | à faire |
 | R5 | Défenseurs ajoutés, renforts, chefs (niveaux IV à VII, terre) | R4 | moyenne à grosse | à faire |
@@ -144,6 +145,8 @@ serveur.
 - Défaite (chrono écoulé, ou plus aucun joueur enrôlé dans le monde) : retrait, bilan, rien perdu.
 - 20 s pour souffler (le héraut propose « Rentrer à Valmont » tout de suite), puis retour de chacun
   à sa position d'origine. Nettoyage (§2.10).
+- Tout retour hors de cette fin normale (connexion perdue, partie quittée, plantage, arrêt du
+  serveur, remise à zéro du monde) se fait **auprès d'Alderic** (décision du 21/10/2026, §2.9).
 
 ---
 
@@ -184,8 +187,8 @@ Indice déjà observé : Youer inscrit les mondes Bukkit et les dimensions de mo
 ### 2.2 Création et règles du monde
 
 - `WorldCreator("citycore_raids")` : environnement `NORMAL`, générateur normal, **graine fixe**
-  (config), `generateStructures(false)` (pas de structures naturelles parasites ; à vérifier pour
-  celles des mods), `keepSpawnInMemory(false)`, `setAutoSave(false)` (le monde est jetable).
+  (config), **`generateStructures(true)`** (décision du 21/10/2026 : les cibles naissent de la
+  génération, §2.4), `keepSpawnLoaded(false)`, `setAutoSave(false)` (le monde est jetable).
 - Règles de jeu du monde : `doMobSpawning false`, `doPatrolSpawning false`, `doTraderSpawning
   false`, `doInsomnia false`, **`disableRaids true`** (tuer un capitaine pillard donne le Mauvais
   présage, qui déclencherait un raid illageois dans un village cible), `doDaylightCycle false`,
@@ -204,131 +207,100 @@ Indice déjà observé : Youer inscrit les mondes Bukkit et les dimensions de mo
   l'a déjà chargé, en sortir tout joueur, `Bukkit.unloadWorld(monde, false)`, supprimer le
   dossier, recréer. Sinon supprimer le dossier avant `createWorld`. Le cache de classement des
   emplacements (§2.4) est gardé.
+- À l'arrêt du serveur (décision du 21/10/2026 : ne rien garder des chunks), le monde est jeté :
+  joueurs renvoyés au monde principal, `Bukkit.unloadWorld(monde, false)` (le serveur n'écrit pas
+  ses chunks en s'arrêtant), dossier effacé. Si le déchargement est refusé, l'effacement du
+  démarrage suivant prend le relais. Un joueur qui se reconnecte dans un monde des raids hors
+  d'un raid revient au monde principal (`PlayerSpawnLocationEvent`).
 - `/city raid purge` (admin, hors raid) fait la même chose à chaud.
 - Avec `reinitialiser-au-demarrage: false`, l'index du prochain emplacement est gardé en SQLite
   (`raid_state`) pour ne jamais reprendre un emplacement usé.
 
-### 2.4 Emplacements et terrain cohérent (décision)
+### 2.4 Génération naturelle et repérage (décision du 21/10/2026)
 
-Le terrain d'un raid doit correspondre à la structure : chaque cible est posée sur un emplacement
-dont le biome fait partie de ceux où elle apparaît naturellement.
+Les premiers essais de R0 posaient les cibles par `/place structure` dans un terrain déjà généré,
+sur une grille d'emplacements classés par famille de biomes : résultat jugé mauvais en jeu
+(blocs chaotiques, structures qui flottent ou entaillent les collines). L'adaptation au terrain
+d'une structure (remblai, enfouissement) ne se fait que pendant la génération du terrain ;
+`/place jigsaw` n'agrandit pas non plus les villages (§7.8). **Décision** : utiliser la
+génération des mods eux-mêmes.
 
-**Familles de terrain.** Les biomes sont regroupés en familles (réglables dans
-`raids.familles` de `config.yml`) :
+- Le monde des raids génère ses structures **comme un monde neuf** : chaque cible y naît telle que
+  son mod la fait apparaître (biomes autorisés, espacement, réglages de Structurify et Sparse
+  Structures compris), adaptée au relief, avec les entités de ses gabarits. Le terrain est donc
+  toujours celui de la structure ; la colonne « Terrain » du §7 devient indicative.
+- **Repérage** : `World#locateNearestStructure(départ, structure, rayon, true)` (la recherche de
+  `/locate`) trouve l'exemplaire naturel **non exploré** le plus proche d'un point de départ neuf
+  (x = 10 000 + n × `espacement`, z = 10 000 ; `rayon-recherche` 100 chunks). L'exemplaire trouvé
+  reçoit une référence : il ne ressort plus avant la remise à zéro du monde. La recherche se fait
+  sur le fil principal mais ne génère que l'amorce des chunks candidats ; sa durée est notée.
+  Constaté sous Youer (21/10/2026) : l'API a rendu « rien » en 0 ms, même pour
+  `minecraft:village_plains`. Repli : la commande du jeu `/locate structure`, lancée dans le monde
+  des raids (`execute in … positioned … run locate structure <id>`), retour capturé et coordonnées
+  lues dans son lien « /tp @s x ~ z » ; les exemplaires déjà pris (que `/locate` ne marque pas)
+  sont écartés par le plugin, le point de départ s'éloignant à chaque essai. Sous Youer, la
+  commande s'exécute un peu après son envoi : sa réponse est attendue (60 s au plus). Coût
+  constaté : 3,1 s du fil principal pour `minecraft:village_plains` (journal « Locating element
+  … took … ms ») — pour R1, repérer les sites d'avance, au démarrage ou quand le serveur est
+  calme, plutôt qu'au moment du rassemblement.
+- **Sans placement** : au démarrage, chaque cible est contrôlée auprès du générateur
+  (`ChunkGeneratorStructureState#getPlacementsForStructure`, par réflexion) ; une structure dont
+  aucun biome n'existe dans le monde n'a aucun placement et ne naîtra jamais : cible masquée
+  (« ne naissent pas sur ce serveur »). Constaté le 21/10/2026 : les 16 villages et avant-postes
+  « de style » de Towns and Towers (`exclusives/…`) ne naissent que dans des biomes de
+  Terralith, Biomes O' Plenty, Wythers, Biomes We've Gone, Regions Unexplored ou Tectonic,
+  absents du serveur (recherche rendue en 0 ms) ; les villes fortifiées qui en dépendent aussi.
+- **Introuvable** (biome trop rare dans le rayon) : la cible est masquée jusqu'au redémarrage
+  (« introuvable dans le monde des raids »).
+- Abandonnés : la grille de 4 096 emplacements, les familles de terrain (`raids.familles`), le
+  classement des biomes et son cache, le contrôle du relief, `/place structure | jigsaw`.
 
-| Famille | Biomes |
-|---|---|
-| `plaines` | plains, sunflower_plains |
-| `prairie` | meadow, cherry_grove |
-| `foret` | forest, flower_forest, birch_forest, old_growth_birch_forest |
-| `foret-sombre` | dark_forest |
-| `taiga` | taiga, old_growth_pine_taiga, old_growth_spruce_taiga |
-| `neige` | snowy_plains, ice_spikes, snowy_taiga, snowy_beach, grove, snowy_slopes |
-| `sommets` | jagged_peaks, frozen_peaks, stony_peaks, windswept_hills, windswept_gravelly_hills, windswept_forest |
-| `desert` | desert |
-| `savane` | savanna, savanna_plateau, windswept_savanna |
-| `badlands` | badlands, wooded_badlands, eroded_badlands |
-| `jungle` | jungle, sparse_jungle, bamboo_jungle |
-| `marais` | swamp, mangrove_swamp |
-| `champignons` | mushroom_fields |
-| `plage` | beach, stony_shore |
-| `mer` | ocean, deep_ocean, lukewarm_ocean, deep_lukewarm_ocean, warm_ocean |
-| `mer-froide` | cold_ocean, deep_cold_ocean, frozen_ocean, deep_frozen_ocean |
-| `nether`, `end` | mondes du Nether et de l'End des raids |
+### 2.5 Génération du site
 
-Raccourci **`variee`** : plaines, forêt, forêt sombre, taïga, neige, sommets, savane, jungle,
-badlands (structures qui apparaissent presque partout : `#minecraft:structurebiomes` de Valarian
-Conquest, nombreuses structures d'ATi).
+- Chunk de départ de la structure d'abord, puis tous les chunks de sa **boîte** (connue une fois
+  le départ généré : `World#getStructures(x, z, structure)` → `GeneratedStructure`) élargie de
+  `marge` (32 blocs : abords, camp).
+- **Toujours en tâche de fond, jamais sur le fil principal** : tickets de chargement du jeu
+  (`ServerChunkCache#addRegionTicket`, ticket `FORCED` au niveau 33, posés par réflexion ; noms
+  Spigot `a`/`b` sous Youer), 16 chunks demandés à la fois ; sinon `getChunkAtAsync` ; sinon refus.
+  Constaté le 21/10/2026 : sous Youer, `getChunkAtAsync` ne rend rien pour un terrain neuf, et
+  générer sur le fil principal a figé le serveur jusqu'à son arrêt par le watchdog.
+- Tickets du plugin sur les chunks du site pendant le raid, retirés au nettoyage (en R0 : dès la
+  fin du balayage).
+- Piste (R1) : sites préparés d'avance pour les cibles les plus demandées, pendant que le
+  serveur est calme.
 
-**Terrain de chaque cible.** La colonne « Terrain » du catalogue (§7) donne les familles autorisées,
-lues dans les jars le 21/10/2026 : champ `biomes` de la structure, tags de biomes résolus (jeu de
-base, tags communs `c:` de NeoForge, tags des mods ; les tags de Towns and Towers remplacent ceux
-du jeu de base sur ce serveur). Elle est recopiée dans `raids.yml` (`terrain:`). Cas tranchés à la
-main :
-- **Villages et avant-postes « de style » de Towns and Towers** : leurs biomes viennent de mods de
-  biomes absents du serveur (Terralith, Biomes O' Plenty, Wythers…) ; terrain choisi d'après ces
-  biomes : `classic` → plaines ; `iberian` → savane ; `mediterranean` → savane, plage ; `nilotic` →
-  savane, marais ; `oriental` (avant-poste) et halte des marchands → désert ; `piglin` → savane ;
-  `rustic` → forêt, plaines ; `swedish` → taïga, neige ; `tudor` → plaines, prairie.
-- **Mowzie's Mobs** (génération réglée par `config/mowziesmobs-common.toml` du serveur) : Frostmaw →
-  neige ; bosquet des Umvuthana → savane ; Sculpteur (monastère) → sommets ; salle du Wroughtnaut →
-  variée (souterraine).
-- Galion de Supplementaries → mer ; château dans le ciel → plage (il flotte au-dessus) ; tribu des
-  glaces d'ATi → mer froide (banquise) ; citadelle maudite d'Iron's → Nether.
-- Variantes régionales (`towns_and_towers:village_<suffixe>`, `pillager_outpost_<suffixe>`,
-  villages du jeu de base) : le biome du suffixe (`desert` → désert, `grove` → neige…).
+### 2.6 Pose de structures
 
-**Grille.** Un emplacement tous les `espacement` (1 024) blocs, à partir de x = z = 10 000, en
-lignes de 64 (4 096 emplacements par monde).
-
-**Classement sans générer de chunks.** `World#getBiome(x, 64, z)` lit le biome du générateur
-(biomes « de bruit ») sans créer le chunk (à vérifier sous Youer en R0). Pour chaque emplacement,
-échantillonnage 9×9 dans le rayon de la plus grande cible (≈ 120 blocs) :
-- famille **dominante** de l'emplacement = celle d'au moins 80 % des points ;
-- un emplacement sans famille dominante est sauté ;
-- un emplacement de terre doit aussi offrir de la terre pour le camp (§2.8).
-
-Le classement des 4 096 emplacements se fait une fois, étalé sur plusieurs ticks au démarrage, et
-se garde dans un cache (`plugins/CityCore/raids-emplacements.yml`, clé = graine) : la graine est
-fixe, les mêmes emplacements reviennent à chaque remise à zéro.
-
-**Choix de l'emplacement d'une cible.** Le premier emplacement libre dont la famille dominante est
-dans le terrain de la cible (au hasard parmi les familles autorisées, pour varier). Les familles
-rares (champignons, badlands, sommets) peuvent manquer près de l'origine : si la grille n'en
-contient aucune, la cible est **masquée** avec un avertissement (jamais posée sur un terrain qui ne
-lui correspond pas). Après génération, contrôle du relief : si l'écart de hauteur dans l'emprise
-dépasse `relief-max` (16 blocs), emplacement suivant de la même famille.
-
-### 2.5 Préparation des chunks
-
-- Un emplacement **par famille déjà demandée** est gardé prêt (au démarrage : `plaines`, `foret`,
-  `neige`, `mer` ; puis, après chaque raid, celui de la famille qui vient d'être utilisée) :
-  `World#getChunkAtAsync` sur le rayon de la cible et du camp (≈ 160 blocs, 21×21 chunks), étalé
-  dans le temps.
-- Quand la fiche d'une cible s'ouvre et qu'aucun emplacement de son terrain n'est prêt, la
-  préparation démarre aussitôt (« Les éclaireurs repèrent le terrain… », progression affichée) ;
-  le bouton « Sonner le rassemblement » s'active quand elle est finie.
-- Pendant le raid : tickets de chunk du plugin (`Chunk#addPluginChunkTicket`) sur toute la zone,
-  retirés au nettoyage.
-
-### 2.6 Pose des structures
-
-- Commande lancée par le plugin, **dans le monde des raids** :
-  `execute in <clé du monde> run place structure <id> <x> <y> <z>`, avec `world.getKey()` comme clé
-  (à vérifier sous Youer : `minecraft:citycore_raids` ?). Retour capturé avec
-  `Bukkit.createCommandSender(Consumer<Component>)` (API Paper) pour détecter un échec.
-- `/place structure` **ignore les biomes autorisés** de la structure, applique son adaptation au
-  terrain et fait apparaître les entités de ses gabarits. Il **exige que les chunks soient chargés**
-  (d'où §2.5) et **n'enregistre pas** la structure : `World#getStructures` ne la voit pas, et les
-  apparitions propres à la structure (pillards des avant-postes du jeu, sorcière de la hutte) n'ont
-  pas lieu → le plugin les remplace (§5.3).
-- Villes : `execute in … run place jigsaw <pool de départ> <cible> <profondeur> <x> <y> <z>` pour
-  relancer l'assemblage d'un village avec plus de niveaux (jusqu'à 20, rayon 128 : à vérifier en
-  1.21.1, ainsi que le nom de jigsaw « cible » attendu dans la pièce de départ).
-- Repli pour un gabarit simple : `Bukkit.getStructureManager().loadStructure(clé)` puis
-  `Structure#place(...)` avec entités (API Paper), ou `place template`.
-- Pose pendant le compte à rebours ; mesurer le temps des grosses cibles (§10).
+Plus aucune pour les cibles. Les villes fortifiées (§7.8, R6) demandent d'ajouter des tours et un
+siège du pouvoir à un village : à revoir en R6 (structure « ville » déclarée par datapack et
+générée naturellement, ou pièces ajoutées), sans `/place` dans un terrain déjà généré.
 
 ### 2.7 Balayage de la cible → `Arena`
 
-Après la pose, lecture de `ChunkSnapshot` (hors fil principal) sur le rayon de la structure
-(`max_distance_from_center`, 64 à 116 blocs), puis des entités de la zone :
+Après la génération du site, à partir de la structure enregistrée par le jeu
+(`GeneratedStructure`) :
 
-- **Boîte** de la cible : étendue des blocs non naturels.
+- **Boîte** de la cible : celle de la structure ; **pièces** : celles de la structure
+  (`getPieces`). Les points remarquables ne sont cherchés que dans les pièces (lecture de
+  `ChunkSnapshot` hors du fil principal), jamais dans le terrain autour.
 - **Points remarquables** : cloches, bannières (dont `valarian_conquest:*_hanging_banner`), cages
-  (`minecraft:spawner`), coffres, tonneaux et pots, portes, lits, bouts de chemin à la lisière
-  (entrées), points hauts accessibles (postes d'archers), centre (cloche, sinon barycentre).
-- **Entités**, classées par clé de type (`EntityType#getKey`, valable pour les créatures des mods
-  sous Youer) :
+  (`minecraft:spawner`), coffres, tonneaux et pots, portes, lits ; entrées et points hauts
+  accessibles (postes d'archers) en R5 ; centre (cloche, sinon centre de la boîte au sol).
+- **Entités** de la boîte, classées par clé de type (`EntityType#getKey`, valable pour les
+  créatures des mods sous Youer) :
   - **défenseurs** : monstres hostiles, soldats et archers de Valarian Conquest
     (`valarian_conquest:soldier`, `archer`), balistes (`valarian_conquest:ballista`), mages
     d'Iron's, boss de Mowzie's → étiquette `citycore.raid` + enregistrement ;
   - **civils** : villageois, citoyens de Valarian (`male_citizen`, `female_citizen`), marchands,
     allays → étiquette `citycore.raid.civil` ;
   - **à retirer** : golems de fer et de neige ;
-  - **décor** : cadres, porte-armures, tableaux.
+  - **animaux** (ceux du terrain) et **décor** : cadres, porte-armures, tableaux.
 - Les portes de Valarian Conquest sont des **entités** (`wooden_gate`, `gate_entity`,
   `drawbridge`).
+- Les apparitions propres à certaines structures (pillards des avant-postes, sorcière de la hutte,
+  gardiens) passent par l'apparition naturelle des créatures, coupée dans ce monde : le plugin les
+  remplace (§5.3).
 - Résultat : un enregistrement `Arena` (boîte, centre, points remarquables, défenseurs, civils,
   camp, zone à tenir) utilisé par les objectifs et les défenseurs.
 
@@ -355,9 +327,13 @@ de réapparition** des joueurs morts (§2.9).
 ### 2.9 Allers-retours et sécurité
 
 - **Retour** : table `raid_returns` remplie avant la téléportation.
-- **Reconnexion** : raid en cours → camp ; sinon → position de retour. Après un plantage, le monde
-  est recréé : `PlayerSpawnLocationEvent` renvoie à la position de retour tout joueur dont la
-  position enregistrée est dans le monde des raids.
+- **Reconnexion** : raid en cours → camp ; sinon → **auprès d'Alderic** (décision du 21/10/2026 :
+  connexion perdue, partie quittée, plantage ou redémarrage, le retour se fait au point du maire,
+  à deux pas de lui, face à lui ; point d'apparition du monde principal s'il n'y a pas encore de
+  maire). Après un plantage, le monde est recréé : `PlayerSpawnLocationEvent` envoie auprès
+  d'Alderic tout joueur dont la position enregistrée est dans le monde des raids. De même pour
+  les joueurs évacués avant un déchargement (arrêt du serveur, `/city raid purge`) et pour une
+  mort dans ce monde hors d'un raid.
 - **Entrée** : uniquement par le plugin (`PlayerTeleportEvent` vers ce monde annulé sinon).
 - **Sortie** : par le héraut ou `/city raid quitter` (retraite). Commandes bloquées dans ce monde
   (config) : `sethome`, `home`, `back`, `spawn`, `tpa`, `tpahere`, `tpaccept`, `warp`, `tp`…
@@ -424,15 +400,13 @@ Pour chaque cible de `raids.yml` :
 2. chaque structure enregistrée (`ModIntegrations.structureExists`, registre `Registry.STRUCTURE`) ;
 3. chaque créature nommée par la cible (occupants ajoutés, maître, chef) connue
    (`Registry.ENTITY_TYPE`) ;
-4. pour les villes : le village et les pièces ajoutées existent (le pool de départ n'est vérifiable
-   qu'à la pose : un échec de `place jigsaw` masque la ville jusqu'au redémarrage, avec un
-   avertissement) ;
-5. son **terrain** : au moins un emplacement d'une de ses familles existe dans la grille du monde
-   concerné (§2.4) ; pour une cible du Nether ou de l'End, ce monde est activé.
+4. pour les villes : le village et les pièces ajoutées existent ;
+5. pour une cible du Nether ou de l'End, ce monde est activé. Qu'un exemplaire naisse bien dans le
+   monde des raids ne se sait qu'à sa recherche (§2.4 : introuvable → masquée jusqu'au
+   redémarrage).
 
 Une cible incomplète est **masquée** (pas d'erreur). Console : une ligne de bilan, par exemple
-`⚔ Raids : 168 cibles, 160 disponibles ; 8 masquées (Supplementaries absent : galion ; aucun
-emplacement « champignons » : village et avant-poste des champignons)`.
+`⚔ Raids : 168 cibles et 8 villes, 175 disponibles ; 1 masquée (Supplementaries absent : Galion)`.
 Un mod **présent** dont une structure attendue manque (mod mis à jour) : avertissement qui la nomme.
 
 ### 3.3 Commandes de contrôle
@@ -446,7 +420,7 @@ Un mod **présent** dont une structure attendue manque (mod mis à jour) : avert
 
 1. Le déclarer dans `ModIntegrations.Mod` (témoin = une de ses structures) et dans
    `mod-integrations`.
-2. `/city raid inconnues` liste ses structures ; les poser en test (`/city raid poser <id>`),
+2. `/city raid inconnues` liste ses structures ; en faire l'essai (`/city raid essai <id>`),
    noter occupants et taille.
 3. Les ajouter à `raids.yml` (type, niveau, nom, **terrain** d'après les biomes de la structure,
    défenseurs, objectifs) ou à `ignorees`.
@@ -796,6 +770,15 @@ Requiert Towns and Towers, Valarian Conquest et le mod du siège. Si `place jigs
 le village (R0), repli : la structure du village (`towns_and_towers:exclusives/village_<style>`)
 telle quelle.
 
+**Constat R0 (21/10/2026)** : `place jigsaw` (profondeur 10) n'assemble que les rues et la place
+(boîte 121×39×161, une cloche, un villageois, aucune maison). La commande n'applique pas
+l'« expansion hack » des villages (`use_expansion_hack: true` de la structure) : sans lui, une
+maison accrochée à une rue doit tenir dans la boîte de la rue, haute d'un ou deux blocs, et elle
+est refusée. Piste proposée pour R6 : déclarer dans un datapack du plugin une structure « ville »
+par style (copie de `towns_and_towers:exclusives/village_<style>` avec `size` 10 à 12 et
+`max_distance_from_center` 128, sans `structure_set` donc jamais générée d'elle-même), posée par
+`place structure`, qui garde l'expansion hack.
+
 ### 7.9 Structures écartées (52)
 
 | Mod | Structures | Raison |
@@ -824,10 +807,9 @@ telle quelle.
 | `RaidConfig` | section `raids` de `config.yml` : monde, rassemblement, joueurs, niveaux, récompenses |
 | `RaidCatalog` | lit `raids.yml` (cibles, villes, ignorées), vérifie la disponibilité (§3.2) |
 | `RaidTarget` (record) | une cible : id, nom, type, niveau, structures (id + rôle), défenseurs, objectifs, poids, mods |
-| `RaidWorld` | mondes surface, Nether, End (création, règles, remise à zéro), préparation, tickets |
-| `RaidSlots` | grille d'emplacements, classement par famille de terrain (cache), choix d'un emplacement cohérent avec la cible, contrôle du relief |
-| `TerrainFamilies` | familles de biomes (`raids.familles`) et terrain de chaque cible |
-| `StructurePlacer` | `place structure / jigsaw / template` via `execute in`, retour capturé, repli API Paper |
+| `RaidWorld` | mondes surface, Nether, End (création avec structures naturelles, règles, remise à zéro, abandon à l'arrêt) |
+| `RaidSites` | repérage d'un exemplaire naturel non exploré, génération du site en tâche de fond, tickets, essais |
+| `LoadTickets` | tickets de chargement du jeu par réflexion (génération sans bloquer le fil principal) |
 | `ArenaScanner` → `Arena` (record) | balayage (§2.7) |
 | `RaidManager` (Listener) | états `IDLE → PREPARATION → RASSEMBLEMENT → DEPLOIEMENT → ASSAUT → BILAN → RETOUR`, défiance, chrono, barre, récompenses, recharges |
 | `RaidObjectives` | objectifs (§5.2), poids, détection |
@@ -865,14 +847,12 @@ champion de `SiegeManager`, `QuestHUD`, `TypewriterUtil`, `ModIntegrations`
 | `raid_returns` | `uuid` (clé), `world`, `x`, `y`, `z`, `yaw`, `pitch`, `raid_id`, `started_at` |
 | `raid_results` | `id`, `cible`, `niveau`, `resultat`, `joueurs`, `duree`, `defiance_finale`, `bonus`, `date` |
 | `raid_state` | `niveau` (clé), `victoires`, `renommee`, `recharge_jusqu_a` |
-| `raid_slots_used` | `monde`, `index` (clé composée) : emplacements déjà utilisés, utile seulement avec `reinitialiser-au-demarrage: false` |
 
-Le classement des emplacements par famille est dans `plugins/CityCore/raids-emplacements.yml`
-(clé = graine et espacement), pas en base.
+Les exemplaires déjà pris sont marqués dans le monde lui-même (référence de la structure) : rien en base.
 
 ### 8.5 Configuration
 
-`config.yml` (version 30), extrait :
+`config.yml` (version 32), extrait :
 
 ```yaml
 raids:
@@ -882,19 +862,11 @@ raids:
     nether: {active: true, nom: citycore_raids_nether, graine: 20261022}
     end: {active: true, nom: citycore_raids_end, graine: 20261023}
     reinitialiser-au-demarrage: true
-    espacement: 1024
-    rayon-prepare: 160
+    espacement: 4096        # blocs entre les points de départ de deux recherches
+    rayon-recherche: 100    # chunks : recherche d'un exemplaire naturel (§2.4)
+    marge: 32               # blocs générés autour de la boîte de la cible
     heure: 6000
     difficulte: NORMAL
-  terrain:
-    dominance: 0.8          # part des points de l'emplacement dans la même famille
-    relief-max: 16          # écart de hauteur toléré dans l'emprise
-    prets-au-demarrage: [plaines, foret, neige, mer]
-  familles:                 # biomes de chaque famille (§2.4) ; « variee » est un raccourci
-    plaines: [plains, sunflower_plains]
-    desert: [desert]
-    # … toutes les familles du §2.4
-    variee: [plaines, foret, foret-sombre, taiga, neige, sommets, savane, jungle, badlands]
   camp:
     distance: 32            # blocs entre le bord de la cible et le camp (point de réapparition)
   rassemblement: {rayon: 10, secondes: 30, joueurs-min: 1}
@@ -964,10 +936,9 @@ ignorees: ["minecraft:ruined_portal*", "minecraft:shipwreck*", "mostructures:*_a
 - Joueurs (`citycore.player`) : `/city raid` (raid en cours, niveaux débloqués, recharges),
   `/city raid quitter` (retraite).
 - Administration (`citycore.admin.raid`) : `start <cible> [ici]` (rassemblement autour de
-  l'administrateur avec `ici`), `stop`, `next` (objectif suivant), `poser <structure>
-  [famille]` (essai de pose sur un emplacement de la famille donnée, sinon de son terrain ; R0),
-  `emplacements` (nombre d'emplacements classés par famille et par monde, emplacements prêts),
-  `tp [emplacement]`, `purge`, `catalogue [niveau]`, `inconnues`, `recharge reset`,
+  l'administrateur avec `ici`), `stop`, `next` (objectif suivant), `essai <structure>` (repérage
+  d'un exemplaire naturel et génération de son site ; R0), `zones` (recherches et essais),
+  `tp [essai]`, `retour`, `purge`, `catalogue [niveau]`, `inconnues`, `recharge reset`,
   `debloquer <niveau>`.
 
 ### 8.7 Écrans et dessins
@@ -983,46 +954,42 @@ dans `MayorGUI`.
 
 ### R0 — Prototype technique (administration seulement)
 
-**À coder** : `RaidWorld` minimal pour le monde de surface (création, règles, remise à zéro au
-démarrage, `purge`) ; `RaidSlots` et `TerrainFamilies` : classement de la grille par famille de
-terrain (§2.4, cache), choix d'un emplacement de la famille demandée, contrôle du relief ;
-préparation asynchrone ; `/city raid poser <structure> [famille]` (pose via `execute in`, retour
-capturé ; famille par défaut : la première du terrain de la structure au §7) ;
-`/city raid emplacements` ; `/city raid tp` ; journal du balayage dans la console (occupants par
-clé, cloches, bannières, cages, portes, taille).
+**À coder** (revu le 21/10/2026 : génération naturelle, §2.4) : `RaidWorld` pour le monde de
+surface (création avec structures naturelles, règles, remise à zéro au démarrage, abandon à
+l'arrêt, `purge`) ; `RaidSites` : repérage d'un exemplaire naturel non exploré, génération du
+site en tâche de fond ; `/city raid essai <structure>`, `zones`, `tp`, `retour` ; journal du
+balayage dans la console (occupants par clé, cloches, bannières, cages, portes, taille).
 
 **À tester en jeu** :
-1. Le monde se crée ; il apparaît dans `youer-config/worlds.yml` ; au redémarrage il est effacé et
-   recréé sans erreur.
-2. `/city raid emplacements` : durée du classement, nombre d'emplacements par famille (les
-   familles rares, champignons et badlands, sont-elles présentes ?) ; le biome lu sans générer de
-   chunk correspond-il au biome réel une fois sur place ?
-3. Poser et chronométrer, chacune sur son terrain : `towns_and_towers:exclusives/village_tudor`,
-   `valarian_conquest:templar_castle`, `valarian_conquest:orleanian_castle`, `taxov:pirate_ship`
-   (mer), `taxov:illager_king_ship` (mer), `mowziesmobs:wrought_chamber`, `minecraft:mansion`,
+1. Le monde se crée avec ses structures ; au redémarrage il est effacé et recréé sans erreur ;
+   à l'arrêt, « déchargé sans sauvegarde et effacé ».
+2. `/city raid essai <id>` : durée de la recherche (console « Recherche de … en N ms »), taille
+   de la boîte, temps de génération du site ; la structure est-elle intacte, sur son terrain ?
+3. Essais, chacun noté (durée, occupants) : `towns_and_towers:exclusives/village_tudor`,
+   `valarian_conquest:templar_castle`, `valarian_conquest:orleanian_castle`, `taxov:pirate_ship`,
+   `taxov:illager_king_ship`, `mowziesmobs:wrought_chamber`, `minecraft:mansion`,
    `mostructures:villager_market`, `irons_spellbooks:pyromancer_tower`,
-   `irons_spellbooks:catacombs`, `minecraft:village_desert` (désert), `ati_structures:ice_tribe`
-   (banquise).
+   `irons_spellbooks:catacombs`, `minecraft:village_desert`, `ati_structures:ice_tribe`. Lesquelles
+   sont introuvables dans un rayon de 100 chunks ?
 4. Les soldats de Valarian Conquest attaquent-ils un joueur sans citoyenneté ? Avec ? Les portes et
    le pont-levis se cassent-ils ? Les balistes tirent-elles ?
 5. Le Wroughtnaut, les illageois du manoir, les mages d'Iron's apparaissent-ils ?
-6. `place jigsaw` sur `kaisyn:village/exclusives/tudor/town_centers`, profondeur 10 : quelle
-   taille ?
+6. (Fait le 21/10/2026) `place jigsaw` n'agrandit pas les villages (§7.8).
 7. Ecliptic Seasons, JourneyMap, Tough As Nails dans ce monde ; un PNJ Citizens et son animation
    Epic Fight.
 
-**Décisions de sortie** : monde Bukkit gardé ou repli datapack ; seuil de dominance et relief
-maximal ; cibles à retirer ou à changer de niveau ; mise à jour du §7 et du §10.
+**Décisions de sortie** : rayon de recherche et espacement ; cibles introuvables à retirer ou à
+remplacer ; cibles à changer de niveau ; mise à jour du §7 et du §10.
 
 ### R1 — Monde, allers-retours et sécurité
 
-**À coder** : `raids.mondes`, `raids.terrain`, `raids.familles`, `raids.camp` ; emplacements prêts
-par famille et préparation à la demande avec progression (§2.5) ; camp à côté de la structure,
+**À coder** : `raids.camp` ; sites préparés d'avance et repérage à la demande avec progression
+(§2.4, §2.5) ; camp à côté de la structure,
 point de réapparition et héraut (§2.8) ; `RaidParticipants` (enrôlement, `raid_returns`,
 `PlayerSpawnLocationEvent`, garde des téléportations, commandes bloquées, **mort : inventaire et
 expérience gardés, réapparition au camp, 3 s d'invulnérabilité**, déconnexion) ; nettoyage ;
 exclusion siège / raid ; `/city raid start <cible> ici` (sans écran ni objectifs : une cible au
-choix, posée sur son terrain, retour au bout du chrono).
+choix, repérée dans le monde des raids, retour au bout du chrono).
 
 **À tester en jeu** : départ à 2 joueurs dont un hors du cercle ; une cible du désert arrive dans
 le désert, une cible de neige dans la neige ; le camp est à côté de la structure, hors de portée
@@ -1135,6 +1102,11 @@ Dialogues d'Alderic et du héraut, trophées, succès dans l'écran des progrès
 
 ### Tranchés (21/10/2026)
 
+- **Retour de secours** : après une déconnexion, un plantage, un arrêt du serveur ou une remise à
+  zéro du monde, le joueur revient auprès d'Alderic (§2.9).
+- **Relief** : 50 blocs d'écart tolérés (80 pour les sommets) ; monde des raids jeté à l'arrêt du
+  serveur, rien n'en est gardé (§2.3).
+
 - **Terrain** : cohérent avec la structure de chaque raid (§2.4) ; naturel, graine fixe ; mondes du
   Nether et de l'End pour les cibles qui en viennent.
 - **Mort dans le monde des raids** : inventaire (et expérience) conservés ; réapparition au camp de
@@ -1158,3 +1130,138 @@ Dialogues d'Alderic et du héraut, trophées, succès dans l'écran des progrès
 11. Cibles du Nether et de l'End (4) gardées au catalogue ; à retirer si les mondes
     supplémentaires posent problème (`raids.mondes.nether/end.active: false`).
 12. Familles rares absentes de la grille : la cible est masquée plutôt que posée ailleurs.
+
+---
+
+## 12. Journal de réalisation
+
+### R0 revue — génération naturelle (21/10/2026)
+
+Après essai en jeu (structures posées par `/place` « chaotiques »), R0 passe à la génération
+naturelle (§2.4 à §2.7) : monde des raids avec structures, repérage par
+`locateNearestStructure` (exemplaire non exploré, point de départ neuf à chaque recherche),
+génération du chunk de départ puis de la boîte et de la marge par tickets de chargement,
+balayage des pièces de la `GeneratedStructure`. Retirés : `RaidSlots` (grille, classement des
+biomes, relief), `TerrainFamilies`, `StructurePlacer` (`/place structure | jigsaw | gabarit`),
+la table `raid_slots_used`, le cache `raids-emplacements.yml` (supprimé au démarrage),
+`/city raid poser | jigsaw | emplacements` (remplacées par `essai` et `zones`). Ajouté :
+`RaidSites`. `config-version` 32 : en-tête de la section `raids` réécrit, `espacement` 1024 →
+4096, `rayon-prepare` remplacé par `rayon-recherche` (100 chunks) et `marge` (32 blocs),
+sections `raids.terrain` et `raids.familles` retirées (contrôlé hors jeu sur une copie de la
+configuration du serveur, second passage sans effet). La colonne « Terrain » de `raids.yml` reste
+indicative ; la ligne de bilan ne dépend plus du terrain.
+
+Le journal ci-dessous (R0 et R2 du 21/10/2026) garde l'historique de la première version.
+
+### R0 et R2 — codées le 21/10/2026 (tests en jeu à faire)
+
+**Code** : paquet `com.citycore.raid` — `RaidConfig`, `TerrainFamilies`, `RaidWorld`,
+`RaidSlots`, `StructurePlacer`, `ArenaScanner` → `Arena`, `RaidTarget`, `RaidCatalog`,
+`RaidManager` (façade : démarrage, essais de pose), `RaidCommands` (`/city raid`). Câblage dans
+`CityCore`, `CityCommand`, `CitySubCommand` (`RAID`), `CityTabCompleter`, `CityPermissions`
+(`citycore.admin.raid`, déclaré dans `plugin.yml`), `ModIntegrations` (3 mods, ligne Raids de
+`/city mods`), `DatabaseManager` (`raid_slots_used`), `ConfigUpdater` (version 30, `raids` ajoutée
+aux sections complétées), `config.yml` (section `raids`, clés `mod-integrations`), `raids.yml`
+(nouveau), `docs/INTEGRATION_MODS.md`.
+
+**Écarts et précisions par rapport au plan** :
+- Lecture des biomes à **y = 256** (et non 64) : sous un relief, un point à y = 64 peut tomber
+  dans un biome de grotte (grottes luxuriantes, concrétions), et l'emplacement serait perdu ;
+  au-dessus du sol, le générateur rend toujours le biome de surface. Lecture par
+  `UnsafeValues#getBiomeKey` (clé complète, biomes de mods compris), sans créer de chunk ; le
+  nombre de chunks chargés pendant le classement est journalisé pour le vérifier.
+- **Boîte de la cible** = étendue des blocs qui ont changé entre deux instantanés des chunks, pris
+  juste avant et juste après la pose (pas de liste de blocs « naturels » à tenir) ; les points
+  remarquables ne sont relevés que parmi ces blocs. Entités relevées **2 s après la pose**
+  (occupants qui apparaissent au premier tick), classées : défenseurs (étiquette
+  `citycore.raid`), civils (`citycore.raid.civil`), golems, portes (entités), engins, animaux,
+  décor, autres. R0 n'en retire aucune (observation) ; points hauts et entrées viendront avec les
+  postes (R5).
+- Réglages ajoutés : `raids.terrain.relief-max-familles` (`sommets: 80`, `mer` et `mer-froide` :
+  `-1`, sans contrôle) et `raids.terrain.rayon-relief` (48, emprise quand la taille de la cible
+  est inconnue) ; emprise de 24 à 64 blocs (au-delà, les pièces d'un village épousent le
+  terrain). `prets-au-demarrage` est déjà dans `config.yml` mais ne sert qu'à partir de R1 (en
+  R0, chaque essai prépare son emplacement à la demande). Les chunks d'un essai sont rendus dès
+  la fin du balayage (rien n'est gardé chargé).
+- Table `raid_slots_used` : colonne **`idx`** (et non `index`, mot réservé en SQL).
+- Commandes d'essai en plus : `/city raid jigsaw <pool> <cible> [profondeur] [famille]` (test 6)
+  et `/city raid poser gabarit:<id> [famille]` (repli par gabarit, API Paper). La pièce de départ
+  des places Tudor de Towns and Towers (`tudor_meeting_point_1`) a des blocs puzzle nommés
+  `minecraft:street` (4, départs des rues) et `minecraft:bottom` (7, apparitions) : `cible` =
+  `minecraft:street`.
+- Pose : `execute in <world.getKey()> run place structure …` ; si la dimension est refusée, la
+  forme `minecraft:<nom>` est essayée et l'essai le signale en console. Réussite = clé de
+  traduction `commands.place.*.success` du retour capturé.
+- **`raids.yml`** : une ligne par cible ; `structure:` pour une pièce unique ; objectifs **déduits
+  du type et du niveau** (cages à partir du niveau IV et pour les repaires, chef à partir du
+  niveau V et pour les villes et navires, ou quand la cible nomme un chef), écrits seulement pour
+  les exceptions ; bonus `sans-perte` et `eclair` partout, `epargner` pour villages et villes ;
+  mods requis déduits des espaces de noms (`avec-mod` pour en ajouter) ; `taille` ou `rayon`
+  (emprise) ; `active: false` retire une cible. Variantes de Towns and Towers : la plus grande
+  taille de la fourchette du §7. Fusion par version : les cibles, villes et structures écartées
+  absentes du fichier du serveur y sont ajoutées (copie de l'ancien), le reste est gardé.
+- Bilan console : « ⚔ Raids : 168 cibles et 8 villes, N disponibles ; M masquées (…) », écrit
+  une fois la grille classée (le terrain en dépend).
+
+**Premiers constats en jeu (21/10/2026)** :
+- **`getChunkAtAsync` ne rend aucun chunk sous Youer** pour un terrain jamais généré (chunk vide,
+  sans erreur) : la première préparation échouait (« chunk 1191, 615 non généré (?) »).
+- **Ne jamais générer sur le fil principal** : un premier repli par `getChunkAt` (quelques chunks
+  par tick) a figé le serveur — sous Youer, un seul chunk neuf demande plusieurs secondes
+  (voisins, écoulement des fluides) ; le watchdog a fini par arrêter le serveur (tick de plus de
+  60 s), la sauvegarde des mondes a planté et le processus est resté bloqué, tenant
+  `world/session.lock`. Remplacé par des **tickets de chargement du jeu** posés par réflexion
+  (`ServerChunkCache#addRegionTicket`, ticket `FORCED` au niveau 33, noms de Mojang communs à
+  NeoForge et Paper) : la génération se fait sur les fils de génération, comme autour d'un
+  joueur ; le plugin attend l'arrivée des chunks, 16 à la fois. Sans ces tickets ni
+  `getChunkAtAsync`, la préparation est refusée. `/city raid tp` fait de même pour un terrain
+  neuf (« Préparation de l'arrivée… »). Sous Youer, les classes du jeu se présentent aux plugins
+  sous leurs noms Spigot (`ChunkProviderServer`) et les deux méthodes y sont `a(…)` / `b(…)`
+  (table `spigot2srg` de NeoForge) : les noms de Mojang puis ceux-ci sont essayés. Constaté :
+  la préparation et `/city raid tp` passent ainsi, sans figer le serveur.
+- Retour de secours **auprès d'Alderic** (décision du 21/10/2026) : reconnexion dans le monde des
+  raids, joueurs évacués à l'arrêt ou par `/city raid purge`, mort dans ce monde hors raid,
+  `/city raid retour` sans position connue ; repli : point d'apparition du monde principal.
+- Test 6 (`place jigsaw … minecraft:street 10`) : posé en 7,3 s, mais seulement des rues et la
+  place (voir §7.8) ; les animaux relevés (cochons, moutons, vaches, ratons laveurs de Wilder
+  Nature) sont ceux de la génération du terrain.
+- Ajout de `/city raid retour` : retour à la position d'avant `/city raid tp` (sinon point
+  d'apparition du monde principal). Un retour par téléportation sur le fil principal n'a pas fait
+  quitter le monde des raids, alors que l'aller en tâche de fond avait marché : les deux
+  commandes chargent d'abord le chunk d'arrivée, essaient `teleportAsync`, puis `teleport`, et
+  notent le résultat en console (« ⚔ [Raids] Téléportation de … ») — à lire pour R1 (retours des
+  joueurs). Secours sans le plugin : `/back` d'EssentialsX.
+- Chunky (version NeoForge) est installé sur le serveur : piste pour générer d'avance les
+  emplacements prêts de R1, plutôt que sur le fil principal.
+- Le premier essai de jigsaw (relief max 16) a enchaîné les refus et fait générer une cinquantaine
+  de régions : relief max porté à 50 (sommets 80, `config-version` 31) et relief contrôlé avant
+  la préparation complète ; monde jeté à l'arrêt du serveur (§2.3).
+
+**Contrôlé hors jeu** (code du plugin, sans serveur) : lecture du vrai `raids.yml` (168 cibles,
+8 villes, 16/53/40/25/10+8/12/12 par niveau, aucun avertissement ; Towns and Towers 58 cibles +
+8 villes, Valarian Conquest 21 + 8, ATi 46 + 7…), structures écartées par motif
+(`minecraft:ruined_portal*`, `mostructures:*_abandoned_church`), fusion de `config.yml` v29 → v30
+(sections `raids` et 3 clés `mod-integrations` ajoutées, second passage sans effet), fusion de
+`raids.yml` par version (entrées manquantes ajoutées, réglage modifié conservé).
+
+**À tester en jeu — R0** : voir la liste de la phase R0 (§9), revue pour la génération
+naturelle. Déjà constaté : création et effacement du monde, génération des chunks en tâche de
+fond par tickets, retour auprès d'Alderic, `place jigsaw` sans maisons.
+
+**À tester en jeu — R2** :
+1. Bilan console au démarrage (« ⚔ Raids : 168 cibles et 8 villes, … disponibles ; … masquées
+   (…) ») et éventuels avertissements « structure … n'existe pas (mod mis à jour ?) ».
+2. `mod-integrations: t_and_t: off` → 58 cibles et 8 villes masquées (« Towns and Towers
+   absent ») ; `raids.mondes.nether.active: false` → 3 cibles masquées (citadelle maudite,
+   vestiges de bastion, forteresse du Nether).
+3. `/city raid catalogue` puis `/city raid catalogue 2` : disponibles et raisons.
+4. `/city raid inconnues` vide (sinon : structures à classer, et espace de noms de Fish of
+   Thieves à confirmer).
+5. `/city mods` : ligne « Raids : N cibles (M disponibles) » sous chaque mod de structures et
+   ligne du jeu de base.
+6. Fusion de `config.yml` sur le serveur de test (version 29 → 30, copie de sauvegarde) et
+   `plugins/CityCore/raids.yml` créé.
+
+**Décisions attendues des tests** (sortie de R0) : monde Bukkit gardé ou repli datapack ; seuil
+de dominance, relief maximal et hauteur de lecture des biomes ; cibles à retirer ou à changer de
+niveau (mise à jour du §7 et du §10).

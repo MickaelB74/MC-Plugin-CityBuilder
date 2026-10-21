@@ -1,0 +1,287 @@
+# ============================================================
+#  CATALOGUE DES RAIDS (plan « Raids », docs/PLAN_RAIDS.md §7)
+#  168 cibles, 8 villes fortifiées et les structures écartées.
+#  Copié dans le dossier du plugin au premier démarrage, puis complété
+#  à chaque nouvelle version (les entrées ajoutées s'ajoutent aux vôtres).
+#  Une cible dont le mod, la structure, une créature ou le terrain manque
+#  sur le serveur est masquée.
+#
+#  Clés d'une cible :
+#    nom         nom affiché
+#    type        camp, avant-poste, village, ville, fort, chateau, abordage, repaire
+#    niveau      1 (Escarmouche) à 7 (Légende)
+#    terrain     où la structure naît (indicatif : la cible est repérée parmi les
+#                structures générées naturellement ; nether / end : autre monde des raids)
+#    structure   identifiant de la structure posée
+#    taille      pièce principale (x×y×z) ; rayon : rayon d'un village (blocs)
+#    occupants   entités lues dans les gabarits (indicatif)
+#    souterrain  true : repaire enfoui ; flottant : true : structure dans le ciel
+#    defenseurs  source : gabarit (occupants de la structure), armee (soldats des
+#                factions ennemies), creatures (liste d'identifiants) ;
+#                complement : true = le plugin complète jusqu'au minimum du niveau ;
+#                remplacer : true = occupants d'origine remplacés ;
+#                maitre / chef : créature à abattre
+#    active      false : cible retirée du catalogue (gardée dans le fichier)
+#  Les objectifs se déduisent du type, les mods requis des espaces de noms.
+# ============================================================
+version: 1
+cibles:
+  # ── Niveau I — Escarmouche (16) ──
+  camp-de-bandits: {nom: "Camp de bandits", type: camp, niveau: 1, terrain: [variee], structure: "valarian_conquest:bandit_camp", taille: "12×12×12", occupants: "2 soldats", defenseurs: {source: gabarit, complement: true}}
+  repaire-de-bandits: {nom: "Repaire de bandits", type: camp, niveau: 1, terrain: [variee], structure: "valarian_conquest:bandit_ruins", taille: "17×24×17", occupants: "2 soldats, 1 archer", defenseurs: {source: gabarit, complement: true}}
+  repaire-de-bandits-variante: {nom: "Repaire de bandits (variante)", type: camp, niveau: 1, terrain: [variee], structure: "valarian_conquest:bandit_ruins_2", taille: "17×24×16", occupants: "1 soldat, 1 archer", defenseurs: {source: gabarit, complement: true}}
+  camp-de-tentes: {nom: "Camp de tentes", type: camp, niveau: 1, terrain: [variee], structure: "valarian_conquest:neutral_tent_camp", taille: "29×18×29", occupants: "6 citoyens (civils)", defenseurs: {source: armee}}
+  petit-camp-de-tentes: {nom: "Petit camp de tentes", type: camp, niveau: 1, terrain: [variee], structure: "valarian_conquest:neutral_tent_camp_2", taille: "16×12×20", occupants: "1 soldat, 3 citoyens", defenseurs: {source: armee}}
+  camp-nomade: {nom: "Camp nomade", type: camp, niveau: 1, terrain: [variee], structure: "ati_structures:nomadic_camp", taille: "36×12×30", occupants: "5 zombies momifiés", defenseurs: {source: gabarit}}
+  ferme-illageoise: {nom: "Ferme illageoise", type: camp, niveau: 1, terrain: [variee], structure: "ati_structures:illager_homestead", taille: "17×15×13", occupants: "2 pillards, 1 vindicateur, cloche", defenseurs: {source: gabarit, complement: true}}
+  entrepot-des-pillards: {nom: "Entrepôt des pillards", type: camp, niveau: 1, terrain: [variee], structure: "ati_structures:storage_house", taille: "16×12×12", occupants: "2 pillards, 1 vindicateur", defenseurs: {source: gabarit, complement: true}}
+  cabane-des-pillards: {nom: "Cabane des pillards", type: camp, niveau: 1, terrain: [variee], structure: "ati_structures:storage_shack", taille: "17×11×13", occupants: "2 pillards, 1 vindicateur", defenseurs: {source: gabarit, complement: true}}
+  halte-des-marchands: {nom: "Halte des marchands", type: camp, niveau: 1, terrain: [desert], structure: "towns_and_towers:exclusives/village_wandering_trader_camp", occupants: "10 marchands ambulants (civils)", defenseurs: {source: armee}}
+  mines-des-pillards: {nom: "Mines des pillards", type: camp, niveau: 1, terrain: [plaines, taiga, neige, sommets], structure: "mostructures:pillager_mines", taille: "17×8×10", occupants: "aucun (naissent du terrain)", defenseurs: {source: creatures, creatures: ["minecraft:pillager", "minecraft:vindicator"]}}
+  ruine-hantee: {nom: "Ruine hantée", type: repaire, niveau: 1, terrain: [plaines, foret, taiga, savane], structure: "ati_structures:haunted_ruin", taille: "15×10×15", occupants: "6 squelettes (3 variantes)", defenseurs: {source: gabarit}}
+  ruines-des-vagabonds: {nom: "Ruines des vagabonds", type: repaire, niveau: 1, terrain: [neige, sommets], structure: "ati_structures:stray_ruins", taille: "15×10×15", occupants: "4 squelettes", defenseurs: {source: gabarit}}
+  nid-de-poissons-d-argent: {nom: "Nid de poissons d'argent", type: repaire, niveau: 1, terrain: [variee], structure: "ati_structures:silverfish_nest", taille: "15×10×15", occupants: "4 poissons d'argent, 1 cage", defenseurs: {source: gabarit}}
+  hutte-de-la-sorciere: {nom: "Hutte de la sorcière", type: repaire, niveau: 1, terrain: [marais], structure: "minecraft:swamp_hut", occupants: "sorcière (naît du terrain)", defenseurs: {source: creatures, maitre: "minecraft:witch"}}
+  cabane-de-l-apothicaire: {nom: "Cabane de l'apothicaire", type: repaire, niveau: 1, terrain: [marais], structure: "irons_spellbooks:mangrove_hut", taille: "16×27×27", occupants: "1 apothicaire (irons_spellbooks:apothecarist)", defenseurs: {source: gabarit, maitre: "irons_spellbooks:apothecarist"}}
+
+  # ── Niveau II — Coup de main (53) ──
+  avant-poste-pillard: {nom: "Avant-poste pillard", type: avant-poste, niveau: 2, terrain: [plaines], structure: "minecraft:pillager_outpost", taille: "16×30×16", occupants: "allays en cage (pillards : naissent du terrain)", defenseurs: {source: creatures, creatures: ["minecraft:pillager", "minecraft:vindicator"]}}
+  # Avant-postes pillards régionaux (Towns and Towers, 22) : terrain = biome du suffixe ; taille 9×4×9 à 35×18×30 selon la variante
+  avant-poste-pillard-badlands: {nom: "Avant-poste pillard des badlands", type: avant-poste, niveau: 2, terrain: [badlands], structure: "towns_and_towers:pillager_outpost_badlands", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-beach: {nom: "Avant-poste pillard de la plage", type: avant-poste, niveau: 2, terrain: [plage], structure: "towns_and_towers:pillager_outpost_beach", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-birch-forest: {nom: "Avant-poste pillard de la forêt de bouleaux", type: avant-poste, niveau: 2, terrain: [foret], structure: "towns_and_towers:pillager_outpost_birch_forest", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-desert: {nom: "Avant-poste pillard du désert", type: avant-poste, niveau: 2, terrain: [desert], structure: "towns_and_towers:pillager_outpost_desert", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-flower-forest: {nom: "Avant-poste pillard de la forêt fleurie", type: avant-poste, niveau: 2, terrain: [foret], structure: "towns_and_towers:pillager_outpost_flower_forest", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-forest: {nom: "Avant-poste pillard de la forêt", type: avant-poste, niveau: 2, terrain: [foret], structure: "towns_and_towers:pillager_outpost_forest", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-grove: {nom: "Avant-poste pillard du bosquet enneigé", type: avant-poste, niveau: 2, terrain: [neige], structure: "towns_and_towers:pillager_outpost_grove", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-jungle: {nom: "Avant-poste pillard de la jungle", type: avant-poste, niveau: 2, terrain: [jungle], structure: "towns_and_towers:pillager_outpost_jungle", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-meadow: {nom: "Avant-poste pillard de la prairie", type: avant-poste, niveau: 2, terrain: [prairie], structure: "towns_and_towers:pillager_outpost_meadow", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-mushroom-fields: {nom: "Avant-poste pillard des champs de champignons", type: avant-poste, niveau: 2, terrain: [champignons], structure: "towns_and_towers:pillager_outpost_mushroom_fields", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-old-growth-taiga: {nom: "Avant-poste pillard de la taïga ancienne", type: avant-poste, niveau: 2, terrain: [taiga], structure: "towns_and_towers:pillager_outpost_old_growth_taiga", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-savanna: {nom: "Avant-poste pillard de la savane", type: avant-poste, niveau: 2, terrain: [savane], structure: "towns_and_towers:pillager_outpost_savanna", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-savanna-plateau: {nom: "Avant-poste pillard du plateau de savane", type: avant-poste, niveau: 2, terrain: [savane], structure: "towns_and_towers:pillager_outpost_savanna_plateau", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-snowy-beach: {nom: "Avant-poste pillard de la plage enneigée", type: avant-poste, niveau: 2, terrain: [neige], structure: "towns_and_towers:pillager_outpost_snowy_beach", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-snowy-plains: {nom: "Avant-poste pillard des plaines enneigées", type: avant-poste, niveau: 2, terrain: [neige], structure: "towns_and_towers:pillager_outpost_snowy_plains", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-snowy-slopes: {nom: "Avant-poste pillard des pentes enneigées", type: avant-poste, niveau: 2, terrain: [neige], structure: "towns_and_towers:pillager_outpost_snowy_slopes", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-snowy-taiga: {nom: "Avant-poste pillard de la taïga enneigée", type: avant-poste, niveau: 2, terrain: [neige], structure: "towns_and_towers:pillager_outpost_snowy_taiga", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-sparse-jungle: {nom: "Avant-poste pillard de la jungle clairsemée", type: avant-poste, niveau: 2, terrain: [jungle], structure: "towns_and_towers:pillager_outpost_sparse_jungle", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-sunflower-plains: {nom: "Avant-poste pillard des plaines de tournesols", type: avant-poste, niveau: 2, terrain: [plaines], structure: "towns_and_towers:pillager_outpost_sunflower_plains", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-swamp: {nom: "Avant-poste pillard du marais", type: avant-poste, niveau: 2, terrain: [marais], structure: "towns_and_towers:pillager_outpost_swamp", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-taiga: {nom: "Avant-poste pillard de la taïga", type: avant-poste, niveau: 2, terrain: [taiga], structure: "towns_and_towers:pillager_outpost_taiga", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-wooded-badlands: {nom: "Avant-poste pillard des badlands boisés", type: avant-poste, niveau: 2, terrain: [badlands], structure: "towns_and_towers:pillager_outpost_wooded_badlands", taille: "35×18×30", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  # Avant-postes pillards de style (Towns and Towers, 8) : terrain selon le style (§2.4) ; taille 15×39×15 à 36×21×34 selon la variante
+  avant-poste-pillard-style-classic: {nom: "Avant-poste pillard classique", type: avant-poste, niveau: 2, terrain: [plaines], structure: "towns_and_towers:exclusives/pillager_outpost_classic", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-style-iberian: {nom: "Avant-poste pillard ibérique", type: avant-poste, niveau: 2, terrain: [savane], structure: "towns_and_towers:exclusives/pillager_outpost_iberian", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-style-mediterranean: {nom: "Avant-poste pillard méditerranéen", type: avant-poste, niveau: 2, terrain: [savane, plage], structure: "towns_and_towers:exclusives/pillager_outpost_mediterranean", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-style-nilotic: {nom: "Avant-poste pillard nilotique", type: avant-poste, niveau: 2, terrain: [savane, marais], structure: "towns_and_towers:exclusives/pillager_outpost_nilotic", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-style-oriental: {nom: "Avant-poste pillard oriental", type: avant-poste, niveau: 2, terrain: [desert], structure: "towns_and_towers:exclusives/pillager_outpost_oriental", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-style-rustic: {nom: "Avant-poste pillard rustique", type: avant-poste, niveau: 2, terrain: [foret, plaines], structure: "towns_and_towers:exclusives/pillager_outpost_rustic", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-style-swedish: {nom: "Avant-poste pillard suédois", type: avant-poste, niveau: 2, terrain: [taiga, neige], structure: "towns_and_towers:exclusives/pillager_outpost_swedish", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-pillard-style-tudor: {nom: "Avant-poste pillard Tudor", type: avant-poste, niveau: 2, terrain: [plaines, prairie], structure: "towns_and_towers:exclusives/pillager_outpost_tudor", taille: "36×21×34", occupants: "toutes pièces : 2 pillards, 1 vindicateur, 1 ou 2 allays en cage", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-templier: {nom: "Avant-poste templier", type: avant-poste, niveau: 2, terrain: [variee], structure: "valarian_conquest:templar_outpost", taille: "17×32×17", occupants: "4 soldats, 3 archers, bannières", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-valarien: {nom: "Avant-poste valarien", type: avant-poste, niveau: 2, terrain: [variee], structure: "valarian_conquest:valarian_outpost", taille: "28×34×27", occupants: "5 soldats, 2 archers", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-wisigoth: {nom: "Avant-poste wisigoth", type: avant-poste, niveau: 2, terrain: [variee], structure: "valarian_conquest:visgothian_outpost", taille: "23×32×23", occupants: "4 soldats, 3 archers", defenseurs: {source: gabarit, complement: true}}
+  avant-poste-bourguignon: {nom: "Avant-poste bourguignon", type: avant-poste, niveau: 2, terrain: [variee], structure: "valarian_conquest:burgundian_outpost", taille: "25×32×23", occupants: "6 soldats, 2 archers", defenseurs: {source: gabarit}}
+  avant-poste-bohemien: {nom: "Avant-poste bohémien", type: avant-poste, niveau: 2, terrain: [variee], structure: "valarian_conquest:bohemian_outpost", taille: "32×35×29", occupants: "7 soldats, 2 archers, 2 citoyens", defenseurs: {source: gabarit}}
+  avant-poste-neutre: {nom: "Avant-poste neutre", type: avant-poste, niveau: 2, terrain: [variee], structure: "valarian_conquest:neutral_outpost", taille: "28×32×25", occupants: "2 soldats, 2 archers, 3 citoyennes", defenseurs: {source: gabarit, complement: true}}
+  tour-de-terre: {nom: "Tour de terre", type: avant-poste, niveau: 2, terrain: [variee], structure: "ati_structures:mud_tower", taille: "15×25×15", occupants: "7 zombies momifiés", defenseurs: {source: gabarit}}
+  tour-de-guet: {nom: "Tour de guet", type: avant-poste, niveau: 2, terrain: [variee], structure: "medieval_buildings:tower", taille: "12×30×12", occupants: "3 cages à zombies", defenseurs: {source: creatures, creatures: ["minecraft:pillager", "minecraft:vindicator"]}}
+  tour-des-villageois: {nom: "Tour des villageois", type: avant-poste, niveau: 2, terrain: [plaines, foret, foret-sombre, neige], structure: "mostructures:villager_tower", taille: "16×30×16", occupants: "toutes pièces : 14 villageois, golem", defenseurs: {source: creatures, creatures: ["minecraft:pillager", "minecraft:vindicator"]}}
+  taverne-de-carrefour: {nom: "Taverne de carrefour", type: avant-poste, niveau: 2, terrain: [plaines, foret, foret-sombre, neige], structure: "mostructures:tavern", taille: "16×28×16", occupants: "aucun", defenseurs: {source: creatures, creatures: ["minecraft:pillager", "minecraft:vindicator"]}}
+  tour-de-glace: {nom: "Tour de glace", type: avant-poste, niveau: 2, terrain: [neige, sommets], structure: "mostructures:ice_tower", taille: "22×25×22", occupants: "cages", defenseurs: {source: creatures, creatures: ["minecraft:pillager", "minecraft:vindicator"]}}
+  navire-des-sorcieres: {nom: "Navire des sorcières", type: abordage, niveau: 2, terrain: [mer], structure: "taxov:witch_ship", taille: "9×27×28", occupants: "2 sorcières", defenseurs: {source: gabarit, complement: true}}
+  navire-pirate-maudit: {nom: "Navire pirate maudit", type: abordage, niveau: 2, terrain: [mer, mer-froide], structure: "taxov:zombie_pirate_ship", taille: "12×26×28", occupants: "4 zombies-villageois", defenseurs: {source: gabarit, complement: true}}
+  vaisseau-maudit-de-la-marine: {nom: "Vaisseau maudit de la Marine", type: abordage, niveau: 2, terrain: [mer], structure: "taxov:zombie_marine_ship", taille: "12×29×30", occupants: "4 zombies-villageois", defenseurs: {source: gabarit, complement: true}}
+  nef-medievale: {nom: "Nef médiévale", type: abordage, niveau: 2, terrain: [mer, mer-froide], structure: "medieval_buildings:ship", taille: "13×35×39", occupants: "3 cages à squelettes", defenseurs: {source: armee}}
+  bateau-pirate: {nom: "Bateau pirate", type: abordage, niveau: 2, terrain: [mer, mer-froide], structure: "mostructures:pirate_ship", taille: "32×25×32", occupants: "cages (squelettes, vagabonds, zombie, poissons d'argent, cube de magma)", defenseurs: {source: armee}}
+  # Brise-glace empalé : pose en mer à vérifier
+  brise-glace-empale: {nom: "Brise-glace empalé", type: abordage, niveau: 2, terrain: [mer-froide], structure: "irons_spellbooks:impaled_icebreaker", taille: "21×25×29", occupants: "aucun", defenseurs: {source: armee}}
+  temple-pourrissant: {nom: "Temple pourrissant", type: repaire, niveau: 2, terrain: [jungle, marais], structure: "ati_structures:rotting_temple", taille: "20×20×20", occupants: "9 zombies, 2 cages", defenseurs: {source: gabarit}}
+  temple-pourrissant-enfoui: {nom: "Temple pourrissant enfoui", type: repaire, niveau: 2, terrain: [jungle], structure: "ati_structures:rotting_temple_underground", taille: "20×20×20", occupants: "7 zombies, 2 cages", souterrain: true, defenseurs: {source: gabarit}}
+  grande-pyramide: {nom: "Grande pyramide", type: repaire, niveau: 2, terrain: [desert], structure: "mostructures:big_pyramid", taille: "48×25×48", occupants: "cages (7 squelettes, 3 zombies momifiés)", defenseurs: {source: gabarit, complement: true}}
+  sphinx: {nom: "Sphinx", type: repaire, niveau: 2, terrain: [desert], structure: "mostructures:sphinx", taille: "32×18×48", occupants: "cages à squelettes", defenseurs: {source: gabarit, complement: true}}
+  tour-du-cryomancien: {nom: "Tour du cryomancien", type: repaire, niveau: 2, terrain: [prairie, neige, sommets], structure: "irons_spellbooks:mountain_tower", taille: "28×52×17", occupants: "1 cryomancien", defenseurs: {source: gabarit, maitre: "irons_spellbooks:cryomancer"}}
+
+  # ── Niveau III — Expédition (40) ──
+  # Villages du jeu de base (5) : terrain = biome du suffixe
+  village-plains: {nom: "Village des plaines", type: village, niveau: 3, terrain: [plaines], structure: "minecraft:village_plains", rayon: 80, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-desert: {nom: "Village du désert", type: village, niveau: 3, terrain: [desert], structure: "minecraft:village_desert", rayon: 80, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-savanna: {nom: "Village de la savane", type: village, niveau: 3, terrain: [savane], structure: "minecraft:village_savanna", rayon: 80, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-snowy: {nom: "Village des neiges", type: village, niveau: 3, terrain: [neige], structure: "minecraft:village_snowy", rayon: 80, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-taiga: {nom: "Village de la taïga", type: village, niveau: 3, terrain: [taiga], structure: "minecraft:village_taiga", rayon: 80, occupants: "villageois, golem", defenseurs: {source: armee}}
+  # Villages régionaux (Towns and Towers, 17) : terrain = biome du suffixe ; rayon 80 à 116 selon la variante
+  village-badlands: {nom: "Village des badlands", type: village, niveau: 3, terrain: [badlands], structure: "towns_and_towers:village_badlands", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-beach: {nom: "Village de la plage", type: village, niveau: 3, terrain: [plage], structure: "towns_and_towers:village_beach", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-birch-forest: {nom: "Village de la forêt de bouleaux", type: village, niveau: 3, terrain: [foret], structure: "towns_and_towers:village_birch_forest", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-flower-forest: {nom: "Village de la forêt fleurie", type: village, niveau: 3, terrain: [foret], structure: "towns_and_towers:village_flower_forest", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-forest: {nom: "Village de la forêt", type: village, niveau: 3, terrain: [foret], structure: "towns_and_towers:village_forest", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-grove: {nom: "Village du bosquet enneigé", type: village, niveau: 3, terrain: [neige], structure: "towns_and_towers:village_grove", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-jungle: {nom: "Village de la jungle", type: village, niveau: 3, terrain: [jungle], structure: "towns_and_towers:village_jungle", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-meadow: {nom: "Village de la prairie", type: village, niveau: 3, terrain: [prairie], structure: "towns_and_towers:village_meadow", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-mushroom-fields: {nom: "Village des champs de champignons", type: village, niveau: 3, terrain: [champignons], structure: "towns_and_towers:village_mushroom_fields", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-old-growth-taiga: {nom: "Village de la taïga ancienne", type: village, niveau: 3, terrain: [taiga], structure: "towns_and_towers:village_old_growth_taiga", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-savanna-plateau: {nom: "Village du plateau de savane", type: village, niveau: 3, terrain: [savane], structure: "towns_and_towers:village_savanna_plateau", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-snowy-slopes: {nom: "Village des pentes enneigées", type: village, niveau: 3, terrain: [neige], structure: "towns_and_towers:village_snowy_slopes", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-snowy-taiga: {nom: "Village de la taïga enneigée", type: village, niveau: 3, terrain: [neige], structure: "towns_and_towers:village_snowy_taiga", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-sparse-jungle: {nom: "Village de la jungle clairsemée", type: village, niveau: 3, terrain: [jungle], structure: "towns_and_towers:village_sparse_jungle", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-sunflower-plains: {nom: "Village des plaines de tournesols", type: village, niveau: 3, terrain: [plaines], structure: "towns_and_towers:village_sunflower_plains", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-swamp: {nom: "Village du marais", type: village, niveau: 3, terrain: [marais], structure: "towns_and_towers:village_swamp", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-wooded-badlands: {nom: "Village des badlands boisés", type: village, niveau: 3, terrain: [badlands], structure: "towns_and_towers:village_wooded_badlands", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  # Villages de style (Towns and Towers, 8) : terrain selon le style (§2.4) ; rayon 80 à 116 selon la variante
+  village-style-classic: {nom: "Village classique", type: village, niveau: 3, terrain: [plaines], structure: "towns_and_towers:exclusives/village_classic", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-style-iberian: {nom: "Village ibérique", type: village, niveau: 3, terrain: [savane], structure: "towns_and_towers:exclusives/village_iberian", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-style-mediterranean: {nom: "Village méditerranéen", type: village, niveau: 3, terrain: [savane, plage], structure: "towns_and_towers:exclusives/village_mediterranean", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-style-nilotic: {nom: "Village nilotique", type: village, niveau: 3, terrain: [savane, marais], structure: "towns_and_towers:exclusives/village_nilotic", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-style-piglin: {nom: "Village piglin", type: village, niveau: 3, terrain: [savane], structure: "towns_and_towers:exclusives/village_piglin", rayon: 116, occupants: "villageois, golem, 3 hoglins", defenseurs: {source: armee}}
+  village-style-rustic: {nom: "Village rustique", type: village, niveau: 3, terrain: [foret, plaines], structure: "towns_and_towers:exclusives/village_rustic", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-style-swedish: {nom: "Village suédois", type: village, niveau: 3, terrain: [taiga, neige], structure: "towns_and_towers:exclusives/village_swedish", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  village-style-tudor: {nom: "Village Tudor", type: village, niveau: 3, terrain: [plaines, prairie], structure: "towns_and_towers:exclusives/village_tudor", rayon: 116, occupants: "villageois, golem", defenseurs: {source: armee}}
+  tribu-des-glaces: {nom: "Tribu des glaces", type: village, niveau: 3, terrain: [mer-froide], structure: "ati_structures:ice_tribe", taille: "42×20×34", occupants: "11 villageois, golem, cloche", defenseurs: {source: armee}}
+  colonie-des-sorcieres: {nom: "Colonie des sorcières", type: village, niveau: 3, terrain: [jungle], structure: "ati_structures:jungle_settlement", taille: "48×17×48", occupants: "12 sorcières, 5 gardiens", defenseurs: {source: gabarit}}
+  bourg-du-marche: {nom: "Bourg du marché", type: village, niveau: 3, terrain: [plaines, foret, foret-sombre, neige, savane], structure: "mostructures:villager_market", taille: "32×23×32", occupants: "toutes pièces : 5 villageois, golem, cloche", defenseurs: {source: armee}}
+  navire-pirate: {nom: "Navire pirate", type: abordage, niveau: 3, terrain: [mer], structure: "taxov:pirate_ship", taille: "9×29×28", occupants: "4 villageois pirates (métiers du mod), golem", defenseurs: {source: armee, remplacer: true}}
+  village-sur-l-eau: {nom: "Village sur l'eau", type: abordage, niveau: 3, terrain: [mer, mer-froide], structure: "towns_and_towers:village_ocean", taille: "81×3×80", occupants: "villageois", defenseurs: {source: armee}}
+  antre-des-arachnides: {nom: "Antre des arachnides", type: repaire, niveau: 3, terrain: [foret-sombre, taiga, neige, jungle, marais], structure: "ati_structures:arachnid_dwelling", taille: "48×30×31", occupants: "16 araignées venimeuses, 12 araignées, 8 cages", defenseurs: {source: gabarit}}
+  dojo-hante: {nom: "Dojo hanté", type: repaire, niveau: 3, terrain: [plaines, foret, taiga, savane, jungle], structure: "ati_structures:dojo", taille: "35×40×29", occupants: "16 squelettes", defenseurs: {source: gabarit}}
+  tour-du-pyromancien: {nom: "Tour du pyromancien", type: repaire, niveau: 3, terrain: [plaines, foret, foret-sombre, neige, sommets, marais], structure: "irons_spellbooks:pyromancer_tower", occupants: "pyromancien (à relever)", defenseurs: {source: gabarit, maitre: "irons_spellbooks:pyromancer"}}
+  grotte-de-la-jungle: {nom: "Grotte de la jungle", type: repaire, niveau: 3, terrain: [jungle, marais], structure: "ati_structures:jungle_grotto", taille: "48×48×48", occupants: "17 zombies, 11 phantoms, 7 noyés, 6 cages", defenseurs: {source: gabarit}}
+  temple-englouti: {nom: "Temple englouti", type: repaire, niveau: 3, terrain: [mer, mer-froide], structure: "ati_structures:sinking_temple", taille: "48×48×48", occupants: "37 zombies, 5 villageois", defenseurs: {source: gabarit}}
+
+  # ── Niveau IV — Assaut (25) ──
+  avant-poste-hospitalier: {nom: "Avant-poste hospitalier", type: avant-poste, niveau: 4, terrain: [variee], structure: "valarian_conquest:hospitaller_outpost", taille: "27×38×27", occupants: "6 soldats, 6 archers, porte", defenseurs: {source: gabarit}}
+  avant-poste-barathien: {nom: "Avant-poste barathien", type: avant-poste, niveau: 4, terrain: [variee], structure: "valarian_conquest:barathian_outpost", taille: "19×32×19", occupants: "8 soldats, 2 archers, 4 balistes", defenseurs: {source: gabarit}}
+  tour-orleanaise: {nom: "Tour orléanaise", type: avant-poste, niveau: 4, terrain: [variee], structure: "valarian_conquest:orleanian_outpost", taille: "17×44×17", occupants: "7 soldats, 2 archers, 3 balistes, porte, cloche", defenseurs: {source: gabarit}}
+  tour-illageoise: {nom: "Tour illageoise", type: avant-poste, niveau: 4, terrain: [variee], structure: "ati_structures:illager_tower", taille: "19×25×19", occupants: "10 pillards, 6 vindicateurs", defenseurs: {source: gabarit}}
+  tour-sombre: {nom: "Tour sombre", type: avant-poste, niveau: 4, terrain: [variee], structure: "ati_structures:dark_tower", taille: "23×21×23", occupants: "19 zombies momifiés", defenseurs: {source: gabarit}}
+  avant-poste-envahi: {nom: "Avant-poste envahi", type: avant-poste, niveau: 4, terrain: [foret, foret-sombre, taiga, jungle], structure: "ati_structures:overgrown_outpost", taille: "27×45×35", occupants: "25 zombies", defenseurs: {source: gabarit}}
+  fortin-du-desert: {nom: "Fortin du désert", type: fort, niveau: 4, terrain: [desert], structure: "ati_structures:desert_outpost", taille: "48×48×48", occupants: "26 zombies momifiés", defenseurs: {source: gabarit}}
+  donjon-sombre: {nom: "Donjon sombre", type: fort, niveau: 4, terrain: [variee], structure: "ati_structures:dark_keep", taille: "20×35×22", occupants: "16 squelettes, bannières", defenseurs: {source: gabarit}}
+  petit-donjon: {nom: "Petit donjon", type: fort, niveau: 4, terrain: [variee], structure: "ati_structures:small_keep", taille: "17×38×23", occupants: "13 zombies-villageois", defenseurs: {source: gabarit}}
+  donjon-des-bois: {nom: "Donjon des bois", type: fort, niveau: 4, terrain: [foret, foret-sombre, taiga, neige, jungle, marais], structure: "ati_structures:woodland_keep", taille: "43×40×43", occupants: "25 zombies", defenseurs: {source: gabarit}}
+  relais-fortifie: {nom: "Relais fortifié", type: fort, niveau: 4, terrain: [plaines, foret, taiga, savane, badlands], structure: "ati_structures:tavern", taille: "48×37×48", occupants: "22 zombies momifiés, 4 villageois", defenseurs: {source: gabarit}}
+  auberge-envahie: {nom: "Auberge envahie", type: fort, niveau: 4, terrain: [plaines, foret, foret-sombre, taiga, jungle, marais], structure: "ati_structures:villager_inn", taille: "44×48×43", occupants: "20 zombies momifiés, 5 zombies", defenseurs: {source: gabarit}}
+  manoir: {nom: "Manoir", type: fort, niveau: 4, terrain: [foret, foret-sombre, taiga, jungle], structure: "ati_structures:manor", taille: "35×31×48", occupants: "12 vindicateurs, 10 zombies momifiés, 2 illusionnistes", defenseurs: {source: gabarit}}
+  vieille-demeure: {nom: "Vieille demeure", type: fort, niveau: 4, terrain: [foret, foret-sombre, taiga, jungle], structure: "ati_structures:old_residence", taille: "27×37×31", occupants: "9 vindicateurs, 8 araignées, évocateur, illusionniste, 2 cages", defenseurs: {source: gabarit}}
+  castillo: {nom: "Castillo", type: fort, niveau: 4, terrain: [variee], structure: "ati_structures:castillo", taille: "20×20×41", occupants: "13 pillards, 9 vindicateurs, ravageur, illusionniste", defenseurs: {source: gabarit}}
+  fort-medieval: {nom: "Fort médiéval", type: fort, niveau: 4, terrain: [plaines], structure: "medieval_buildings:fort", taille: "68×30×55", occupants: "16 villageois, 4 cages à araignées venimeuses, bannières", defenseurs: {source: armee}}
+  fabrique-des-pillards: {nom: "Fabrique des pillards", type: fort, niveau: 4, terrain: [plaines, taiga, neige, sommets], structure: "mostructures:pillager_factory", taille: "32×22×32", occupants: "toutes pièces : ravageur (pillards : naissent du terrain)", defenseurs: {source: creatures, creatures: ["minecraft:pillager", "minecraft:vindicator"]}}
+  bosquet-des-umvuthana: {nom: "Bosquet des Umvuthana", type: village, niveau: 4, terrain: [savane], structure: "mowziesmobs:umvuthana_grove", occupants: "guerriers Umvuthana, Umvuthi (à vérifier)", defenseurs: {source: gabarit}}
+  galion: {nom: "Galion", type: abordage, niveau: 4, terrain: [mer], structure: "supplementaries:galleon", taille: "19×37×47", occupants: "toutes pièces : ravageur, golem", defenseurs: {source: armee}}
+  avant-poste-pillard-en-mer: {nom: "Avant-poste pillard en mer", type: abordage, niveau: 4, terrain: [mer, mer-froide], structure: "towns_and_towers:pillager_outpost_ocean", taille: "76×65×27", occupants: "2 pillards, 1 vindicateur, allays", defenseurs: {source: gabarit, complement: true}}
+  nid-d-araignees-geant: {nom: "Nid d'araignées géant", type: repaire, niveau: 4, terrain: [variee], structure: "ati_structures:spider_nest", taille: "45×32×45", occupants: "51 araignées", defenseurs: {source: gabarit}}
+  hutte-du-gnome: {nom: "Hutte du gnome", type: repaire, niveau: 4, terrain: [foret-sombre, taiga, jungle, champignons], structure: "ati_structures:gnome_hut", taille: "24×41×23", occupants: "jusqu'à 79 zombies", defenseurs: {source: gabarit}}
+  monument-souterrain: {nom: "Monument souterrain", type: repaire, niveau: 4, terrain: [variee], structure: "ati_structures:underground_monument", taille: "45×11×45", occupants: "20 pillards", souterrain: true, defenseurs: {source: gabarit}}
+  antre-des-araignees-des-glaces: {nom: "Antre des araignées des glaces", type: repaire, niveau: 4, terrain: [neige, sommets], structure: "irons_spellbooks:ice_spider_den", occupants: "à relever (cages)", defenseurs: {source: gabarit}}
+  catacombes: {nom: "Catacombes", type: repaire, niveau: 4, terrain: [variee], structure: "irons_spellbooks:catacombs", occupants: "à relever", souterrain: true, defenseurs: {source: gabarit}}
+
+  # ── Niveau V — Offensive (10, + 8 villes plus bas) ──
+  vieux-fort: {nom: "Vieux fort", type: fort, niveau: 5, terrain: [neige, sommets], structure: "ati_structures:old_fort", taille: "48×48×48", occupants: "22 squelettes, 2 wither squelettes, zombie momifié, cloche", defenseurs: {source: gabarit}}
+  fort-de-granit: {nom: "Fort de granit", type: fort, niveau: 5, terrain: [plaines, foret, foret-sombre, taiga, savane], structure: "ati_structures:granite_fort", taille: "48×48×48", occupants: "18 squelettes, 15 zombies momifiés, 3 villageois, golems", defenseurs: {source: gabarit}}
+  carriere-illageoise: {nom: "Carrière illageoise", type: fort, niveau: 5, terrain: [plaines, foret], structure: "ati_structures:quarry", taille: "48×26×48", occupants: "toutes pièces : 12 vindicateurs, 5 pillards, ravageur, illusionniste", defenseurs: {source: gabarit}}
+  taillerie-illageoise: {nom: "Taillerie illageoise", type: fort, niveau: 5, terrain: [variee], structure: "ati_structures:ati_stoneworks", taille: "48×48×48", occupants: "toutes pièces : 28 vindicateurs, 17 pillards, 4 évocateurs, 2 illusionnistes, ravageur", defenseurs: {source: gabarit}}
+  temple-fortifie: {nom: "Temple fortifié", type: fort, niveau: 5, terrain: [plaines, foret, taiga, savane, jungle], structure: "ati_structures:fortified_temple", taille: "48×48×48", occupants: "21 pillards, 13 vindicateurs, 8 zombies momifiés, 4 évocateurs, 4 illusionnistes", defenseurs: {source: gabarit}}
+  forge-a-vapeur: {nom: "Forge à vapeur", type: fort, niveau: 5, terrain: [variee], structure: "ati_structures:steam_house", taille: "48×48×48", occupants: "33 pillards, 11 gardiens, 7 zoglins, gardien ancien", defenseurs: {source: gabarit}}
+  fort-des-evocateurs: {nom: "Fort des évocateurs", type: fort, niveau: 5, terrain: [variee], structure: "irons_spellbooks:evoker_fort", taille: "19×34×19", occupants: "toutes pièces : archévocateur, vindicateur chasseur de mages, évocateur, pillard, 2 ravageurs", defenseurs: {source: gabarit, chef: "irons_spellbooks:archevoker"}}
+  salle-du-wroughtnaut: {nom: "Salle du Wroughtnaut", type: repaire, niveau: 5, terrain: [variee], structure: "mowziesmobs:wrought_chamber", occupants: "Ferrous Wroughtnaut (à vérifier)", souterrain: true, defenseurs: {source: gabarit, maitre: "mowziesmobs:ferrous_wroughtnaut"}}
+  temple-antique: {nom: "Temple antique", type: repaire, niveau: 5, terrain: [jungle], structure: "ati_structures:ancient_temple", taille: "48×48×48", occupants: "26 squelettes, ghast", defenseurs: {source: gabarit}}
+  forteresse-du-nether: {nom: "Forteresse du Nether", type: fort, niveau: 5, terrain: [nether], structure: "minecraft:fortress", occupants: "cages à blazes (blazes et wither squelettes naissent du terrain)", defenseurs: {source: creatures, creatures: ["minecraft:wither_skeleton", "minecraft:blaze"]}}
+
+  # ── Niveau VI — Grande offensive (12) ──
+  chateau-bourguignon: {nom: "Château bourguignon", type: chateau, niveau: 6, terrain: [plaines, neige], structure: "valarian_conquest:burgundian_castle", taille: "33×36×32", occupants: "12 soldats, 6 archers, porte, 3 citoyennes", defenseurs: {source: gabarit}}
+  chateau-hospitalier: {nom: "Château hospitalier", type: chateau, niveau: 6, terrain: [plaines, neige], structure: "valarian_conquest:hospitaller_castle", taille: "64×40×55", occupants: "14 soldats, 10 archers, porte, 4 citoyens", defenseurs: {source: gabarit}}
+  chateau-wisigoth: {nom: "Château wisigoth", type: chateau, niveau: 6, terrain: [plaines, neige], structure: "valarian_conquest:visgothian_castle", taille: "69×48×58", occupants: "14 soldats, 8 archers, porte, 5 citoyens", defenseurs: {source: gabarit}}
+  chateau-valarien: {nom: "Château valarien", type: chateau, niveau: 6, terrain: [plaines, neige], structure: "valarian_conquest:valarian_castle", taille: "72×40×80", occupants: "17 soldats, 7 archers, porte, 7 citoyens", defenseurs: {source: gabarit}}
+  commanderie-du-temple: {nom: "Commanderie du Temple", type: chateau, niveau: 6, terrain: [plaines, neige], structure: "valarian_conquest:templar_castle", taille: "66×36×80", occupants: "19 soldats, 14 archers, 2 portes, cloche, 4 citoyens", defenseurs: {source: gabarit}}
+  chateau-catalan: {nom: "Château catalan", type: chateau, niveau: 6, terrain: [variee], structure: "ati_structures:catalonian_castle", taille: "42×32×35", occupants: "17 pillards, 6 vindicateurs, 4 illusionnistes, 8 zombies momifiés, ravageur, évocateur", defenseurs: {source: gabarit}}
+  chateau-en-ruine: {nom: "Château en ruine", type: chateau, niveau: 6, terrain: [plaines, foret, taiga, neige], structure: "ati_structures:ruined_castle", taille: "48×45×48", occupants: "47 zombies, évocateur, illusionniste, cloche", defenseurs: {source: gabarit}}
+  chateau-de-marbre: {nom: "Château de marbre", type: chateau, niveau: 6, terrain: [plaines, foret, taiga, savane, jungle], structure: "ati_structures:marble_chateau", taille: "48×48×48", occupants: "50 zombies momifiés", defenseurs: {source: gabarit}}
+  manoir-forestier: {nom: "Manoir forestier", type: chateau, niveau: 6, terrain: [foret-sombre], structure: "minecraft:mansion", occupants: "vindicateurs, évocateurs (à vérifier avec /place)", defenseurs: {source: gabarit}}
+  antre-du-frostmaw: {nom: "Antre du Frostmaw", type: repaire, niveau: 6, terrain: [neige], structure: "mowziesmobs:frostmaw_spawn", occupants: "Frostmaw (à vérifier)", defenseurs: {source: gabarit, maitre: "mowziesmobs:frostmaw"}}
+  caverne-du-wither: {nom: "Caverne du Wither", type: repaire, niveau: 6, terrain: [variee], structure: "ati_structures:wither_cavern", taille: "45×45×45", occupants: "21 wither squelettes, cristal de l'End", defenseurs: {source: gabarit}}
+  vestiges-de-bastion: {nom: "Vestiges de bastion", type: fort, niveau: 6, terrain: [nether], structure: "minecraft:bastion_remnant", taille: "46×24×46", occupants: "piglins, brutes piglins, hoglins (pièces « mobs »), cage à cubes de magma", defenseurs: {source: gabarit, complement: true}}
+
+  # ── Niveau VII — Légende (12) ──
+  citadelle-barathienne: {nom: "Citadelle barathienne", type: chateau, niveau: 7, terrain: [plaines, neige], structure: "valarian_conquest:barathian_castle", taille: "120×52×96", occupants: "37 soldats, 1 archer, 9 balistes, portes, 7 citoyens", defenseurs: {source: gabarit}}
+  forteresse-d-orleans: {nom: "Forteresse d'Orléans", type: chateau, niveau: 7, terrain: [plaines, neige], structure: "valarian_conquest:orleanian_castle", taille: "114×64×115", occupants: "29 soldats, 1 archer, 13 balistes, pont-levis, cloche, 6 citoyens", defenseurs: {source: gabarit}}
+  donjon-du-wither: {nom: "Donjon du Wither", type: chateau, niveau: 7, terrain: [variee], structure: "ati_structures:wither_keep", taille: "30×47×17", occupants: "20 wither squelettes", defenseurs: {source: gabarit}}
+  bastion-de-herobrine: {nom: "Bastion de Herobrine", type: chateau, niveau: 7, terrain: [variee], structure: "ati_structures:herobrine_stronghold", taille: "48×48×48", occupants: "34 zombies momifiés, ravageur, wither squelette", defenseurs: {source: gabarit}}
+  chateau-du-lapin-tueur: {nom: "Château du lapin tueur", type: chateau, niveau: 7, terrain: [plaines, foret, foret-sombre, neige, savane], structure: "mostructures:killer_bunny_castle", taille: "32×35×32", occupants: "lapin (tueur), cages", defenseurs: {source: gabarit, complement: true}}
+  chateau-dans-le-ciel: {nom: "Château dans le ciel", type: chateau, niveau: 7, terrain: [plage], structure: "mostructures:the_castle_in_the_sky", taille: "48×24×48", occupants: "cages (8 zombies, 4 squelettes, 6 araignées venimeuses, 1 zombie-villageois)", flottant: true, defenseurs: {source: armee}}
+  citadelle-maudite: {nom: "Citadelle maudite", type: chateau, niveau: 7, terrain: [nether], structure: "irons_spellbooks:citadel", taille: "51×70×51", occupants: "12 armures maudites (irons_spellbooks:cursed_armor_stand)", defenseurs: {source: gabarit, complement: true}}
+  vaisseau-du-roi-pirate: {nom: "Vaisseau du roi pirate", type: abordage, niveau: 7, terrain: [mer, mer-froide], structure: "taxov:illager_king_ship", taille: "36×105×120", occupants: "49 pillards, 48 vindicateurs, 4 évocateurs, 4 illusionnistes, ravageur, roi pirate illageois", defenseurs: {source: gabarit, chef: "taxov:illager_pirate_king"}}
+  vaisseau-ancien: {nom: "Vaisseau ancien", type: abordage, niveau: 7, terrain: [mer, mer-froide], structure: "ati_structures:ancient_vessel", taille: "43×35×19", occupants: "Warden, 1 villageois", defenseurs: {source: gabarit, maitre: "minecraft:warden"}}
+  monastere-du-sculpteur: {nom: "Monastère du Sculpteur", type: repaire, niveau: 7, terrain: [sommets], structure: "mowziesmobs:monastery", occupants: "Sculpteur (à vérifier)", defenseurs: {source: gabarit, maitre: "mowziesmobs:sculptor"}}
+  monument-du-warden: {nom: "Monument du Warden", type: repaire, niveau: 7, terrain: [neige, sommets], structure: "ati_structures:warden_monument", taille: "48×48×48", occupants: "Warden", defenseurs: {source: gabarit, maitre: "minecraft:warden"}}
+  # Cité de l'End : hautes terres des îles extérieures ; élytres de la nef retirées à la pose
+  cite-de-l-end: {nom: "Cité de l'End", type: ville, niveau: 7, terrain: [end], structure: "minecraft:end_city", occupants: "shulkers (posés par la génération, à vérifier)", defenseurs: {source: gabarit, complement: true}}
+
+# ── Villes fortifiées (niveau V, §7.8) ──
+# Une ville = un village de style agrandi (place jigsaw sur le pool de départ, profondeur 10)
+# + 3 tours d'une faction sur les routes qui en sortent + un siège du pouvoir opposé au camp.
+# Repli si le village n'est pas agrandi : la structure du village (village.structure) telle quelle.
+villes:
+  brumeval: {nom: "Brumeval", terrain: [plaines, prairie], village: {pool: "kaisyn:village/exclusives/tudor/town_centers", profondeur: 10, structure: "towns_and_towers:exclusives/village_tudor"}, tours: {id: "valarian_conquest:templar_outpost", nombre: 3}, siege: "ati_structures:manor"}
+  skarholm: {nom: "Skarholm", terrain: [taiga, neige], village: {pool: "kaisyn:village/exclusives/swedish/town_centers", profondeur: 10, structure: "towns_and_towers:exclusives/village_swedish"}, tours: {id: "valarian_conquest:visgothian_outpost", nombre: 3}, siege: "ati_structures:woodland_keep"}
+  vila-real: {nom: "Vila Real", terrain: [savane], village: {pool: "kaisyn:village/exclusives/iberian/town_centers", profondeur: 10, structure: "towns_and_towers:exclusives/village_iberian"}, tours: {id: "valarian_conquest:burgundian_outpost", nombre: 3}, siege: "ati_structures:castillo"}
+  portocalda: {nom: "Portocalda", terrain: [savane, plage], village: {pool: "kaisyn:village/exclusives/mediterranean/town_centers", profondeur: 10, structure: "towns_and_towers:exclusives/village_mediterranean"}, tours: {id: "valarian_conquest:hospitaller_outpost", nombre: 3}, siege: "ati_structures:old_residence"}
+  kemet: {nom: "Kemet", terrain: [savane, marais], village: {pool: "kaisyn:village/exclusives/nilotic/base_plate", profondeur: 10, structure: "towns_and_towers:exclusives/village_nilotic"}, tours: {id: "valarian_conquest:barathian_outpost", nombre: 3}, siege: "ati_structures:fortified_temple"}
+  haut-bois: {nom: "Haut-Bois", terrain: [foret, plaines], village: {pool: "kaisyn:village/exclusives/rustic/town_centers", profondeur: 10, structure: "towns_and_towers:exclusives/village_rustic"}, tours: {id: "valarian_conquest:valarian_outpost", nombre: 3}, siege: "medieval_buildings:fort"}
+  valclaire: {nom: "Valclaire", terrain: [plaines], village: {pool: "kaisyn:village/exclusives/classic/town_centers", profondeur: 10, structure: "towns_and_towers:exclusives/village_classic"}, tours: {id: "valarian_conquest:bohemian_outpost", nombre: 3}, siege: "ati_structures:manor"}
+  hautefroide: {nom: "Hautefroide", terrain: [neige], village: {pool: "kaisyn:village/snowy_taiga_viking/town_centers", profondeur: 10, structure: "towns_and_towers:village_snowy_taiga"}, tours: {id: "valarian_conquest:orleanian_outpost", nombre: 3}, siege: "ati_structures:dark_keep"}
+
+# ── Structures écartées (§7.9, 52) ──
+# Jamais proposées comme cibles et non signalées par /city raid inconnues.
+# « * » remplace n'importe quels caractères.
+ignorees:
+  # Minecraft (23) : souterrain géant, temples piégés, épaves et ruines vides, mécanique propre
+  - "minecraft:ancient_city"
+  - "minecraft:buried_treasure"
+  - "minecraft:desert_pyramid"
+  - "minecraft:igloo"
+  - "minecraft:jungle_pyramid"
+  - "minecraft:mineshaft"
+  - "minecraft:mineshaft_mesa"
+  - "minecraft:monument"
+  - "minecraft:nether_fossil"
+  - "minecraft:ocean_ruin_cold"
+  - "minecraft:ocean_ruin_warm"
+  - "minecraft:ruined_portal*"
+  - "minecraft:shipwreck"
+  - "minecraft:shipwreck_beached"
+  - "minecraft:stronghold"
+  - "minecraft:trail_ruins"
+  - "minecraft:trial_chambers"
+  # ATi Structures (9) : vides, trop petits ou sous l'eau
+  - "ati_structures:deepslate_keep"
+  - "ati_structures:lighthouse"
+  - "ati_structures:monastery_tower"
+  - "ati_structures:mosque"
+  - "ati_structures:old_home"
+  - "ati_structures:pufferfish_cave"
+  - "ati_structures:rotten_log"
+  - "ati_structures:sculk_deposit"
+  - "ati_structures:underwater_dungeon"
+  # Mo' Structures (10) : décors sans occupants
+  - "mostructures:air_balloon"
+  - "mostructures:barn_house"
+  - "mostructures:*_abandoned_church"
+  - "mostructures:jungle_pyramid"
+  - "mostructures:lighthouse"
+  - "mostructures:moai"
+  # Iron's Spells (1) : ruines
+  - "irons_spellbooks:ancient_battleground"
+  # Medieval Buildings (2) : maisons isolées
+  - "medieval_buildings:house_1"
+  - "medieval_buildings:house_2"
+  # Towns and Towers (2) : piège isolé, épave
+  - "towns_and_towers:mimic_desert"
+  - "towns_and_towers:wreckage_ocean"
+  # Tax' Ocean Villager (1) : camp allié de l'Abordage
+  - "taxov:marine_ship"
+  # Supplementaries (1) : panneau
+  - "supplementaries:road_sign"
+  # Let's Do Brewery (1) : réservée aux fêtes
+  - "brewery:brewfest_tent"
+  # Fish of Thieves (2) : décors ; espace de noms à confirmer avec /city raid inconnues
+  - "fishofthieves:guardian_fruit_tree"
+  - "fishofthieves:seapost"
