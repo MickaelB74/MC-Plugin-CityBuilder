@@ -82,6 +82,9 @@ public final class ConfigUpdater {
      * 38 : villes fortifiées (R6) : poids de l'objectif « tours » dans raids.objectifs.poids.
      * 39 : camps des raids : le camp de bandits seul sur la terre ferme (raids.camp.modeles), un
      *      petit bateau d'un mod sur l'eau (raids.camp.navires, ajouté sous raids.camp).
+     * 40 : quêtes sans valeur avec Iron's Spells (Gandalf ne rachète plus les objets de l'End) :
+     *      valeur fixe, celle de son rachat, pour Béatrice, Geralt et Harold ; jus de cactus de
+     *      Robinson à 2,25 (3,5 : rentable en achetant eau purifiée, sucre et cactus).
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -188,7 +191,25 @@ public final class ConfigUpdater {
                             "raids.objectifs.poids (tours)"}),
             39, List.<String[]>of(
                     new String[]{"(?m)^" + java.util.regex.Pattern.quote("    modeles: [valarian_conquest:bandit_camp, valarian_conquest:aegis_camp]   # camps des mods (un au hasard, sans occupants, coffres vidés) ; [] ou absents : camp du plugin") + "$", "    modeles: [valarian_conquest:bandit_camp]   # camp sur la terre ferme : gabarit d'un mod (un au hasard, sans occupants, coffres vidés) ; [] : camp du plugin",
-                            "raids.camp.modeles (camp de bandits seul)"}));
+                            "raids.camp.modeles (camp de bandits seul)"}),
+            40, List.<String[]>of(
+                    questValue("ECHO_SHARD, base-amount: 1, min-level: 4", "ECHO_SHARD, base-amount: 1, value: 10, min-level: 4", "beatrice"),
+                    questValue("ENDER_PEARL, base-amount: 8", "ENDER_PEARL, base-amount: 8, value: 1.5", "geralt"),
+                    questValue("CHORUS_FRUIT, base-amount: 32", "CHORUS_FRUIT, base-amount: 32, value: 0.25", "harold"),
+                    questValue("SHULKER_SHELL, base-amount: 2, min-level: 2", "SHULKER_SHELL, base-amount: 2, value: 12, min-level: 2", "harold"),
+                    questValue("DRAGON_BREATH, base-amount: 2, min-level: 3", "DRAGON_BREATH, base-amount: 2, value: 4, min-level: 3", "harold"),
+                    questValue("ECHO_SHARD, base-amount: 2, min-level: 4", "ECHO_SHARD, base-amount: 2, value: 10, min-level: 4", "harold"),
+                    questValue("\"toughasnails:cactus_juice\", base-amount: 3, value: 3.5, min-level: 2",
+                            "\"toughasnails:cactus_juice\", base-amount: 3, value: 2.25, min-level: 2", "robinson")));
+
+    /**
+     * Entrée d'un item-pool de quête (« - {material: …} ») réécrite : la ligne exacte seulement,
+     * pour ne pas toucher aux entrées voisines qui commencent pareil (« sans-mod », autre niveau).
+     */
+    private static String[] questValue(String before, String after, String npc) {
+        return new String[]{"(?m)^" + Pattern.quote("        - {material: " + before + "}") + "$",
+                "        - {material: " + after + "}", npc + ".quests (valeur de " + before.split(",")[0].replace("\"", "") + ")"};
+    }
 
     private ConfigUpdater() {}
 

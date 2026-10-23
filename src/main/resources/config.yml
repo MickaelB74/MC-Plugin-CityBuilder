@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 39
+config-version: 40
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -1199,7 +1199,7 @@ beatrice:
       item-pool:
         - {material: EMERALD, base-amount: 24, min-level: 2}
         - {material: DIAMOND, base-amount: 3, min-level: 2}
-        - {material: ECHO_SHARD, base-amount: 1, min-level: 4}
+        - {material: ECHO_SHARD, base-amount: 1, value: 10, min-level: 4}
       entity-pool:
         - {entity: VINDICATOR, base-amount: 3, value: 8}
         - {entity: EVOKER, base-amount: 1, value: 20, min-level: 3}
@@ -1733,7 +1733,7 @@ geralt:
       objectives-count: 2
       item-pool:
         - {material: BLAZE_ROD, base-amount: 6}
-        - {material: ENDER_PEARL, base-amount: 8}
+        - {material: ENDER_PEARL, base-amount: 8, value: 1.5}
         - {material: PHANTOM_MEMBRANE, base-amount: 6}
         - {material: SPIDER_EYE, base-amount: 16}
         - {material: GHAST_TEAR, base-amount: 2, min-level: 3}
@@ -1835,11 +1835,11 @@ harold:
       xp-reward-per-level: 70
       objectives-count: 2
       item-pool:
-        - {material: CHORUS_FRUIT, base-amount: 32}
-        - {material: SHULKER_SHELL, base-amount: 2, min-level: 2}
-        - {material: DRAGON_BREATH, base-amount: 2, min-level: 3}
+        - {material: CHORUS_FRUIT, base-amount: 32, value: 0.25}
+        - {material: SHULKER_SHELL, base-amount: 2, value: 12, min-level: 2}
+        - {material: DRAGON_BREATH, base-amount: 2, value: 4, min-level: 3}
         - {material: "dmr:dragon_egg", base-amount: 1, value: 200, min-level: 3}
-        - {material: ECHO_SHARD, base-amount: 2, min-level: 4}
+        - {material: ECHO_SHARD, base-amount: 2, value: 10, min-level: 4}
       entity-pool:
         - {entity: PHANTOM, base-amount: 8, value: 4}
         - {entity: ENDERMAN, base-amount: 6, value: 4, min-level: 2}
@@ -1929,7 +1929,7 @@ robinson:
       objectives-count: 2
       item-pool:
         - {material: "toughasnails:purified_water_bottle", base-amount: 4, value: 1.2}
-        - {material: "toughasnails:cactus_juice", base-amount: 3, value: 3.5, min-level: 2}
+        - {material: "toughasnails:cactus_juice", base-amount: 3, value: 2.25, min-level: 2}
         - {material: "toughasnails:iron_purified_water_canteen", base-amount: 1, value: 20, min-level: 4}
       entity-pool:
         - {entity: HUSK, base-amount: 10, value: 2}
