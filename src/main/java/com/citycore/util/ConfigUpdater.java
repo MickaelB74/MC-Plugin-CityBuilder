@@ -85,6 +85,7 @@ public final class ConfigUpdater {
      * 40 : quêtes sans valeur avec Iron's Spells (Gandalf ne rachète plus les objets de l'End) :
      *      valeur fixe, celle de son rachat, pour Béatrice, Geralt et Harold ; jus de cactus de
      *      Robinson à 2,25 (3,5 : rentable en achetant eau purifiée, sucre et cactus).
+     * 41 : sièges tous les jours à 22 h (au lieu du mercredi et du samedi à 21 h).
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -200,7 +201,11 @@ public final class ConfigUpdater {
                     questValue("DRAGON_BREATH, base-amount: 2, min-level: 3", "DRAGON_BREATH, base-amount: 2, value: 4, min-level: 3", "harold"),
                     questValue("ECHO_SHARD, base-amount: 2, min-level: 4", "ECHO_SHARD, base-amount: 2, value: 10, min-level: 4", "harold"),
                     questValue("\"toughasnails:cactus_juice\", base-amount: 3, value: 3.5, min-level: 2",
-                            "\"toughasnails:cactus_juice\", base-amount: 3, value: 2.25, min-level: 2", "robinson")));
+                            "\"toughasnails:cactus_juice\", base-amount: 3, value: 2.25, min-level: 2", "robinson")),
+            41, List.<String[]>of(
+                    new String[]{"(?m)^" + Pattern.quote("    - {type: siege, jours: [mercredi, samedi], heure: \"21:00\", joueurs-min: 2}") + "$",
+                            "    - {type: siege, jours: [tous], heure: \"22:00\", joueurs-min: 2}",
+                            "evenements.planning (siège tous les jours à 22 h)"}));
 
     /**
      * Entrée d'un item-pool de quête (« - {material: …} ») réécrite : la ligne exacte seulement,

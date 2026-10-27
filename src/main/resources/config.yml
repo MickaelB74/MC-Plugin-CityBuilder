@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 40
+config-version: 41
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -2645,7 +2645,7 @@ evenements:
   fuseau: "Europe/Paris"   # fuseau horaire des heures du planning
   annonce-minutes: 5       # annonce avant le début
   planning:
-    - {type: siege, jours: [mercredi, samedi], heure: "21:00", joueurs-min: 2}
+    - {type: siege, jours: [tous], heure: "22:00", joueurs-min: 2}
 
 # ============================================================
 #  SIÈGES (phase 4) — vagues d'assaillants contre la ville : monstres, ou armée ennemie
