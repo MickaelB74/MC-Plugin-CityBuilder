@@ -86,6 +86,8 @@ public final class ConfigUpdater {
      *      valeur fixe, celle de son rachat, pour Béatrice, Geralt et Harold ; jus de cactus de
      *      Robinson à 2,25 (3,5 : rentable en achetant eau purifiée, sucre et cactus).
      * 41 : sièges tous les jours à 22 h (au lieu du mercredi et du samedi à 21 h).
+     * 42 : dialogues.taille-police (répliques sur deux lignes à la taille de la police Unicode
+     *      forcée) s'ajoute en tête de la section dialogues.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(
@@ -205,7 +207,11 @@ public final class ConfigUpdater {
             41, List.<String[]>of(
                     new String[]{"(?m)^" + Pattern.quote("    - {type: siege, jours: [mercredi, samedi], heure: \"21:00\", joueurs-min: 2}") + "$",
                             "    - {type: siege, jours: [tous], heure: \"22:00\", joueurs-min: 2}",
-                            "evenements.planning (siège tous les jours à 22 h)"}));
+                            "evenements.planning (siège tous les jours à 22 h)"}),
+            42, List.<String[]>of(
+                    new String[]{"(?m)^dialogues:[ \\t]*$",
+                            "dialogues:\n  taille-police: 6   # avec le pack : hauteur des lettres (4 à 8) ; 6 = comme l’option du jeu « Forcer la police Unicode », 8 = police classique",
+                            "dialogues.taille-police (répliques à la taille de la police Unicode)"}));
 
     /**
      * Entrée d'un item-pool de quête (« - {material: …} ») réécrite : la ligne exacte seulement,

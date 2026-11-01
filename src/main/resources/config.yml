@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 41
+config-version: 42
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -3142,6 +3142,7 @@ batiments:
 #  personnage repris à chaque fois.
 # ============================================================
 dialogues:
+  taille-police: 6   # avec le pack : hauteur des lettres (4 à 8) ; 6 = comme l’option du jeu « Forcer la police Unicode », 8 = police classique
   largeur: 58   # sans le pack : caractères au plus par morceau (interface à l’échelle 4 en 1080p : environ 75)
   largeur-pixels: 400   # avec le pack : largeur d’une ligne en pixels d’interface (écran à l’échelle 4 en 1080p : 479)
 

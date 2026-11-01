@@ -25,7 +25,7 @@ import java.util.Map;
  * Répliques des PNJ sur deux lignes dans la barre d'action, pour les joueurs équipés du pack.
  *
  * La barre d'action n'affiche qu'une ligne. Chaque ligne est écrite dans une copie de la police
- * classique du jeu, la deuxième abaissée de {@link #LINE_STEP} px ({@code citycore:dialogue_0} et
+ * classique du jeu, la deuxième abaissée d'une ligne ({@code citycore:dialogue_0} et
  * {@code citycore:dialogue_1} : mêmes textures que la police par défaut, rien n'est copié). Le jeu
  * refuse d'élever une police (ascent plus grand que la hauteur) : on ne peut que descendre, et deux
  * lignes tiennent entre la barre d'action et les cœurs / l'armure. Une réplique plus longue passe
@@ -33,6 +33,11 @@ import java.util.Map;
  *
  * La première ligne a aussi sa copie : la police par défaut du client peut être remplacée (police
  * Unicode forcée, pack ou mod de polices), et ses largeurs ne seraient plus celles de la table.
+ *
+ * Taille des lettres (dialogues.taille-police) : 8 = police classique ; plus petit, les copies sont
+ * réduites pour ressembler au reste du texte d'un client en police Unicode forcée (6 : majuscules de
+ * 5 px comme elle, net à l'échelle d'interface 4). Le serveur ne connaît pas l'option du client :
+ * la taille vaut pour tous les joueurs, et les largeurs sont recalculées comme le jeu les calcule.
  *
  * Mise en page d'une machine à écrire : les lignes partent du même bord gauche et les lettres
  * apparaissent l'une après l'autre ; le bloc est centré sur sa largeur définitive (la plus longue
@@ -45,10 +50,32 @@ public final class UiDialogue {
 
     /** Lignes par page (au-delà, la troisième passerait sur l'armure et les cœurs). */
     public static final int LINES = 2;
-    /** Écart entre deux lignes (hauteur d'une ligne de la police du jeu + 1). */
-    static final int LINE_STEP = 10;
     /** Police de la deuxième ligne. */
     static final Key LINE2_FONT = Key.key(UiAtlas.NS, "dialogue_1");
+    /** Hauteur des lettres de la police classique du jeu, en pixels d'interface. */
+    private static final int BASE_SIZE = 8;
+    /** Fournisseur « space » de la police du jeu (include/space) : avances fixes, non mises à l'échelle par le jeu. */
+    private static final Map<Integer, Integer> SPACES = Map.of((int) ' ', 4, 0x200C, 0);
+
+    /** Hauteur des lettres des répliques (dialogues.taille-police, 4 à 8 ; 8 = police classique). */
+    static int fontSize(JavaPlugin plugin) {
+        return Math.max(4, Math.min(BASE_SIZE, plugin.getConfig().getInt("dialogues.taille-police", 6)));
+    }
+
+    /** Écart entre deux lignes : hauteur des lettres + 2 (10 pour la police classique). */
+    private static int lineStep(int size) {
+        return size + 2;
+    }
+
+    /** Hauteur réduite d'un fournisseur bitmap (ses cases gardent leurs proportions). */
+    private static int scaledHeight(int height, int size) {
+        return Math.max(1, (int) Math.round(height * (double) size / BASE_SIZE));
+    }
+
+    /** Hauteur au-dessus de la ligne de base, réduite d'autant (arrondie vers le bas : lettres posées sur la ligne). */
+    private static int scaledAscent(int ascent, int size) {
+        return (int) Math.floor(ascent * (double) size / BASE_SIZE);
+    }
 
     /** Police de la ligne {@code index} (0 = première) : copie de la police du jeu, abaissée d'autant de lignes. */
     static Key lineFont(int index) {
@@ -71,8 +98,31 @@ public final class UiDialogue {
         this.atlas = atlas;
         this.pack  = pack;
         JsonObject table = read(plugin);
+        int size = fontSize(plugin);
+        // Échelle du fournisseur de chaque caractère (le premier qui l'a gagne, comme dans le jeu)
+        Map<Integer, Float> scales = new HashMap<>();
+        for (JsonElement el : table.getAsJsonArray("providers")) {
+            JsonObject src = el.getAsJsonObject();
+            int height = src.get("height").getAsInt();
+            float scale = (float) scaledHeight(height, size) / (float) height; // en float, comme le jeu
+            for (JsonElement row : src.getAsJsonArray("chars")) {
+                row.getAsString().codePoints().forEach(cp -> scales.putIfAbsent(cp, scale));
+            }
+        }
         for (Map.Entry<String, JsonElement> e : table.getAsJsonObject("advances").entrySet()) {
-            advances.put(e.getKey().codePointAt(0), e.getValue().getAsInt());
+            int cp = e.getKey().codePointAt(0);
+            int advance = e.getValue().getAsInt();
+            Integer space = SPACES.get(cp);
+            Float scale = scales.get(cp);
+            if (size == BASE_SIZE) {
+                advances.put(cp, advance);
+            } else if (space != null) {
+                advances.put(cp, (int) Math.round(space * (double) size / BASE_SIZE));
+            } else if (scale != null) {
+                // Comme le jeu : largeur réelle du glyphe × échelle, arrondie, + 1. Les cases de la
+                // police d'origine sont à l'échelle 1 : largeur réelle = avance de la table − 1
+                advances.put(cp, (int) (0.5 + (double) ((float) (advance - 1) * scale)) + 1);
+            }
         }
     }
 
@@ -104,19 +154,29 @@ public final class UiDialogue {
                     + ") : répliques des PNJ sur une ligne.");
             return fonts;
         }
+        int size = fontSize(plugin);
         for (int line = 0; line < LINES; line++) {
             JsonArray providers = new JsonArray();
             JsonObject space = new JsonObject();
-            space.addProperty("type", "reference");
-            space.addProperty("id", "minecraft:include/space");
+            if (size == BASE_SIZE) {
+                space.addProperty("type", "reference");
+                space.addProperty("id", "minecraft:include/space");
+            } else {
+                // Espaces réduits comme les lettres (le fournisseur du jeu a des avances fixes)
+                JsonObject spaceAdvances = new JsonObject();
+                SPACES.forEach((cp, advance) -> spaceAdvances.addProperty(new String(Character.toChars(cp)),
+                        (int) Math.round(advance * (double) size / BASE_SIZE)));
+                space.addProperty("type", "space");
+                space.add("advances", spaceAdvances);
+            }
             providers.add(space);
             for (JsonElement el : table.getAsJsonArray("providers")) {
                 JsonObject src = el.getAsJsonObject();
                 JsonObject p = new JsonObject();
                 p.addProperty("type", "bitmap");
                 p.addProperty("file", src.get("file").getAsString());
-                p.addProperty("height", src.get("height").getAsInt());
-                p.addProperty("ascent", src.get("ascent").getAsInt() - line * LINE_STEP);
+                p.addProperty("height", scaledHeight(src.get("height").getAsInt(), size));
+                p.addProperty("ascent", scaledAscent(src.get("ascent").getAsInt(), size) - line * lineStep(size));
                 p.add("chars", src.get("chars"));
                 providers.add(p);
             }

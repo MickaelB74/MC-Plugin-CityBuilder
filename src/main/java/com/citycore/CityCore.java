@@ -75,9 +75,14 @@ public class CityCore extends JavaPlugin {
         // ── Configuration : remplace un config.yml d'une version antérieure ──
         ConfigUpdater.ensureUpToDate(this);
 
+        // ── Réinitialisation demandée (/city restart) : partie archivée avant d'ouvrir la base ──
+        com.citycore.prologue.GameReset gameReset = new com.citycore.prologue.GameReset(this);
+        gameReset.applyIfRequested();
+
         // ── Base de données ──────────────────────────────────────
         databaseManager = new DatabaseManager(this);
         databaseManager.openDatabase();
+        gameReset.restorePrefs(databaseManager); // base neuve : préférences des joueurs reprises
 
         // ── Vault ────────────────────────────────────────────────
         economy = setupEconomy();
@@ -300,6 +305,13 @@ public class CityCore extends JavaPlugin {
             return at.clone();
         });
 
+        // ── Prologue : coffre de départ, quête commune « Le dernier artefact de Valmont », fondation par la clé ──
+        com.citycore.prologue.PrologueManager prologue =
+                new com.citycore.prologue.PrologueManager(this, databaseManager, cityManager, npcManager);
+        prologue.setForbiddenWorld(raids::isRaidWorld); // monde des raids : recréé à chaque démarrage
+        getServer().getPluginManager().registerEvents(prologue, this);
+        prologue.start();
+
         // ── Emplois : les habitants travaillent pour les artisans (annexes de travail) ──
         jobs = new com.citycore.jobs.JobsManager(this, buildingManager, buildingInspector, npcDataManager, market, inhabitants);
         jobs.start();
@@ -464,6 +476,7 @@ public class CityCore extends JavaPlugin {
         // Suivi « accroché » : panneau « Quêtes » de la liste des joueurs, renvoyée à chaque progression
         questHUD.setTabRefresher(cityHUD::updatePlayer);
         questHUD.setRaid(raids::hudRows, raids::hudLines); // expédition en cours : défiance et objectifs
+        questHUD.setPrologue(prologue::hudRows, prologue::hudLines); // avant la fondation : le dernier artefact
         cityHUD.setQuests(questHUD);
         questHUD.startUpdating();
 
@@ -523,6 +536,8 @@ public class CityCore extends JavaPlugin {
         cityCommand.setMapExport(mapExport);
         com.citycore.raid.RaidCommands raidCommands = new com.citycore.raid.RaidCommands(raids);
         cityCommand.setRaids(raidCommands);
+        // Coffre de départ, /city start, fondation ; /city restart + /city confirm (réinitialisation)
+        cityCommand.setPrologue(prologue, gameReset, raids::blocksSiege);
         // Phase 0 du plan « Valmont vivante » : prototype temporaire (/city proto)
         prototype = new com.citycore.debug.NpcPrototype(this, cityManager);
         getServer().getPluginManager().registerEvents(prototype, this);
@@ -550,7 +565,14 @@ public class CityCore extends JavaPlugin {
                 new ChunkListener(cityManager, npcManager, cityHUD, this, findNpcQuestManager), this);
 
         // ── Restauration NPCs ─────────────────────────────────────
-        Bukkit.getScheduler().runTaskLater(this, () -> npcManager.restoreNPCs(), 20L);
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            // Partie effacée : PNJ de l'ancienne Valmont restés chez Citizens (arrêt brutal), retirés
+            if (gameReset.applied()) {
+                int removed = com.citycore.prologue.GameReset.destroyCityNpcs(npcManager);
+                if (removed > 0) getLogger().info("Réinitialisation : " + removed + " PNJ de l'ancienne partie retiré(s).");
+            }
+            npcManager.restoreNPCs();
+        }, 20L);
 
         NPCCityArrivalTask arrivalTask = new NPCCityArrivalTask(npcManager, npcDataManager, cityManager,
                 this, buildingManager, notificationManager, findNpcQuestManager);

@@ -9,8 +9,15 @@ import static com.citycore.command.CityPermissions.*;
 public enum CitySubCommand {
 
     // Droits : voir Rights plus bas. Sans droits précisés, une sous-commande est réservée à citycore.admin.
-    CREATE("create",   "create",                          "Faire renaître Valmont ici (fondation)",
+    CREATE("create",   "create [starterchest]",
+            "Faire renaître Valmont ici (fondation directe) ; starterchest : cacher le coffre de la clé (avant /city start)",
             Rights.admin(ADMIN_VILLE)),
+    START("start",     "start",                           "Lancer l'aventure : quête commune « Le dernier artefact de Valmont »",
+            Rights.admin(ADMIN_VILLE).alsoConsole(), "commencer"),
+    RESTART("restart", "restart",                         "Réinitialiser le jeu : Valmont effacée (sauvegarde), serveur arrêté ; à confirmer",
+            Rights.admin(ADMIN).alsoConsole(), "reinitialiser", "réinitialiser"),
+    CONFIRM("confirm", "confirm",                         "Confirmer l'action demandée (restart)",
+            Rights.admin(ADMIN).alsoConsole(), "confirmer"),
     CLAIM("claim",     "claim",                           "Claim le chunk actuel",
             Rights.admin(ADMIN_VILLE).npc("Placez-vous sur la parcelle voulue (demandez à §6Alderic §7de vous suivre),"
                     + "\nparlez-lui, puis §fclic gauche §7sur la barre « Parcelles » de son menu.")),

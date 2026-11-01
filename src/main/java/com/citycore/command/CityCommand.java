@@ -143,6 +143,22 @@ public class CityCommand implements CommandExecutor {
         this.raids = raids;
     }
 
+    /** Prologue (coffre de départ, /city start, fondation) et réinitialisation (/city restart, /city confirm). */
+    private com.citycore.prologue.PrologueManager prologue;
+    private com.citycore.prologue.GameReset       gameReset;
+    /** Ce qui empêche une réinitialisation (expédition en cours), ou null. */
+    private Supplier<String> resetBlocker = () -> null;
+    /** /city restart en attente de /city confirm : demandeur → limite (ms). */
+    private final Map<String, Long> restartRequests = new java.util.HashMap<>();
+    private static final long CONFIRM_DELAY_MS = 30_000;
+
+    public void setPrologue(com.citycore.prologue.PrologueManager prologue,
+                            com.citycore.prologue.GameReset gameReset, Supplier<String> resetBlocker) {
+        this.prologue     = prologue;
+        this.gameReset    = gameReset;
+        this.resetBlocker = resetBlocker;
+    }
+
     /** Prototype de la phase 0 (/city proto) : PNJ blessables, foule, combat. Temporaire. */
     private com.citycore.debug.NpcPrototype prototype;
 
@@ -287,18 +303,79 @@ public class CityCommand implements CommandExecutor {
 
                 // ── /city create ─────────────────────────────────
                 case CREATE -> {
+                    // /city create starterchest : cacher le coffre de la clé (prologue)
+                    if (args.length >= 2 && args[1].equalsIgnoreCase("starterchest")) {
+                        if (prologue == null) sender.sendMessage("§c❌ Prologue indisponible.");
+                        else prologue.placeChest(player);
+                        return true;
+                    }
                     if (cityManager.isCityInitialized()) {
                         player.sendMessage("§c❌ La ville existe déjà.");
                         return true;
                     }
-                    // La ville est Valmont, qui renaît de ses cendres : pas de nom à saisir
-                    String cityName = CITY_NAME;
-                    cityManager.initializeCity(cityName);
-                    cityManager.claimChunk(player.getLocation().getChunk());
-                    npcManager.spawnMayor(player);
-                    player.sendMessage("§6🏰 §e" + cityName + " §6renaît de ses cendres !");
+                    // La ville est Valmont, qui renaît de ses cendres : pas de nom à saisir.
+                    // Même fondation que la clé du prologue (qui se termine ici s'il était en cours)
+                    if (prologue != null) {
+                        prologue.found(player.getLocation().getChunk(), null, player);
+                    } else {
+                        cityManager.initializeCity(CITY_NAME);
+                        cityManager.claimChunk(player.getLocation().getChunk());
+                        npcManager.spawnMayor(player);
+                    }
+                    player.sendMessage("§6🏰 §e" + CITY_NAME + " §6renaît de ses cendres !");
                     player.sendMessage("§a📍 Chunk de départ claim.");
                     player.sendMessage("§7👴 Le §6Maire §7est apparu devant vous.");
+                }
+
+                // ── /city start : quête commune d'ouverture (coffre de départ déjà caché) ──
+                case START -> {
+                    if (prologue == null) sender.sendMessage("§c❌ Prologue indisponible.");
+                    else prologue.begin(sender);
+                }
+
+                // ── /city restart : réinitialisation du jeu, à confirmer (/city confirm) ──
+                case RESTART -> {
+                    if (gameReset == null) {
+                        sender.sendMessage("§c❌ Réinitialisation indisponible.");
+                        return true;
+                    }
+                    String blocked = resetBlocker.get();
+                    if (blocked != null) {
+                        sender.sendMessage("§c❌ Réinitialisation impossible : " + blocked + ". §7Arrêtez-la d'abord.");
+                        return true;
+                    }
+                    restartRequests.put(sender.getName(), System.currentTimeMillis() + CONFIRM_DELAY_MS);
+                    sender.sendMessage("§8§m--------------------");
+                    sender.sendMessage("§c⚠ Réinitialiser le jeu : Valmont sera entièrement effacée.");
+                    sender.sendMessage("§7Effacés : la ville et ses parcelles, les bâtiments, tous les PNJ (maire, artisans,"
+                            + " habitants, garde), les quêtes et la progression, niveaux et métiers des joueurs,"
+                            + " historique des sièges et des raids, le coffre de départ.");
+                    sender.sendMessage("§7Conservés : les constructions du monde, les inventaires et l'argent des joueurs,"
+                            + " leurs préférences d'affichage. L'ancienne base est rangée dans §fplugins/CityCore/sauvegardes§7.");
+                    sender.sendMessage("§7Le serveur s'arrête : §frelancez-le§7, puis cachez le coffre de départ"
+                            + " (§f/city create starterchest§7) avant §f/city start§7.");
+                    sender.sendMessage("§eTapez §f/city confirm §edans les 30 secondes pour confirmer.");
+                    sender.sendMessage("§8§m--------------------");
+                }
+
+                // ── /city confirm : confirme le /city restart en attente ──
+                case CONFIRM -> {
+                    Long until = restartRequests.remove(sender.getName());
+                    if (until == null || System.currentTimeMillis() > until) {
+                        sender.sendMessage("§c❌ Rien à confirmer. §7(/city restart d'abord ; la confirmation vaut 30 secondes)");
+                        return true;
+                    }
+                    String blocked = resetBlocker.get();
+                    if (blocked != null) {
+                        sender.sendMessage("§c❌ Réinitialisation impossible : " + blocked + ". §7Arrêtez-la d'abord.");
+                        return true;
+                    }
+                    boolean started = gameReset.request(sender.getName(), () -> {
+                        if (prologue != null) prologue.removeChest(); // il garde encore la clé
+                        int removed = com.citycore.prologue.GameReset.destroyCityNpcs(npcManager);
+                        plugin.getLogger().info("Réinitialisation : " + removed + " PNJ de la ville retiré(s).");
+                    });
+                    if (!started) sender.sendMessage("§c❌ Réinitialisation impossible : voir la console.");
                 }
 
                 // ── /city claim (admin ; joueurs : barre « Parcelles » d'Alderic) ──

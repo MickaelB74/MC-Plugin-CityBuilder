@@ -84,7 +84,7 @@ public class CityTabCompleter implements TabCompleter {
             return switch (args[0].toLowerCase()) {
                 case "deposit"  -> List.of("100", "500", "1000", "5000");
                 case "niveau", "level", "palier", "chapitre" -> List.of("monter", "descendre", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
-                case "create"   -> new ArrayList<>(); // la ville s'appelle Valmont : rien à saisir
+                case "create"   -> List.of("starterchest"); // la ville s'appelle Valmont : seul le coffre de départ
                 case "npc"      -> java.util.stream.Stream.concat(java.util.stream.Stream.of("tous"), Arrays.stream(CityNPC.values())
                         .filter(n -> n != CityNPC.MAYOR)
                         .map(n -> n.tag.replace("citycore_", "")))

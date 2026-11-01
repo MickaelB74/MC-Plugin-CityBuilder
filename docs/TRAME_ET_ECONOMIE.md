@@ -14,8 +14,14 @@ dragon noir en est sorti. C'est la **Nuit Noire**.
 
 Les survivants — les artisans qui faisaient la richesse de la ville — se sont dispersés dans
 les terres sauvages. **Alderic**, dernier intendant de Valmont, a sauvé la Charte de la ville.
-Avec les joueurs, il fait **renaître Valmont** : `/city create` fonde la ville sous ce nom,
-sans rien demander.
+Avec les joueurs, il fait **renaître Valmont**. Tout commence par un **prologue** commun : un
+administrateur cache le coffre de départ (`/city create starterchest`), qui ne contient que la
+**Clé de la ville de Valmont** ; `/city start` (administrateurs seulement) lance la quête « Le dernier artefact de Valmont »
+pour tous les joueurs (barre de chaleur, panneau des quêtes). Le joueur qui prend la clé termine la
+quête ; un clic droit avec la clé sur le sol (confirmé par un second) fonde la ville sur ce chunk
+et fait apparaître Alderic. `/city create` reste la fondation directe des administrateurs, et
+`/city restart` + `/city confirm` effacent la partie (base archivée, serveur arrêté) pour repartir
+du coffre de départ.
 
 Le fil rouge suit la progression naturelle de Minecraft, en trois actes et un épilogue :
 

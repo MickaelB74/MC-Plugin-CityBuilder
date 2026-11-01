@@ -18,6 +18,7 @@ import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.EntityTarget;
 import net.citizensnpcs.api.event.DespawnReason;
 import net.citizensnpcs.api.event.NPCDeathEvent;
+import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.npc.MemoryNPCDataStore;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.api.npc.NPCRegistry;
@@ -189,6 +190,8 @@ public class InhabitantManager implements Listener {
     private final Map<Integer, Inhabitant> all = new LinkedHashMap<>();
     private final Map<Integer, NPC> npcs = new HashMap<>();          // habitant → PNJ (créé à la première apparition)
     private final Map<Integer, Long> idleSince = new HashMap<>();    // pause de promenade / de ronde
+    private final Map<Integer, Integer> strolledAt = new HashMap<>(); // dernier passage en promenade (clic droit : nouveau chemin)
+    private final Map<Integer, Long> rerouted = new HashMap<>();     // dernier « nouveau chemin » demandé (double clic ignoré)
     private final Map<Integer, Long> lastShot = new HashMap<>();     // dernier tir d'un archer
     private final Map<Integer, Long> lastSwing = new HashMap<>();    // dernier coup au contact (contre un soldat)
     private final Set<Integer> sleeping = new HashSet<>();
@@ -661,6 +664,8 @@ public class InhabitantManager implements Listener {
         saveDeath(inh);
         sleeping.remove(inh.id);
         idleSince.remove(inh.id);
+        strolledAt.remove(inh.id);
+        rerouted.remove(inh.id);
         awaySince.remove(inh.id);
         removeTimer(inh.id);
         Building home = homes.get(inh.buildingId);
@@ -1112,6 +1117,8 @@ public class InhabitantManager implements Listener {
         sleeping.remove(inh.id);
         asleep.remove(inh.id);
         idleSince.remove(inh.id);
+        strolledAt.remove(inh.id);
+        rerouted.remove(inh.id);
         awaySince.remove(inh.id);
         bedSince.remove(inh.id);
         offPostSince.remove(inh.id);
@@ -1208,6 +1215,7 @@ public class InhabitantManager implements Listener {
         // Le jour : il se lève et flâne autour de sa maison
         bedSince.remove(inh.id);
         wake(inh, npc);
+        strolledAt.put(inh.id, ticks); // en promenade : un clic droit lui fait prendre un autre chemin
         if (walking) { idleSince.remove(inh.id); return; }
         long idle = idleSince.computeIfAbsent(inh.id, k -> now);
         long pause = strollPause / 2 + (strollPause == 0 ? 0 : Math.floorMod(inh.id * 7919L, strollPause));
@@ -2143,6 +2151,37 @@ public class InhabitantManager implements Listener {
         Object id = event.getNPC().data().get(NPC_KEY);
         Inhabitant inh = id instanceof Integer i ? all.get(i) : null;
         if (inh != null && inh.alive()) die(inh);
+    }
+
+    /**
+     * Clic droit sur un habitant en promenade (le jour, en ville) : il abandonne son chemin et en
+     * prend un nouveau, même pendant une pause. De quoi débloquer à la main un habitant coincé
+     * (mur, trou, porte) ; au travail, à la garde, de nuit ou hors de la ville, le clic ne fait rien.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onRightClick(NPCRightClickEvent event) {
+        if (registry == null || event.getNPC().getOwningRegistry() != registry) return;
+        NPC npc = event.getNPC();
+        Object id = npc.data().get(NPC_KEY);
+        Inhabitant inh = id instanceof Integer i ? all.get(i) : null;
+        Integer at = inh == null ? null : strolledAt.get(inh.id);
+        // Promenade au dernier passage (deux par seconde), sinon autre chose en cours
+        if (at == null || ticks - at > 1 || !inh.alive() || !npc.isSpawned() || inh.bed() == null) return;
+        long now = System.currentTimeMillis();
+        Long last = rerouted.get(inh.id);
+        if (last != null && now - last < 1000) return; // même clic reçu deux fois
+        rerouted.put(inh.id, now);
+
+        // Sans message : le joueur voit l'habitant repartir (ou rester sur place s'il n'a aucun chemin,
+        // la promenade réessaiera après sa pause)
+        npc.getNavigator().cancelNavigation();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Location target = randomSpot(inh.bed(), strollRadius);
+            if (target != null && SafeNavigation.walkTo(npc, target, walkSpeed, false) == SafeNavigation.Result.WALKING) {
+                idleSince.remove(inh.id);
+                return;
+            }
+        }
     }
 
     /** Ni butin, ni expérience, ni message de mort dans le chat (un PNJ de type joueur meurt comme un joueur). */

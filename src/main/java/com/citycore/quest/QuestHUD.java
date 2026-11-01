@@ -123,6 +123,15 @@ public class QuestHUD {
         this.raidLines = lines;
     }
 
+    /** Prologue (« Le dernier artefact de Valmont ») : tout en tête du suivi avant la fondation, vide ensuite. */
+    private Function<Player, List<UiHud.Row>> prologueRows = p -> List.of();
+    private Function<Player, List<String>> prologueLines = p -> List.of();
+
+    public void setPrologue(Function<Player, List<UiHud.Row>> rows, Function<Player, List<String>> lines) {
+        this.prologueRows = rows;
+        this.prologueLines = lines;
+    }
+
     private boolean hiddenByMod(CityNPC npc) {
         return integrations != null && !integrations.isAvailable(npc);
     }
@@ -379,7 +388,8 @@ public class QuestHUD {
     private List<String> buildLines(Player player) {
         UUID uuid  = player.getUniqueId();
         Set<String> hidden = untracked(player);
-        List<String> lines = new ArrayList<>(raidLines.apply(player)); // expédition en cours d'abord
+        List<String> lines = new ArrayList<>(prologueLines.apply(player)); // quête commune d'ouverture
+        lines.addAll(raidLines.apply(player)); // expédition en cours d'abord
 
         // Une seule requête pour savoir quels PNJ ont une quête active
         Set<String> active = questManager.getActiveQuestKeys(uuid);
@@ -555,7 +565,8 @@ public class QuestHUD {
     private List<UiHud.Row> buildRows(Player player, int maxRows) {
         UUID uuid = player.getUniqueId();
         Set<String> hidden = untracked(player);
-        List<UiHud.Row> rows = new ArrayList<>(raidRows.apply(player)); // expédition en cours d'abord
+        List<UiHud.Row> rows = new ArrayList<>(prologueRows.apply(player)); // quête commune d'ouverture
+        rows.addAll(raidRows.apply(player)); // expédition en cours d'abord
         Set<String> active = questManager.getActiveQuestKeys(uuid);
         if (active.isEmpty()) return rows;
 

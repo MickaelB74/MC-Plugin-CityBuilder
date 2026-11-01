@@ -20,7 +20,7 @@ permissions:
     description: "Commandes de joueur : infos, bordures, progression, journal de quêtes, style des menus, consultations (habitants, garde, emplois, siège, événements), inspection des bâtiments"
     default: true
   citycore.admin:
-    description: "Tout CityCore : administration et actions de test (dont /city carte)"
+    description: "Tout CityCore : administration et actions de test (dont /city carte), réinitialisation du jeu (/city restart, /city confirm)"
     default: op
     children:
       citycore.player: true
@@ -32,12 +32,12 @@ permissions:
       citycore.admin.habitants: true
       citycore.admin.evenements: true
       citycore.admin.raid: true
-      citycore.admin.raid:
+      citycore.admin.proto: true
+  citycore.admin.raid:
     description: "Raids : essais de pose, emplacements, catalogue, structures inconnues, remise à zéro du monde des raids (/city raid)"
     default: op
-  citycore.admin.proto: true
   citycore.admin.ville:
-    description: "Fondation (create), parcelles (claim, unclaim), agrandissement (expand) et caisse (deposit) en commande, sans Alderic"
+    description: "Coffre de départ (create starterchest), lancement de l'aventure (start), fondation directe (create), parcelles (claim, unclaim), agrandissement (expand) et caisse (deposit) en commande, sans Alderic"
     default: op
   citycore.admin.batiments:
     description: "Bâtiments en commande : liste, création, type, suppression (dont « all »), installation d'un artisan, hauteur"
