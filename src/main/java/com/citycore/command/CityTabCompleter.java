@@ -169,10 +169,10 @@ public class CityTabCompleter implements TabCompleter {
                 case "event", "evenements", "événements" -> admin && args[1].equalsIgnoreCase("start")
                         ? List.of("siege")
                         : new ArrayList<>();
-                // /city garde former <habitant civil> | renvoyer <garde> | kill <garde> (admin)
+                // /city garde former <habitant sans emploi | garde (changement de poste)> | renvoyer <en formation> | kill <garde> (admin)
                 case "garde", "guard" -> inhabitants == null ? new ArrayList<String>() : switch (args[1].toLowerCase()) {
-                    case "former", "train" -> guardByCommand ? inhabitants.civilianNames() : new ArrayList<String>();
-                    case "renvoyer", "dismiss" -> guardByCommand ? inhabitants.guardNames() : new ArrayList<String>();
+                    case "former", "train" -> guardByCommand ? inhabitants.trainableNames() : new ArrayList<String>();
+                    case "renvoyer", "dismiss" -> guardByCommand ? inhabitants.traineeNames() : new ArrayList<String>();
                     case "kill", "tuer" -> admin ? inhabitants.guardNames() : new ArrayList<String>();
                     case "test" -> admin ? List.of("1", "5", "10", "retirer") : new ArrayList<String>();
                     default -> new ArrayList<String>();

@@ -215,9 +215,9 @@ public final class SiegeManager implements Listener {
         };
     }
 
-    /** Pendant un siège (si sieges.joueurs-blesses) : cet attaquant peut blesser les joueurs en ville. */
-    public boolean woundsPlayers(Entity damager) {
-        return running() && config.playersWounded() && (isAttacker(damager) || army.isSoldier(damager));
+    /** Pendant un siège, si sieges.joueurs-blesses vaut false : cet attaquant ne blesse pas les joueurs en ville. */
+    public boolean sparesPlayers(Entity damager) {
+        return running() && !config.playersWounded() && (isAttacker(damager) || army.isSoldier(damager));
     }
 
     /** Assaillant d'un siège en cours : monstre d'une vague ou soldat de l'armée ennemie (récits de Musashi). */

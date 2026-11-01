@@ -2,6 +2,7 @@ package com.citycore.npc.mayor;
 
 import com.citycore.building.Building;
 import com.citycore.building.BuildingManager;
+import com.citycore.building.BuildingType;
 import com.citycore.npc.CityNPC;
 import com.citycore.building.BuildingParticleTask;
 import org.bukkit.Bukkit;
@@ -16,19 +17,33 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
+/**
+ * Bâtiments de la ville chez Alderic : seulement les bâtiments principaux (habitations, ateliers,
+ * mairie, divers). Les annexes de travail se créent et se suppriment chez leur artisan (Actions).
+ * Supprimer : bouton de la liste, puis clic sur le bâtiment, puis confirmation.
+ */
 public class MayorBuildingGUI {
 
-    public static final String GUI_TITLE        = ChatColor.DARK_GREEN + "Bâtiments de la ville";
-    public static final String GUI_TITLE_DELETE = ChatColor.DARK_RED   + "Supprimer un bâtiment";
+    public static final String GUI_TITLE         = ChatColor.DARK_GREEN + "Bâtiments de la ville";
+    public static final String GUI_TITLE_DELETE  = ChatColor.DARK_RED   + "Supprimer un bâtiment";
+    /** Confirmation de suppression (menu classique) : préfixe suivi du nom du bâtiment. */
+    public static final String GUI_TITLE_CONFIRM = ChatColor.DARK_RED   + "Supprimer · ";
 
     public static final int SLOT_ADD    = 3;
     public static final int SLOT_DELETE = 5;
     public static final int SLOT_BACK   = 4;
 
+    /** Confirmation (menu classique, 27 cases) : annuler, le bâtiment, confirmer. */
+    private static final int CONFIRM_CANCEL = 11;
+    private static final int CONFIRM_INFO   = 13;
+    private static final int CONFIRM_OK     = 15;
+
     private static final int CONTENT_ROWS = 3;
 
     private final BuildingManager buildingManager;
     private final JavaPlugin      plugin;
+    /** Bâtiment dont la suppression attend confirmation, par joueur (menu classique). */
+    private final java.util.Map<java.util.UUID, Integer> pendingDelete = new java.util.HashMap<>();
     private com.citycore.ui.screens.MayorScreens themed;
 
     void setThemed(com.citycore.ui.screens.MayorScreens themed) {
@@ -50,11 +65,27 @@ public class MayorBuildingGUI {
         this.plugin          = plugin;
     }
 
+    /** Bâtiments gérés par Alderic : tous sauf les annexes de travail (gérées chez leur artisan). */
+    public List<Building> mainBuildings() {
+        return buildingManager.getAllBuildings().stream()
+                .filter(b -> b.type() != BuildingType.ANNEXE).toList();
+    }
+
+    /** Ce qu'entraîne la suppression d'un bâtiment (ligne de la confirmation). */
+    public static String deletionEffect(Building b) {
+        return switch (b.type()) {
+            case HABITATION -> "§cSes habitants quittent la ville.";
+            case ATELIER    -> "§cSon artisan perd son atelier.";
+            case MAIRIE     -> "§cLa ville n'a plus de mairie.";
+            default         -> "§7Rien d'autre ne change.";
+        };
+    }
+
     // ── Menu principal : liste des bâtiments ─────────────────────────────────
 
     public void open(Player player) {
         if (themed != null && themed.openBuildings(player)) return;
-        List<Building> buildings = buildingManager.getAllBuildings();
+        List<Building> buildings = mainBuildings();
 
         Inventory inv = Bukkit.createInventory(null, 36, GUI_TITLE);
 
@@ -112,7 +143,7 @@ public class MayorBuildingGUI {
 
     public void openDelete(Player player) {
         if (themed != null && themed.openDelete(player)) return;
-        List<Building> buildings = buildingManager.getAllBuildings();
+        List<Building> buildings = mainBuildings();
 
         Inventory inv = Bukkit.createInventory(null, 36, GUI_TITLE_DELETE);
 
@@ -130,7 +161,7 @@ public class MayorBuildingGUI {
                                     + " §7→ §f" + b.x2() + "," + b.z2(),
                             "§7NPC  : " + npcDisplayName(b),
                             "",
-                            "§cCliquez pour supprimer"
+                            "§cCliquez pour supprimer §8(confirmation)"
                     )
             ));
         }
@@ -144,6 +175,21 @@ public class MayorBuildingGUI {
         player.openInventory(inv);
     }
 
+    /** Confirmation de la suppression d'un bâtiment (menu classique). */
+    private void openConfirm(Player player, Building b) {
+        pendingDelete.put(player.getUniqueId(), b.id());
+        Inventory inv = Bukkit.createInventory(null, 27, GUI_TITLE_CONFIRM + ChatColor.stripColor(b.name()));
+        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < 27; i++) inv.setItem(i, filler);
+        List<String> effects = List.of("§7Retiré de la ville (ses blocs", "§7restent en place).",
+                deletionEffect(b), "", "§c§lDéfinitif.");
+        inv.setItem(CONFIRM_CANCEL, makeItem(Material.LIME_CONCRETE, "§a◀ Annuler", List.of("§7Le bâtiment est conservé.")));
+        inv.setItem(CONFIRM_INFO, makeItem(b.type().icon, "§c" + b.name(), effects));
+        inv.setItem(CONFIRM_OK, makeItem(Material.RED_CONCRETE, "§c✖ Confirmer la suppression", effects));
+        // Ouvert au tick suivant : appelé pendant le clic sur la liste
+        plugin.getServer().getScheduler().runTask(plugin, () -> player.openInventory(inv));
+    }
+
     // ── Handlers de clic ─────────────────────────────────────────────────────
 
     /**
@@ -153,7 +199,7 @@ public class MayorBuildingGUI {
         // ── Clic sur un bâtiment de la liste (slots 0 à 26) ──────
         // Gauche : bordures ; droit : changer le type (boutons dans le chat) ; Maj : inspection
         if (slot < 27) {
-            List<Building> buildings = buildingManager.getAllBuildings();
+            List<Building> buildings = mainBuildings();
             if (slot >= buildings.size()) return true;
             Building b = buildings.get(slot);
             if (click.isShiftClick()) {
@@ -214,6 +260,7 @@ public class MayorBuildingGUI {
     }
 
     /**
+     * Clic dans la liste de suppression : ouvre la confirmation du bâtiment cliqué.
      * @return true si géré
      */
     public boolean handleDeleteClick(Player player, int slot) {
@@ -222,22 +269,37 @@ public class MayorBuildingGUI {
             return true;
         }
         if (slot < 27) {
-            List<Building> buildings = buildingManager.getAllBuildings();
-            if (slot < buildings.size()) delete(player, buildings.get(slot));
+            List<Building> buildings = mainBuildings();
+            if (slot < buildings.size()) openConfirm(player, buildings.get(slot));
             return true;
         }
         return true;
     }
 
-    /** Supprime un bâtiment puis rouvre la liste de suppression. */
+    /** Clic dans la confirmation (menu classique) : supprimer, ou revenir à la liste de suppression. */
+    public boolean handleConfirmClick(Player player, int slot) {
+        if (slot != CONFIRM_OK && slot != CONFIRM_CANCEL) return true;
+        Integer id = pendingDelete.remove(player.getUniqueId());
+        Building b = id == null ? null : buildingManager.getAllBuildings().stream()
+                .filter(x -> x.id() == id).findFirst().orElse(null);
+        if (slot == CONFIRM_OK && b != null) delete(player, b);
+        else plugin.getServer().getScheduler().runTask(plugin, () -> openDelete(player));
+        return true;
+    }
+
+    /**
+     * Supprime un bâtiment principal (après confirmation) puis rouvre la liste de suppression.
+     * Une annexe de travail est refusée : elle se supprime chez son artisan.
+     */
     public void delete(Player player, Building b) {
-        boolean removed = buildingManager.removeByName(b.name());
-        if (removed) {
+        if (b.type() == BuildingType.ANNEXE) {
+            player.sendMessage("§c❌ Une annexe de travail se supprime chez son artisan (Actions).");
+        } else if (buildingManager.removeByName(b.name())) {
             player.sendMessage("§a✅ Bâtiment §e" + b.name() + " §asupprimé.");
         } else {
             player.sendMessage("§c❌ Erreur lors de la suppression.");
         }
-        openDelete(player);
+        plugin.getServer().getScheduler().runTask(plugin, () -> openDelete(player));
     }
 
     /** Nom du PNJ installé dans un bâtiment (ou « Aucun »). */

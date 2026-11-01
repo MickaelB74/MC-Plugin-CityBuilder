@@ -135,6 +135,12 @@ public class CityCore extends JavaPlugin {
                 buildingInspector, cityManager, npcDataManager, npcManager);
         getServer().getPluginManager().registerEvents(inhabitants, this);
         Bukkit.getScheduler().runTask(this, inhabitants::start);
+        // Portes : les PNJ (artisans, habitants) les ouvrent pour passer et les referment derrière eux
+        com.citycore.npc.DoorAssistant doors = new com.citycore.npc.DoorAssistant(this);
+        doors.addSource(net.citizensnpcs.api.CitizensAPI::getNPCRegistry);
+        doors.addSource(inhabitants::npcList);
+        getServer().getPluginManager().registerEvents(doors, this);
+        doors.start();
 
         getServer().getPluginManager().registerEvents(
                 new BuildingListener(buildingSession, buildingManager, cityManager, buildingCreation), this);
@@ -481,7 +487,7 @@ public class CityCore extends JavaPlugin {
 
         // ── Chunks ────────────────────────────────────────────────
         ClaimProtectionListener claimProtection = new ClaimProtectionListener(cityManager);
-        claimProtection.setSiegeAttacker(siege::woundsPlayers); // siège : les assaillants peuvent blesser les joueurs
+        claimProtection.setSiegeSpares(siege::sparesPlayers); // siège (joueurs-blesses: false) : les assaillants épargnent les joueurs en ville
         getServer().getPluginManager().registerEvents(claimProtection, this);
 
         // ── Commandes ────────────────────────────────────────────

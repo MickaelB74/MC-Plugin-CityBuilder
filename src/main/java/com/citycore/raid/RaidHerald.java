@@ -37,6 +37,7 @@ final class RaidHerald {
         if (skin != null) trait.setSkinPersistent("citycore_heraut", skin[1], skin[0]);
         else trait.setFetchDefaultSkin(false);
         com.citycore.inhabitant.NpcGestures.prepare(npc); // pas de balancement de bras à l'apparition (Epic Fight)
+        com.citycore.npc.NpcNameplates.apply(npc); // nom sur fond noir
         npc.spawn(at);
     }
 

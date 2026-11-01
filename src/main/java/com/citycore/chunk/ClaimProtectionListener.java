@@ -35,9 +35,9 @@ import java.util.Set;
 public class ClaimProtectionListener implements Listener {
 
     private final CityManager cityManager;
-    private final ClaimCache  claims; // chunks de la ville en cache (feu et blocs : événements fréquents)
-    /** Assaillant d'un siège en cours autorisé à blesser les joueurs en ville (sieges.joueurs-blesses). */
-    private java.util.function.Predicate<Entity> siegeAttacker;
+    private final ClaimCache  claims; // chunks de la ville en cache (feu, blocs, dégâts : événements fréquents)
+    /** Assaillant d'un siège en cours qui ne blesse pas les joueurs en ville (sieges.joueurs-blesses: false). */
+    private java.util.function.Predicate<Entity> siegeSpares;
 
     /** Types d'entités qui peuvent exploser. */
     private static final Set<EntityType> EXPLOSIVE_TYPES = Set.of(
@@ -58,14 +58,15 @@ public class ClaimProtectionListener implements Listener {
         this.claims      = new ClaimCache(cityManager);
     }
 
-    public void setSiegeAttacker(java.util.function.Predicate<Entity> siegeAttacker) {
-        this.siegeAttacker = siegeAttacker;
+    public void setSiegeSpares(java.util.function.Predicate<Entity> siegeSpares) {
+        this.siegeSpares = siegeSpares;
     }
 
     /**
-     * Annule TOUS les dégâts subis par un joueur dans un chunk claimé, sauf, pendant un siège (si
-     * sieges.joueurs-blesses), ceux des assaillants : monstres du siège et soldats ennemis.
-     * Couvre : PvE, eau, lave, chute, feu, explosion, poison, etc.
+     * Joueurs dans un chunk claimé : seules les explosions ne les blessent pas (comme pour les
+     * blocs de la ville). Tous les autres dégâts s'appliquent comme ailleurs : monstres, chute,
+     * feu, lave, noyade, poison… Pendant un siège, si sieges.joueurs-blesses vaut false, les
+     * assaillants (monstres du siège et soldats ennemis) ne les blessent pas non plus en ville.
      * Les PNJ Citizens de type joueur (métadonnée « NPC ») ne sont pas concernés : leur
      * protection est réglée par Citizens, et les soldats de la garde doivent pouvoir être blessés.
      */
@@ -73,17 +74,20 @@ public class ClaimProtectionListener implements Listener {
     public void onEntityDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
         if (!(entity instanceof Player) || entity.hasMetadata("NPC")) return;
-        if (siegeAttacker != null) {
-            Entity source = event instanceof EntityDamageByEntityEvent byEntity ? byEntity.getDamager()
-                    : com.citycore.inhabitant.NpcCombat.striking();
-            if (source instanceof Projectile p && p.getShooter() instanceof Entity shooter) source = shooter;
-            if (source != null && siegeAttacker.test(source)) return;
-        }
+        EntityDamageEvent.DamageCause cause = event.getCause();
+        boolean explosion = cause == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                || cause == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION;
+        if (!explosion && !sparedBySiege(event)) return;
+        if (claims.isClaimed(entity.getLocation())) event.setCancelled(true);
+    }
 
-        Chunk chunk = entity.getLocation().getChunk();
-        if (cityManager.isChunkClaimed(chunk)) {
-            event.setCancelled(true);
-        }
+    /** Dégât d'un assaillant de siège qui épargne les joueurs (sieges.joueurs-blesses: false). */
+    private boolean sparedBySiege(EntityDamageEvent event) {
+        if (siegeSpares == null) return false;
+        Entity source = event instanceof EntityDamageByEntityEvent byEntity ? byEntity.getDamager()
+                : com.citycore.inhabitant.NpcCombat.striking();
+        if (source instanceof Projectile p && p.getShooter() instanceof Entity shooter) source = shooter;
+        return source != null && siegeSpares.test(source);
     }
 
     /**

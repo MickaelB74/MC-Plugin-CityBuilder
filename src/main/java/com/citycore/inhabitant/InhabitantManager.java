@@ -123,6 +123,7 @@ public class InhabitantManager implements Listener {
         public Long diedAt;
         public String role;         // rôle de la garde (recrue ou garde), null pour un habitant
         public long trainingLeft;   // ms de formation restantes
+        public String previousRole; // changement de poste en cours (garde formé reparti en formation) : rôle tenu avant
         public int uniform = -1;    // numéro du skin d'uniforme (soldats.skins)
         public boolean test;        // garde de test (commande op) : sans lit, jamais enregistré
         public String employer;     // emploi : artisan pour qui il travaille (tag), null = sans emploi
@@ -135,6 +136,9 @@ public class InhabitantManager implements Listener {
         }
 
         public boolean alive() { return state != State.MORT; }
+
+        /** Garde formé reparti en formation pour un autre rôle : il reste engagé dans la garde. */
+        public boolean changingPost() { return state == State.FORMATION && previousRole != null; }
 
         /** Tête du lit, ou null si le monde n'est pas chargé. */
         public Location bed() {
@@ -162,6 +166,12 @@ public class InhabitantManager implements Listener {
     private static final long SWING_COOLDOWN_MS = 900;
     /** Délai entre deux flèches d'un archer. */
     private static final long BOW_COOLDOWN_MS = 1500;
+    /** Retour au lit : chemin terminé (ou refusé) loin du lit depuis ce délai → téléporté (pas d'accès). */
+    private static final long NO_PATH_MS = 3_000;
+    /** Retour au lit : toujours en route après ce délai (coincé) → téléporté. */
+    private static final long BED_TIMEOUT_MS = 30_000;
+    /** Surveillance des employés : hors de leur poste en journée depuis ce délai → remis au travail. */
+    private static final long WORK_RESCUE_MS = 45_000;
 
     private final JavaPlugin        plugin;
     private final DatabaseManager   db;
@@ -182,8 +192,11 @@ public class InhabitantManager implements Listener {
     private final Map<Integer, Long> lastShot = new HashMap<>();     // dernier tir d'un archer
     private final Map<Integer, Long> lastSwing = new HashMap<>();    // dernier coup au contact (contre un soldat)
     private final Set<Integer> sleeping = new HashSet<>();
+    private final Set<Integer> asleep = new HashSet<>();               // couchés pour de vrai (allongés dans leur lit)
     private final Map<Integer, TextDisplay> timers = new HashMap<>(); // minuteur au-dessus d'une recrue
     private final Map<Integer, Long> awaySince = new HashMap<>();     // recrue pas encore à sa place depuis…
+    private final Map<Integer, Long> bedSince = new HashMap<>();      // la nuit : pas encore couché depuis…
+    private final Map<Integer, Long> offPostSince = new HashMap<>();  // le jour : employé hors de son poste depuis…
     private final Map<Integer, Integer> bedsByBuilding = new HashMap<>(); // lits des habitations conformes (dernier relevé)
     private Map<Integer, Building> homes = new HashMap<>();             // bâtiments par id (relus toutes les 5 s)
     private Building rolandBuilding;                                     // atelier de Roland (formation)
@@ -227,6 +240,7 @@ public class InhabitantManager implements Listener {
     private int     tax = 2;
     private int     maxVisible = 24;
     private boolean nightAttacks = true;
+    private boolean dayAttacks = true;   // le jour aussi (habitants sans emploi comme employés)
 
     private long nextArrivalAt;
     private long lastTaxDay = -1;
@@ -286,6 +300,7 @@ public class InhabitantManager implements Listener {
         tax          = Math.max(0, c.getInt("habitants.impot", 2));
         maxVisible   = Math.max(0, c.getInt("habitants.max-visibles", 24));
         nightAttacks = c.getBoolean("habitants.attaques-nocturnes", true);
+        dayAttacks   = c.getBoolean("habitants.attaques-jour", true);
         skins.reload();
         uniforms.reload();
         guard.reload();
@@ -309,6 +324,7 @@ public class InhabitantManager implements Listener {
                         rs.getInt("bed_z"), state, rs.getLong("arrived_at"), diedAt);
                 inh.role = rs.getString("role");
                 inh.trainingLeft = rs.getLong("training_left");
+                inh.previousRole = rs.getString("previous_role");
                 inh.uniform = rs.getInt("uniform");
                 inh.employer = rs.getString("employer");
                 inh.workLeft = rs.getLong("work_left");
@@ -372,16 +388,17 @@ public class InhabitantManager implements Listener {
         }
     }
 
-    /** État de la garde : statut, rôle, formation restante, uniforme. */
+    /** État de la garde : statut, rôle, formation restante, ancien rôle (changement de poste), uniforme. */
     private void saveGuard(Inhabitant inh) {
         if (inh.test) return;
         try (PreparedStatement ps = db.getConnection().prepareStatement(
-                "UPDATE inhabitants SET state = ?, role = ?, training_left = ?, uniform = ? WHERE id = ?")) {
+                "UPDATE inhabitants SET state = ?, role = ?, training_left = ?, previous_role = ?, uniform = ? WHERE id = ?")) {
             ps.setString(1, inh.state.name());
             ps.setString(2, inh.role);
             ps.setLong(3, inh.trainingLeft);
-            ps.setInt(4, inh.uniform);
-            ps.setInt(5, inh.id);
+            ps.setString(4, inh.previousRole);
+            ps.setInt(5, inh.uniform);
+            ps.setInt(6, inh.id);
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -467,6 +484,7 @@ public class InhabitantManager implements Listener {
         tickTax();
         tickTraining(elapsed);
         tickWork(elapsed);
+        superviseWorkers(now);
         tickVisibility();
         if (now >= nextArrivalAt && !Bukkit.getOnlinePlayers().isEmpty()) {
             double factor = arrivalFactor.getAsDouble();
@@ -660,6 +678,7 @@ public class InhabitantManager implements Listener {
     public String label(Inhabitant inh) {
         GuardConfig.Role role = guard.role(inh.role);
         if (role == null || (inh.state != State.SOLDAT && inh.state != State.FORMATION)) return inh.name;
+        if (inh.changingPost()) return inh.name + ", " + role.name().toLowerCase() + " en formation";
         return inh.name + ", " + (inh.state == State.FORMATION ? "recrue " : "") + role.name().toLowerCase();
     }
 
@@ -681,11 +700,18 @@ public class InhabitantManager implements Listener {
         return guards().size() + trainees().size();
     }
 
-    /** Liste du menu de la garde : gardes, puis recrues, puis habitants civils (qu'on peut former). */
+    /**
+     * Liste du menu de la garde : gardes, puis recrues, puis habitants civils sans emploi (qu'on
+     * peut former), puis ceux qui travaillent pour un artisan (seul leur employeur peut les renvoyer).
+     */
     public List<Inhabitant> guardRoster() {
         List<Inhabitant> list = new ArrayList<>(guards());
         list.addAll(trainees());
-        list.addAll(civilians());
+        List<Inhabitant> employed = new ArrayList<>();
+        for (Inhabitant inh : civilians()) {
+            if (inh.employer == null) list.add(inh); else employed.add(inh);
+        }
+        list.addAll(employed);
         return list;
     }
 
@@ -696,6 +722,19 @@ public class InhabitantManager implements Listener {
         if (guardSize() >= guard.maxGuards(rank)) {
             return "La garde est complète (" + guard.maxGuards(rank) + " au rang " + rank + " de Roland).";
         }
+        if (trainees().size() >= guard.maxTraining(rank)) {
+            return "Roland forme déjà " + guard.maxTraining(rank) + " recrue(s) à la fois.";
+        }
+        return null;
+    }
+
+    /**
+     * Raison pour laquelle un garde ne peut pas changer de poste maintenant, ou null si c'est
+     * possible : il reste dans la garde (sa taille ne change pas), mais occupe une place de formation.
+     */
+    public String canChangePost() {
+        int rank = guardRank();
+        if (rank == 0) return "Roland doit être installé dans son atelier pour former ses gardes.";
         if (trainees().size() >= guard.maxTraining(rank)) {
             return "Roland forme déjà " + guard.maxTraining(rank) + " recrue(s) à la fois.";
         }
@@ -718,25 +757,28 @@ public class InhabitantManager implements Listener {
     }
 
     /**
-     * Forme un habitant civil à un rôle, à l'atelier de Roland. Le menu est commun : n'importe quel
-     * joueur peut lancer une formation, dans la limite du rang de Roland.
+     * Forme un habitant civil sans emploi à un rôle, à l'atelier de Roland ; pour un garde déjà
+     * formé, c'est un changement de poste (voir changePost). Le menu est commun : n'importe quel
+     * joueur peut lancer une formation, dans la limite du rang de Roland. Un employé n'est pas
+     * débauché : seul son artisan peut le renvoyer, il pourra ensuite rejoindre la garde.
      * @return null si c'est fait, sinon la raison du refus
      */
     public String train(int inhabitantId, String roleKey) {
+        Inhabitant inh = all.get(inhabitantId);
+        if (inh != null && inh.state == State.SOLDAT) return changePost(inh, roleKey);
         String blocked = canRecruit();
         if (blocked != null) return blocked;
         int rank = guardRank();
-        Inhabitant inh = all.get(inhabitantId);
         if (inh == null || inh.state != State.HABITANT) return "Cet habitant n'est plus disponible.";
+        CityNPC boss = employerOf(inh);
+        if (boss != null) {
+            return inh.name + " travaille pour " + plainName(boss) + " : seul " + plainName(boss) + " peut le renvoyer.";
+        }
         GuardConfig.Role role = guard.role(roleKey);
         if (role == null) return "Rôle inconnu.";
         if (role.rank() > rank) return role.name() + " : Roland doit être au rang " + role.rank() + ".";
         inh.state = State.FORMATION;
-        if (inh.employer != null) { // une recrue quitte son emploi
-            inh.employer = null;
-            inh.workLeft = 0;
-            saveJob(inh);
-        }
+        inh.previousRole = null;
         inh.role = role.key();
         inh.trainingLeft = role.trainingMs();
         saveGuard(inh);
@@ -756,21 +798,54 @@ public class InhabitantManager implements Listener {
         return null;
     }
 
-    /** Fin de formation : la recrue devient garde (uniforme, équipement). */
+    /**
+     * Changement de poste d'un garde formé (soldat → sergent…) : il repart en formation chez Roland
+     * pour son nouveau rôle (même durée qu'une recrue), sans quitter la garde ; il garde son
+     * uniforme, range son équipement et ne patrouille plus le temps de la formation. Arrêter cette
+     * formation (dismiss) le rend à son ancien poste. @return null si c'est fait, sinon la raison du refus
+     */
+    private String changePost(Inhabitant inh, String roleKey) {
+        String blocked = canChangePost();
+        if (blocked != null) return blocked;
+        int rank = guardRank();
+        GuardConfig.Role role = guard.role(roleKey);
+        if (role == null) return "Rôle inconnu.";
+        if (role.key().equals(inh.role)) return inh.name + " est déjà " + role.name().toLowerCase() + ".";
+        if (role.rank() > rank) return role.name() + " : Roland doit être au rang " + role.rank() + ".";
+        String who = label(inh);
+        inh.previousRole = inh.role;
+        inh.state = State.FORMATION;
+        inh.role = role.key();
+        inh.trainingLeft = role.trainingMs();
+        saveGuard(inh);
+        refreshNpc(inh); // équipement rangé, arme d'entraînement en main
+        awaySince.remove(inh.id);
+        Bukkit.broadcastMessage("§9🛡 " + who + " §7repart en formation chez Roland : §f" + role.name()
+                + " §8(" + minutes(role.trainingMs()) + ")");
+        return null;
+    }
+
+    /** Fin de formation : la recrue devient garde (uniforme, équipement), ou le garde prend son nouveau poste. */
     private void promote(Inhabitant inh) {
+        boolean newPost = inh.previousRole != null;
         inh.state = State.SOLDAT;
         inh.trainingLeft = 0;
+        inh.previousRole = null;
         if (inh.uniform < 0) inh.uniform = uniforms.nextIndex();
         saveGuard(inh);
         refreshNpc(inh);
         GuardConfig.Role role = guard.role(inh.role);
-        Bukkit.broadcastMessage("§9🛡 " + inh.name + " §7a terminé sa formation : §f"
-                + (role != null ? role.name() : "garde") + " §7de la garde de Valmont.");
+        String post = role != null ? role.name() : "garde";
+        Bukkit.broadcastMessage(newPost
+                ? "§9🛡 " + inh.name + " §7prend son nouveau poste : §f" + post + " §7de la garde de Valmont."
+                : "§9🛡 " + inh.name + " §7a terminé sa formation : §f" + post + " §7de la garde de Valmont.");
     }
 
     /**
-     * Rend un garde (ou une recrue) à la vie civile : il redevient habitant (même lit), sa place
-     * dans la garde se libère. @return null si c'est fait, sinon la raison du refus
+     * Arrête une formation chez Roland. Une recrue redevient habitant (même lit) et sa place dans la
+     * garde se libère ; un garde qui changeait de poste reprend son ancien rôle. Un garde formé ne
+     * quitte jamais la garde (sauf les gardes de test, simplement retirés).
+     * @return null si c'est fait, sinon la raison du refus
      */
     public String dismiss(int inhabitantId) {
         Inhabitant inh = all.get(inhabitantId);
@@ -782,12 +857,28 @@ public class InhabitantManager implements Listener {
             Bukkit.broadcastMessage("§7🛡 " + who + " §8(garde de test) §7est retiré.");
             return null;
         }
+        if (inh.state == State.SOLDAT) {
+            return inh.name + " est engagé dans la garde : un garde formé ne la quitte plus"
+                    + " (il peut changer de poste chez Roland).";
+        }
+        if (inh.changingPost()) {
+            inh.state = State.SOLDAT;
+            inh.role = inh.previousRole;
+            inh.previousRole = null;
+            inh.trainingLeft = 0;
+            saveGuard(inh);
+            refreshNpc(inh);
+            GuardConfig.Role role = guard.role(inh.role);
+            Bukkit.broadcastMessage("§7🛡 " + inh.name + " §7arrête sa formation et reprend son poste : §f"
+                    + (role != null ? role.name() : "garde") + "§7.");
+            return null;
+        }
         inh.state = State.HABITANT;
         inh.role = null;
         inh.trainingLeft = 0;
         saveGuard(inh);
         refreshNpc(inh);
-        Bukkit.broadcastMessage("§7🛡 " + who + " §7rend son uniforme et redevient habitant.");
+        Bukkit.broadcastMessage("§7🛡 " + who + " §7arrête sa formation et redevient habitant.");
         return null;
     }
 
@@ -846,8 +937,13 @@ public class InhabitantManager implements Listener {
 
     /** Texture du skin d'un habitant ou de son uniforme (têtes du menu de la garde), ou null. */
     public String[] skinTexture(Inhabitant inh) {
-        if (inh.state == State.SOLDAT && inh.uniform >= 0 && !uniforms.isEmpty()) return uniforms.texture(inh.uniform);
+        if (uniformed(inh)) return uniforms.texture(inh.uniform);
         return skins.texture(inh.skin);
+    }
+
+    /** En uniforme : garde, ou garde formé qui change de poste (une recrue garde ses habits). */
+    private boolean uniformed(Inhabitant inh) {
+        return (inh.state == State.SOLDAT || inh.changingPost()) && inh.uniform >= 0 && !uniforms.isEmpty();
     }
 
     /** « 12 min », « 45 s ». */
@@ -969,8 +1065,8 @@ public class InhabitantManager implements Listener {
             npc.data().set(NPC.Metadata.PATHFINDER_OPEN_DOORS, inh.state != State.SOLDAT); // les gardes restent dehors
             npc.data().set(NPC_KEY, inh.id);
             NpcGestures.prepare(npc); // pas de balancement de bras à l'apparition (Epic Fight)
-            boolean uniformed = inh.state == State.SOLDAT && inh.uniform >= 0 && !uniforms.isEmpty();
-            if (uniformed) uniforms.apply(npc, Math.floorMod(inh.uniform, uniforms.size()));
+            com.citycore.npc.NpcNameplates.apply(npc); // nom sur fond noir, comme les minuteurs
+            if (uniformed(inh)) uniforms.apply(npc, Math.floorMod(inh.uniform, uniforms.size()));
             else skins.apply(npc, skins.size() == 0 || inh.skin < 0 ? -1 : Math.floorMod(inh.skin, skins.size()));
             if (inh.state == State.SOLDAT) equip(npc, guard.role(inh.role)); // un habitant n'a pas d'équipement
             if (inh.state == State.FORMATION) trainingGear(npc, guard.role(inh.role));
@@ -1014,8 +1110,11 @@ public class InhabitantManager implements Listener {
     /** Retire le PNJ du monde (destroy = il ne reviendra pas sous cette forme). */
     private void despawn(Inhabitant inh, boolean destroy) {
         sleeping.remove(inh.id);
+        asleep.remove(inh.id);
         idleSince.remove(inh.id);
         awaySince.remove(inh.id);
+        bedSince.remove(inh.id);
+        offPostSince.remove(inh.id);
         removeTimer(inh.id);
         NPC npc = destroy ? npcs.remove(inh.id) : npcs.get(inh.id);
         if (npc == null) return;
@@ -1054,8 +1153,8 @@ public class InhabitantManager implements Listener {
             boolean keeps = inh != null && (inh.state == State.FORMATION || (inh.state == State.HABITANT && inh.employer != null));
             if (!keeps || npc == null || !npc.isSpawned()) removeTimer(id);
         }
-        // Toutes les 2 secondes, la nuit : les monstres proches s'en prennent aux habitants
-        if (nightAttacks && ticks % 4 == 0) provokeMonsters();
+        // Toutes les 2 secondes, de nuit comme de jour : les monstres proches s'en prennent aux habitants
+        if ((nightAttacks || dayAttacks) && ticks % 4 == 0) provokeMonsters();
     }
 
     /** Habitant : flâne le jour autour de sa maison, dort la nuit dans son lit. */
@@ -1073,18 +1172,41 @@ public class InhabitantManager implements Listener {
         }
 
         if (isNight(bed.getWorld())) {
-            // La nuit : il rentre se coucher
-            if (sleeping.contains(inh.id)) return;
+            // La nuit : il rentre jusqu'à son lit et se couche. Pas d'accès (chemin refusé ou
+            // terminé loin du lit : porte, escalier, détour impossible) ou coincé en route : il
+            // est téléporté à côté de son lit, puis se couche.
+            if (sleeping.contains(inh.id)) {
+                bedSince.remove(inh.id);
+                // Réveillé en pleine nuit (blessé dans son lit) : il retourne se coucher
+                if (asleep.contains(inh.id) && body instanceof HumanEntity h && !h.isSleeping()) {
+                    asleep.remove(inh.id);
+                    sleeping.remove(inh.id);
+                    clearSleep(npc);
+                }
+                return;
+            }
             Location stand = standNear(inh);
-            if (stand != null && body.getLocation().distanceSquared(stand) <= 2.5 * 2.5) {
+            if (stand == null) return;
+            if (body.getWorld().equals(stand.getWorld()) && body.getLocation().distanceSquared(stand) <= 2.5 * 2.5) {
+                bedSince.remove(inh.id);
                 sleep(inh, npc, bed);
-            } else if (!walking && stand != null) {
+                return;
+            }
+            long since = bedSince.computeIfAbsent(inh.id, k -> now);
+            boolean noAccess = !walking && now - since > NO_PATH_MS;
+            if (noAccess || now - since > BED_TIMEOUT_MS) {
+                npc.getNavigator().cancelNavigation();
+                npc.teleport(stand, PlayerTeleportEvent.TeleportCause.PLUGIN);
+                bedSince.remove(inh.id);
+                sleep(inh, npc, bed);
+            } else if (!walking) {
                 SafeNavigation.walkTo(npc, stand, walkSpeed, true);
             }
             return;
         }
 
         // Le jour : il se lève et flâne autour de sa maison
+        bedSince.remove(inh.id);
         wake(inh, npc);
         if (walking) { idleSince.remove(inh.id); return; }
         long idle = idleSince.computeIfAbsent(inh.id, k -> now);
@@ -1711,11 +1833,30 @@ public class InhabitantManager implements Listener {
         return t >= 12500 && t < 23500;
     }
 
+    /**
+     * Couche l'habitant dans son lit. Le serveur refuse le coucher d'un joueur à plus de 3 blocs
+     * du lit (« trop loin ») : le PNJ restait alors debout, marqué endormi sans position de lit.
+     * Il est donc d'abord placé sur le lit ; un instant plus tard, s'il n'est toujours pas
+     * allongé, le coucher est retenté directement (et signalé dans la console s'il échoue encore).
+     */
     private void sleep(Inhabitant inh, NPC npc, Location bed) {
         try {
             npc.getNavigator().cancelNavigation();
-            npc.getOrAddTrait(SleepTrait.class).setSleeping(bed.clone().add(0.5, 0, 0.5));
+            Location onBed = bed.clone().add(0.5, 0, 0.5);
+            onBed.setYaw(npc.getEntity().getLocation().getYaw());
+            npc.teleport(onBed, PlayerTeleportEvent.TeleportCause.PLUGIN); // à portée du lit
+            npc.getOrAddTrait(SleepTrait.class).setSleeping(onBed);
             sleeping.add(inh.id);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!npc.isSpawned() || npcs.get(inh.id) != npc || !sleeping.contains(inh.id)) return;
+                if (!(npc.getEntity() instanceof HumanEntity human)) return;
+                if (human.isSleeping() || human.sleep(onBed, true)) {
+                    asleep.add(inh.id); // couché : s'il se réveille avant le jour, il se recouchera
+                } else {
+                    plugin.getLogger().warning("[Habitants] " + inh.name + " ne peut pas se coucher dans son lit "
+                            + inh.bx + " " + inh.by + " " + inh.bz + " (lit obstrué ?).");
+                }
+            }, 10L);
         } catch (Throwable t) {
             sleeping.add(inh.id); // sommeil indisponible : il reste près de son lit
         }
@@ -1728,7 +1869,16 @@ public class InhabitantManager implements Listener {
      */
     private void wake(Inhabitant inh, NPC npc) {
         sleeping.remove(inh.id);
-        if (!clearSleep(npc) || !npc.isSpawned()) return; // pas couché : rien à faire
+        asleep.remove(inh.id);
+        if (!clearSleep(npc) || !npc.isSpawned()) {
+            // Pas de sommeil en cours, mais resté allongé (réveil manqué, réapparition) : il se relève sur place
+            if (npc.isSpawned() && lying(npc.getEntity())) {
+                Location at = npc.getEntity().getLocation();
+                npc.despawn(DespawnReason.PENDING_RESPAWN);
+                npc.spawn(at);
+            }
+            return;
+        }
         if (npc.getEntity() instanceof HumanEntity human && human.isSleeping()) {
             try { human.wakeup(false); } catch (Throwable ignored) { }
         }
@@ -1738,12 +1888,16 @@ public class InhabitantManager implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!npc.isSpawned() || npcs.get(inh.id) != npc || sleeping.contains(inh.id)) return;
             Entity body = npc.getEntity();
-            boolean lying = body.getPose() == Pose.SLEEPING || (body instanceof HumanEntity h && h.isSleeping());
-            if (!lying) return;
+            if (!lying(body)) return;
             Location at = body.getLocation();
             npc.despawn(DespawnReason.PENDING_RESPAWN);
             npc.spawn(at);
         }, 5L);
+    }
+
+    /** Corps allongé (posture de sommeil) ? */
+    private static boolean lying(Entity body) {
+        return body.getPose() == Pose.SLEEPING || (body instanceof HumanEntity h && h.isSleeping());
     }
 
     /** Retire le trait « sommeil » du PNJ (réveil) ; false s'il ne l'avait pas. */
@@ -1757,11 +1911,18 @@ public class InhabitantManager implements Listener {
         return true;
     }
 
-    /** La nuit, un monstre sans cible près d'un habitant (ou d'un garde) le prend pour cible. */
+    /**
+     * Un monstre sans cible près d'un habitant (ou d'un garde) le prend pour cible : tous les
+     * habitants sont vulnérables, avec ou sans emploi, couchés ou debout. Les monstres ne repèrent
+     * pas d'eux-mêmes les PNJ : sans cela, seul un habitant croisé par hasard était attaqué.
+     * La nuit (habitants.attaques-nocturnes) et le jour (habitants.attaques-jour).
+     */
     private void provokeMonsters() {
         for (Map.Entry<Integer, NPC> e : npcs.entrySet()) {
             NPC npc = e.getValue();
-            if (!npc.isSpawned() || !isNight(npc.getEntity().getWorld())) continue;
+            if (!npc.isSpawned()) continue;
+            boolean night = isNight(npc.getEntity().getWorld());
+            if (night ? !nightAttacks : !dayAttacks) continue;
             for (Entity near : npc.getEntity().getNearbyEntities(16, 6, 16)) {
                 if (near instanceof Monster monster && monster.getTarget() == null && !registry.isNPC(near)) {
                     monster.setTarget((LivingEntity) npc.getEntity());
@@ -2113,6 +2274,11 @@ public class InhabitantManager implements Listener {
         this.deathListener = listener;
     }
 
+    /** PNJ des habitants, recrues et gardes (affichés ou non) : portes franchies (npc.DoorAssistant). */
+    public java.util.Collection<NPC> npcList() {
+        return npcs.values();
+    }
+
     /** Habitants, recrues et gardes affichés : les cibles des assaillants d'un siège. */
     public List<LivingEntity> defenders() {
         List<LivingEntity> list = new ArrayList<>();
@@ -2204,6 +2370,59 @@ public class InhabitantManager implements Listener {
         }
     }
 
+    /**
+     * Surveillance des employés (toutes les 5 s) : le jour, quand l'artisan peut les faire
+     * travailler, un employé affiché qui n'est pas à sa place depuis WORK_RESCUE_MS (chemin perdu,
+     * coincé, resté couché, monté dans un véhicule, comportement interrompu…) est remis au
+     * travail sans attendre une nouvelle journée.
+     */
+    private void superviseWorkers(long now) {
+        if (workPlace == null || Bukkit.getOnlinePlayers().isEmpty()) {
+            offPostSince.clear();
+            return;
+        }
+        for (Inhabitant inh : civilians()) {
+            CityNPC boss = employerOf(inh);
+            NPC npc = npcs.get(inh.id);
+            Location bed = inh.bed();
+            Building annex = boss == null ? null : workPlace.annex(boss);
+            Location spot = annex == null || inh.test || npc == null || !npc.isSpawned() || bed == null
+                    || isNight(bed.getWorld()) || workPlace.cycleMs(boss) <= 0 ? null : workSpot(inh, annex, boss);
+            if (spot == null) { // pas censé travailler maintenant (nuit, annexe absente ou à l'arrêt…)
+                offPostSince.remove(inh.id);
+                continue;
+            }
+            Entity body = npc.getEntity();
+            boolean atPost = !lying(body) && body.getVehicle() == null && body.getWorld().equals(spot.getWorld())
+                    && body.getLocation().distanceSquared(spot) <= 2.0 * 2.0;
+            if (atPost) {
+                offPostSince.remove(inh.id);
+                continue;
+            }
+            long since = offPostSince.computeIfAbsent(inh.id, k -> now);
+            if (now - since < WORK_RESCUE_MS) continue;
+            offPostSince.remove(inh.id);
+            sendBackToWork(inh, npc, spot);
+        }
+    }
+
+    /** Remet un employé au travail : réveillé, descendu de tout véhicule, navigation arrêtée, réapparu à sa place. */
+    private void sendBackToWork(Inhabitant inh, NPC npc, Location spot) {
+        sleeping.remove(inh.id);
+        clearSleep(npc);
+        awaySince.remove(inh.id);
+        idleSince.remove(inh.id);
+        npc.getNavigator().setPaused(false);
+        npc.getNavigator().cancelNavigation();
+        Entity body = npc.getEntity();
+        if (body.getVehicle() != null) body.leaveVehicle();
+        npc.despawn(DespawnReason.PENDING_RESPAWN); // posture, chemin, état du corps : tout repart de zéro
+        npc.spawn(spot);
+        NpcGestures.clearLeftovers(npc);
+        plugin.getLogger().info("[Emplois] " + inh.name + " remis au travail (hors de son poste depuis "
+                + WORK_RESCUE_MS / 1000 + " s).");
+    }
+
     /** L'employé est-il à son poste ? Affiché : dans l'annexe (ou tout près) ; non affiché : oui. */
     private boolean atWork(Inhabitant inh, CityNPC boss) {
         NPC npc = npcs.get(inh.id);
@@ -2236,6 +2455,7 @@ public class InhabitantManager implements Listener {
             civilianBehaviour(inh, npc, now);
             return;
         }
+        bedSince.remove(inh.id);
         wake(inh, npc);
         Location spot = workSpot(inh, annex, boss);
         if (spot == null) { // annexe dans une zone non chargée : vie ordinaire en attendant
@@ -2248,8 +2468,10 @@ public class InhabitantManager implements Listener {
         Entity body = npc.getEntity();
         if (!body.getWorld().equals(spot.getWorld()) || body.getLocation().distanceSquared(spot) > 1.0) {
             long away = awaySince.computeIfAbsent(inh.id, k -> now);
-            if (now - away > 25_000) {
-                // Chemin introuvable (porte, clôture, rivière) depuis 25 s : il rejoint sa place
+            boolean noAccess = !npc.getNavigator().isNavigating() && now - away > NO_PATH_MS;
+            if (noAccess || now - away > 25_000) {
+                // Pas d'accès (chemin refusé ou terminé loin de sa place : porte, clôture, rivière)
+                // ou coincé en route depuis 25 s : il rejoint sa place
                 npc.getNavigator().cancelNavigation();
                 npc.teleport(spot, PlayerTeleportEvent.TeleportCause.PLUGIN);
                 awaySince.remove(inh.id);
@@ -2432,12 +2654,22 @@ public class InhabitantManager implements Listener {
         return living().stream().map(i -> i.name).toList();
     }
 
-    /** Noms des habitants civils, qu'on peut former (complétion de /city garde former). */
-    public List<String> civilianNames() {
-        return civilians().stream().map(i -> i.name).toList();
+    /**
+     * Noms de ceux qu'on peut former (complétion de /city garde former) : habitants civils sans
+     * emploi, puis gardes formés (changement de poste).
+     */
+    public List<String> trainableNames() {
+        List<String> names = new ArrayList<>(civilians().stream().filter(i -> i.employer == null).map(i -> i.name).toList());
+        guards().stream().filter(i -> !i.test).forEach(i -> names.add(i.name));
+        return names;
     }
 
-    /** Noms des gardes et des recrues (complétion de /city garde renvoyer). */
+    /** Noms de ceux dont on peut arrêter la formation (complétion de /city garde renvoyer). */
+    public List<String> traineeNames() {
+        return trainees().stream().map(i -> i.name).toList();
+    }
+
+    /** Noms des gardes et des recrues (complétion de /city garde kill). */
     public List<String> guardNames() {
         List<String> names = new ArrayList<>(guards().stream().map(i -> i.name).toList());
         trainees().forEach(i -> names.add(i.name));

@@ -229,6 +229,8 @@ public class DatabaseManager {
         addColumn(stmt, "inhabitants", "role TEXT");
         addColumn(stmt, "inhabitants", "training_left INTEGER NOT NULL DEFAULT 0");
         addColumn(stmt, "inhabitants", "uniform INTEGER NOT NULL DEFAULT -1");
+        // Changement de poste d'un garde formé (en formation pour un autre rôle) : rôle tenu avant, sinon null
+        addColumn(stmt, "inhabitants", "previous_role TEXT");
         // Emplois : artisan employeur (tag) et temps restant du cycle de travail en cours (ms)
         addColumn(stmt, "inhabitants", "employer TEXT");
         addColumn(stmt, "inhabitants", "work_left INTEGER NOT NULL DEFAULT 0");

@@ -32,7 +32,8 @@ d'habitants, et le besoin « sécurité » dépend des soldats et des sièges.
 - Nouveaux écrans dessinés en style Valmont, avec un repli en menu classique comme les écrans
   existants.
 - **Dégâts** :
-  - les joueurs restent invulnérables en ville (`ClaimProtectionListener` annule leurs dégâts) ;
+  - les joueurs sont blessés en ville comme ailleurs ; seules les explosions les épargnent
+    (`ClaimProtectionListener`, correctif du 2026-10-27 : ils étaient auparavant invulnérables) ;
   - les artisans et Alderic restent protégés (Citizens les protège par défaut) ;
   - seuls les habitants et les soldats peuvent être blessés et mourir ; les joueurs ne peuvent
     pas les frapper ;
@@ -1017,6 +1018,81 @@ regardant en diagonale au clic du point : l'artisan regarde dans cette direction
 pour parler, puis s'y remet ; créer une annexe : outil « Point de travail », 2 ou 3 employés en
 cercle autour, tournés vers le point ; partir à 300 blocs de la ville : les employés continuent de
 produire, les artisans rejoignent leur poste (`/city emplois` ; retour en ville).
+
+### Correctifs du 2026-10-27 (débauchage, engagement dans la garde, dégâts en ville)
+
+- **Pas de débauchage** (`JobsManager.hire` / `fire`) : un habitant qui travaille déjà ne peut
+  être embauché ni par un autre artisan (anneau ambre, plus cliquable dans Employés) ni formé par
+  Roland (anneau gris dans La garde) ; seul son employeur peut le renvoyer (`fire` vérifie
+  l'artisan qui renvoie).
+- **Engagement dans la garde** (`InhabitantManager.dismiss`) : un garde formé ne quitte plus la
+  garde (Maj + clic droit et `/city garde renvoyer` refusés) ; seule la formation d'une recrue
+  peut être arrêtée (elle redevient habitant). Les gardes de test restent retirables.
+- **Changement de poste** (`InhabitantManager.changePost`, via `train` sur un garde) : clic sur
+  un garde → choix d'un autre rôle (rang de Roland requis) ; il repart en formation pour la durée
+  de ce rôle, garde son uniforme, occupe une place de formation (pas de place dans la garde en
+  plus) et ne patrouille plus le temps de la formation. Ancien rôle en base
+  (`inhabitants.previous_role`) : arrêter cette formation le rend à son ancien poste.
+- **Dégâts en ville** (`ClaimProtectionListener.onEntityDamage`) : les joueurs ne sont plus
+  invulnérables dans les claims ; seules les explosions les épargnent. `sieges.joueurs-blesses:
+  false` épargne toujours les joueurs des assaillants d'un siège en ville. Les protections des
+  blocs (explosions, feu, monstres, piétinement, décorations) ne changent pas.
+
+À tester : Employés chez un 2ᵉ artisan, clic sur un employé d'un autre (refus, rien ne change) ;
+La garde : employé grisé ; Maj + clic droit sur un garde formé (refus) puis sur une recrue
+(redevient habitant) ; clic sur un soldat → Archer : formation, uniforme gardé, `/city garde fin`
+→ « prend son nouveau poste » ; Maj + clic droit pendant un changement de poste → reprend son
+ancien rôle ; en ville : chute, zombie, lave blessent ; creeper ne blesse pas (il ne s'amorce pas).
+
+### Correctifs du 2026-10-27 (suite : travail, coucher, bâtiments d'Alderic, noms)
+
+- **Relance des employés** (`InhabitantManager.superviseWorkers`, toutes les 5 s) : le jour,
+  quand l'artisan peut faire travailler (annexe conforme, atelier), un employé affiché hors de sa
+  place (à plus de 2 blocs, couché ou dans un véhicule) depuis 45 s est remis au travail : réveil,
+  navigation arrêtée, réapparition à sa place (ligne `[Emplois] … remis au travail` dans la
+  console). Le trajet vers la place téléporte aussi dès que le chemin échoue ou s'arrête loin de
+  la place (3 s), au lieu d'attendre 25 s. `wake` relève un PNJ resté allongé sans sommeil en cours.
+- **Coucher** (`civilianBehaviour`, la nuit) : chaque habitant marche jusqu'à son lit ; chemin
+  refusé ou terminé loin du lit (3 s) ou coincé en route (30 s) → téléporté à côté du lit, puis
+  couché.
+- **Bâtiments d'Alderic** (`MayorBuildingGUI.mainBuildings`) : les annexes ne sont plus listées
+  ni supprimables chez Alderic (elles se gèrent chez l'artisan). Suppression comme avant (bouton
+  « Supprimer un bâtiment » de la liste, puis clic sur le bâtiment), suivie d'une
+  **confirmation** : écran `MayorScreens.ConfirmDelete` (bâtiment au centre, ce que la
+  suppression entraîne, Annuler / Retirer) ; menu classique : « Supprimer · nom » (Annuler /
+  Confirmer).
+- **Coucher** (`InhabitantManager.sleep`) : le serveur refuse le coucher d'un joueur à plus de
+  3 blocs du lit ; le PNJ restait debout, marqué endormi sans position de lit. Il est désormais
+  placé sur le lit avant le coucher ; 10 ticks plus tard, s'il n'est pas allongé, le coucher est
+  retenté directement (sinon avertissement « lit obstrué ? » dans la console). Réveillé en pleine
+  nuit (blessé dans son lit), il se recouche.
+- **Habitants vulnérables** (`provokeMonsters`) : les monstres ne repèrent pas d'eux-mêmes les
+  PNJ ; ils n'étaient provoqués que la nuit. Désormais aussi le jour (`habitants.attaques-jour`,
+  vrai par défaut, lu même absent du fichier), pour tous les habitants (avec ou sans emploi).
+- **Noms sur fond noir** (`npc.NpcNameplates`) : étiquette de Citizens masquée
+  (`NAMEPLATE_VISIBLE`), nom en première ligne de l'hologramme, rendu comme les titres. Artisans,
+  Alderic, habitants, gardes, héraut ; pas les soldats ennemis. Les reconstructions d'hologramme
+  (`NPCNotificationManager`) gardent le nom (`clearKeepingName`).
+
+- **Portes** (`npc.DoorAssistant`, tous les 4 ticks) : Citizens n'ouvrait une porte que si elle
+  était un point du chemin, et la refermait dès l'arrêt de la navigation, même sur un PNJ dans
+  l'embrasure (PNJ bloqués ou coincés). Désormais, un PNJ autorisé (`PATHFINDER_OPEN_DOORS` :
+  artisans, Alderic, habitants ; pas les gardes ni les ennemis) qui marche ouvre la porte ou le
+  portillon fermé à portée (~1 bloc autour de lui), ou celui dans lequel il se trouve même à
+  l'arrêt, avec geste et son. Les portes ouvertes par un PNJ (ici ou par Citizens, via
+  `NPCOpenDoorEvent` / `NPCOpenGateEvent`) sont refermées 1,5 s après que leur abord (1 bloc)
+  est libre de tout PNJ et joueur. Portes en fer et trappes exclues ; une porte ouverte par un
+  joueur n'est jamais refermée. Sources : registre principal de Citizens (artisans) et
+  `InhabitantManager.npcList()`.
+
+À tester : un employé poussé hors de l'annexe ou bloqué derrière une clôture revient seul ;
+portes fermées sur les trajets (maison, atelier, portillon) : le PNJ ouvre, passe, la porte se
+referme derrière lui ; un joueur dans l'embrasure : la porte reste ouverte ; à la
+tombée de la nuit, employés et habitants rejoignent leur lit et se couchent (porte fermée :
+téléportés) et sont **allongés** ; frapper un habitant couché (monstre) : il se recouche ;
+Alderic → Bâtiments : pas d'annexe, Supprimer un bâtiment → clic → confirmation (Annuler /
+Retirer) ; un zombie à l'ombre en plein jour attaque un habitant sans emploi ; noms des artisans,
+habitants et gardes sur fond noir, sous le titre et le minuteur.
 
 ## Hors phase — Animations Epic Fight des PNJ
 

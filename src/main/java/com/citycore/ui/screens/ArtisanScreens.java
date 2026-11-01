@@ -592,8 +592,9 @@ public final class ArtisanScreens {
             int rank = inhabitants.guardRank();
             GuardConfig guard = inhabitants.guard();
             info(c, 7, "§9🛡 La garde de Valmont", List.of(
-                    "§7Cliquez sur un habitant pour le", "§7former, puis choisissez son rôle.",
+                    "§7Cliquez sur un habitant sans emploi", "§7pour le former, puis choisissez", "§7son rôle.",
                     "§7Il s'entraîne chez Roland (temps", "§7compté quand un joueur est en ligne).", "",
+                    "§7Un garde formé ne quitte plus la", "§7garde : cliquez sur lui pour le", "§7former à un autre poste.", "",
                     "§7Les gardes patrouillent dans la", "§7ville, jour et nuit, hors des", "§7bâtiments.", "",
                     "§7Rang " + rank + " de Roland : §f" + guard.maxGuards(rank) + " §7gardes, §f"
                             + guard.maxTraining(rank) + " §7formation(s) à la fois.", "",
@@ -609,6 +610,7 @@ public final class ArtisanScreens {
                 List<String> lore = new ArrayList<>();
                 String ring;
                 Consumer<ClickType> click;
+                CityNPC boss = inhabitants.employerOf(inh);
                 switch (inh.state) {
                     case SOLDAT -> {
                         ring = "ring_purple";
@@ -616,28 +618,55 @@ public final class ArtisanScreens {
                         String hp = inhabitants.healthLine(inh);
                         if (hp != null) lore.add(hp);
                         lore.add("§7Lit : §f" + inhabitants.homeName(inh));
-                        lore.addAll(List.of("", "§cMaj + clic droit §7: le rendre", "§7à la vie civile"));
-                        click = t -> dismiss(t, inh);
+                        lore.add("");
+                        if (inh.test) {
+                            lore.addAll(List.of("§cMaj + clic droit §7: le retirer", "§8(garde de test)"));
+                            click = t -> dismiss(t, inh);
+                        } else {
+                            // Engagé : il ne quitte plus la garde, mais peut être formé à un autre poste
+                            String why = inhabitants.canChangePost();
+                            lore.add(why == null ? "§eCliquez : changer de poste" : "§8" + why);
+                            lore.add("§8Engagé : ne quitte plus la garde");
+                            click = t -> {
+                                String now = inhabitants.canChangePost();
+                                if (now != null) player.sendMessage("§c❌ " + now);
+                                else kit.show(new RoleView(player, inh.id));
+                            };
+                        }
                     }
                     case FORMATION -> {
                         ring = "ring_amber";
-                        lore.add("§6Recrue §7: " + (role != null ? role.name() : "?"));
+                        GuardConfig.Role before = guard.role(inh.previousRole);
+                        lore.add(inh.changingPost()
+                                ? "§6Changement de poste §7: " + (before != null ? before.name() : "?") + " → "
+                                        + (role != null ? role.name() : "?")
+                                : "§6Recrue §7: " + (role != null ? role.name() : "?"));
                         lore.add("§7Encore §f" + InhabitantManager.minutes(inh.trainingLeft) + " §7de formation");
                         if (rank == 0) lore.add("§c⏸ En pause : Roland n'a pas d'atelier");
                         lore.add("§7Lit : §f" + inhabitants.homeName(inh));
-                        lore.addAll(List.of("", "§cMaj + clic droit §7: arrêter", "§7la formation"));
+                        lore.addAll(inh.changingPost()
+                                ? List.of("", "§cMaj + clic droit §7: arrêter et", "§7reprendre son poste")
+                                : List.of("", "§cMaj + clic droit §7: arrêter", "§7la formation"));
                         click = t -> dismiss(t, inh);
                     }
                     default -> {
-                        ring = blocked == null ? "ring_green" : "ring_gray";
                         lore.add("§7Habitant de §f" + inhabitants.homeName(inh));
                         lore.add("");
-                        lore.add(blocked == null ? "§eCliquez : choisir son rôle" : "§8" + blocked);
-                        click = t -> {
-                            String why = inhabitants.canRecruit();
-                            if (why != null) player.sendMessage("§c❌ " + why);
-                            else kit.show(new RoleView(player, inh.id));
-                        };
+                        if (boss != null) {
+                            // Employé d'un artisan : pas de débauchage, seul son employeur peut le renvoyer
+                            ring = "ring_gray";
+                            lore.add("§6Travaille pour " + plain(boss.displayName));
+                            lore.add("§8Seul " + plain(boss.displayName) + " peut le renvoyer");
+                            click = null;
+                        } else {
+                            ring = blocked == null ? "ring_green" : "ring_gray";
+                            lore.add(blocked == null ? "§eCliquez : choisir son rôle" : "§8" + blocked);
+                            click = t -> {
+                                String why = inhabitants.canRecruit();
+                                if (why != null) player.sendMessage("§c❌ " + why);
+                                else kit.show(new RoleView(player, inh.id));
+                            };
+                        }
                     }
                 }
                 c.sprite(ring, sx(col(i)), sy(row(i)));
@@ -650,7 +679,7 @@ public final class ArtisanScreens {
             footer(c, false, guardFooter());
         }
 
-        /** Maj + clic droit : le garde (ou la recrue) redevient habitant. */
+        /** Maj + clic droit : arrête une formation (la recrue redevient habitant, le garde reprend son poste). */
         private void dismiss(ClickType t, Inhabitant inh) {
             if (t != ClickType.SHIFT_RIGHT) return;
             String err = inhabitants.dismiss(inh.id);
@@ -660,7 +689,7 @@ public final class ArtisanScreens {
     }
 
     /* =========================
-       RÔLE — choix du rôle d'une recrue (verrouillé selon le rang de Roland)
+       RÔLE — choix du rôle d'une recrue, ou nouveau poste d'un garde (verrouillé selon le rang de Roland)
        ========================= */
 
     private final class RoleView extends ArtisanMenu {
@@ -680,12 +709,19 @@ public final class ArtisanScreens {
             back(c, 0, "La garde", () -> kit.show(new GuardView(player, 0)));
             c.sprite("rib_role", sx(1), sy(0));
             close(c);
-            if (inh == null || inh.state != InhabitantManager.State.HABITANT) {
+            // Un habitant civil (première formation) ou un garde formé (changement de poste)
+            boolean guardPost = inh != null && inh.state == InhabitantManager.State.SOLDAT;
+            if (inh == null || (inh.state != InhabitantManager.State.HABITANT && !guardPost)) {
                 footer(c, false, "HABITANT INDISPONIBLE");
                 return;
             }
-            item(7, 0, inhabitantHead(inh, "§f" + inh.name, List.of("§7Habitant de §f" + inhabitants.homeName(inh),
-                    "", "§7Choisissez le rôle qu'il apprendra", "§7chez Roland.")), null);
+            GuardConfig.Role current = guardPost ? inhabitants.guard().role(inh.role) : null;
+            item(7, 0, inhabitantHead(inh, "§f" + inh.name, guardPost
+                    ? List.of("§9" + (current != null ? current.name() : "Garde") + " §7de la garde", "",
+                            "§7Choisissez son nouveau poste : il", "§7repart en formation chez Roland,",
+                            "§7sans quitter la garde.")
+                    : List.of("§7Habitant de §f" + inhabitants.homeName(inh),
+                            "", "§7Choisissez le rôle qu'il apprendra", "§7chez Roland.")), null);
 
             int rank = inhabitants.guardRank();
             List<GuardConfig.Role> roles = inhabitants.guard().roles();
@@ -697,6 +733,13 @@ public final class ArtisanScreens {
                         "§7Formation : §f" + InhabitantManager.minutes(role.trainingMs()), "§7Équipement :"));
                 lore.addAll(equipment(role));
                 lore.add("");
+                if (current != null && role.key().equals(current.key())) {
+                    lore.add("§5Son poste actuel");
+                    c.sprite("ring_purple", sx(col(i)), sy(row(i)));
+                    item(col(i), row(i), UiItems.shown(role.weapon() != null ? role.weapon() : Material.IRON_SWORD,
+                            "§f" + role.name(), lore, false), null);
+                    continue;
+                }
                 if (role.rank() > rank) {
                     lore.add("§c🔒 Roland doit être au rang " + role.rank());
                     c.sprite("ring_gray", sx(col(i)), sy(row(i)));
@@ -704,7 +747,7 @@ public final class ArtisanScreens {
                     item(col(i), row(i), UiItems.blank("§8🔒 " + role.name(), lore), null);
                     continue;
                 }
-                lore.add("§eCliquez : former " + inh.name);
+                lore.add(guardPost ? "§eCliquez : nouveau poste de " + inh.name : "§eCliquez : former " + inh.name);
                 c.sprite("ring_green", sx(col(i)), sy(row(i)));
                 item(col(i), row(i), UiItems.shown(role.weapon() != null ? role.weapon() : Material.IRON_SWORD,
                         "§f" + role.name(), lore, false), t -> {
@@ -717,7 +760,7 @@ public final class ArtisanScreens {
                     }
                 });
             }
-            footer(c, false, "FORMER : " + inh.name.toUpperCase());
+            footer(c, false, (guardPost ? "NOUVEAU POSTE : " : "FORMER : ") + inh.name.toUpperCase());
         }
 
         /** « 15 ❤ » (2 points de vie par cœur). */
@@ -738,8 +781,8 @@ public final class ArtisanScreens {
 
     /* =========================
        EMPLOYÉS — liste commune des habitants qu'on peut embaucher pour cet artisan
-       Violet : ses employés ; vert : sans emploi (place libre) ; ambre : employé ailleurs ;
-       gris : plus de place.
+       Violet : ses employés ; vert : sans emploi (place libre) ; ambre : employé ailleurs (seul
+       son employeur peut le renvoyer) ; gris : plus de place.
        ========================= */
 
     private final class EmployeesView extends ArtisanMenu implements Paged {
@@ -797,16 +840,21 @@ public final class ArtisanScreens {
                     lore.addAll(List.of("", "§cMaj + clic droit §7: le renvoyer"));
                     click = t -> {
                         if (t != ClickType.SHIFT_RIGHT) return;
-                        String err = jobs.fire(inh.id);
+                        String err = jobs.fire(inh.id, npc);
                         if (err != null) player.sendMessage("§c❌ " + err);
                         kit.show(new EmployeesView(player, page));
                     };
+                } else if (boss != null) {
+                    // Employé d'un autre artisan : on ne le débauche pas, seul son employeur peut le renvoyer
+                    ring = "ring_amber";
+                    lore.add("§6Travaille pour " + plain(boss.displayName));
+                    lore.addAll(List.of("", "§8Seul " + plain(boss.displayName) + " peut le renvoyer"));
+                    click = null;
                 } else {
-                    ring = !room ? "ring_gray" : boss == null ? "ring_green" : "ring_amber";
-                    if (boss != null) lore.add("§6Travaille pour " + plain(boss.displayName));
+                    ring = room ? "ring_green" : "ring_gray";
                     lore.add("");
-                    lore.add(!room ? "§8" + plain(npc.displayName) + " n'a plus de place (rang " + data.getLevel(npc) + ")"
-                            : boss == null ? "§eCliquez : l'embaucher" : "§eCliquez : l'embaucher ici §8(il quitte son emploi)");
+                    lore.add(room ? "§eCliquez : l'embaucher"
+                            : "§8" + plain(npc.displayName) + " n'a plus de place (rang " + data.getLevel(npc) + ")");
                     click = t -> {
                         String err = jobs.hire(inh.id, npc);
                         if (err != null) player.sendMessage("§c❌ " + err);

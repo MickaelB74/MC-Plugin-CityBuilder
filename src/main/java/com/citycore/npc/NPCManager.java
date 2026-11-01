@@ -61,6 +61,7 @@ public class NPCManager {
             applyMovement(npc); // PNJ créés par une version précédente du plugin
             applySkin(npc, type); // skin ajouté depuis dans config.yml (npc-skins)
             NpcGestures.prepare(npc); // pas de balancement de bras à l'apparition (Epic Fight)
+            NpcNameplates.apply(npc); // nom sur fond noir (PNJ créés par une version précédente)
             if (!npc.isSpawned() && npc.getStoredLocation() != null) {
                 npc.spawn(npc.getStoredLocation());
             }
@@ -100,8 +101,9 @@ public class NPCManager {
                     + " — renseignez npc-skins." + type.skinId + " dans config.yml.");
         }
 
-        // Hologramme
+        // Hologramme : le nom (sur fond noir, à la place de l'étiquette), puis le titre
         HologramTrait hologram = npc.getOrAddTrait(HologramTrait.class);
+        NpcNameplates.apply(npc);
         hologram.addLine(type.hologramLine());
 
         applyMovement(npc);

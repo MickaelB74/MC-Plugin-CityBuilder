@@ -86,12 +86,13 @@ public class MayorListener implements Listener {
         boolean isMayorGui    = title.equals(MayorGUI.GUI_TITLE);
         boolean isBuildingGui = title.equals(MayorBuildingGUI.GUI_TITLE);
         boolean isDeleteGui   = title.equals(MayorBuildingGUI.GUI_TITLE_DELETE);
+        boolean isConfirmGui  = title.startsWith(MayorBuildingGUI.GUI_TITLE_CONFIRM);
         boolean isEconomyGui  = title.equals(MayorEconomyGUI.GUI_TITLE);
         // Préfixe indépendant du niveau : un menu resté ouvert pendant une montée de palier
         // reste protégé (sinon ses icônes deviendraient récupérables)
         boolean isQuestGui    = title.startsWith(MayorQuestGUI.TITLE_PREFIX);
 
-        if (!isMayorGui && !isBuildingGui && !isDeleteGui
+        if (!isMayorGui && !isBuildingGui && !isDeleteGui && !isConfirmGui
                 && !isEconomyGui && !isQuestGui) return;
 
         event.setCancelled(true);
@@ -123,6 +124,13 @@ public class MayorListener implements Listener {
         if (isDeleteGui) {
             if (mg == null) return;
             mg.getBuildingGUI().handleDeleteClick(player, slot);
+            return;
+        }
+
+        // ── Confirmation de la suppression d'un bâtiment ─────────
+        if (isConfirmGui) {
+            if (mg == null) return;
+            mg.getBuildingGUI().handleConfirmClick(player, slot);
             return;
         }
 

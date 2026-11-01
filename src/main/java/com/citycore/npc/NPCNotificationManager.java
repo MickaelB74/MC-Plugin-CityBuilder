@@ -102,8 +102,8 @@ public class NPCNotificationManager {
                 citizensNPC.getOrAddTrait(
                         net.citizensnpcs.trait.HologramTrait.class);
 
-        // Reconstruit les lignes
-        hologram.clear();
+        // Reconstruit les lignes (le nom reste en première ligne, sur fond noir)
+        NpcNameplates.clearKeepingName(citizensNPC, hologram);
         hologram.addLine(npc.hologramLine());
         if (showNotif) {
             hologram.addLine("§c§l!");
@@ -119,7 +119,7 @@ public class NPCNotificationManager {
                 citizensNPC.getOrAddTrait(
                         net.citizensnpcs.trait.HologramTrait.class);
 
-        hologram.clear();
+        NpcNameplates.clearKeepingName(citizensNPC, hologram);
         hologram.addLine(npc.hologramLine());
         if (blocked) {
             hologram.addLine("§e§l/!\\"); // ✅ Triangle d'avertissement

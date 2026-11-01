@@ -26,8 +26,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * Emplois : les habitants travaillent pour les artisans et remplissent leurs entrepôts, pour que
  * la ville tourne sans que les joueurs aient à tout fournir.
  *
- * Chaque artisan installé peut embaucher des habitants civils (menu commun, Actions → Employés),
- * dans la limite de son rang. Ils travaillent dans son annexe de travail (bâtiment « Annexe »
+ * Chaque artisan installé peut embaucher des habitants civils sans emploi (menu commun, Actions →
+ * Employés), dans la limite de son rang ; seul cet artisan peut ensuite les renvoyer (pas de
+ * débauchage par un autre artisan, ni par Roland pour la garde). Ils travaillent dans son annexe de travail (bâtiment « Annexe »
  * créé depuis ses Actions, avec ses exigences et ses niveaux). Le jour seulement, quand un joueur
  * est connecté, chaque employé produit à chaque cycle (plus court quand l'annexe monte de niveau)
  * par-cycle exemplaires (8 par défaut) de chaque objet que l'artisan rachète : la ville récolte
@@ -84,29 +85,37 @@ public final class JobsManager implements WorkPlace {
         return config.maxEmployees(npcData.getLevel(boss));
     }
 
-    /** Embauche d'un habitant civil par un artisan ; null si c'est fait, sinon la raison du refus. */
+    /**
+     * Embauche d'un habitant civil sans emploi par un artisan ; null si c'est fait, sinon la raison
+     * du refus. Un habitant qui travaille déjà n'est jamais débauché par un autre : seul son
+     * employeur peut le renvoyer (Actions → Employés chez cet artisan).
+     */
     public String hire(int inhabitantId, CityNPC boss) {
         if (npcData.getState(boss) != NPCState.ASSIGNED) return plain(boss) + " doit être installé dans son atelier.";
+        Inhabitant inh = inhabitants.get(inhabitantId);
+        if (inh == null || inh.state != InhabitantManager.State.HABITANT || inh.test) return "Cet habitant n'est plus disponible.";
+        CityNPC current = inhabitants.employerOf(inh);
+        if (current == boss) return inh.name + " travaille déjà pour " + plain(boss) + ".";
+        if (current != null) {
+            return inh.name + " travaille pour " + plain(current) + " : seul " + plain(current) + " peut le renvoyer.";
+        }
         int max = maxEmployees(boss);
         if (inhabitants.employees(boss).size() >= max) {
             return plain(boss) + " emploie déjà " + max + " habitant(s) (rang " + npcData.getLevel(boss) + ").";
         }
-        Inhabitant inh = inhabitants.get(inhabitantId);
-        if (inh == null || inh.state != InhabitantManager.State.HABITANT || inh.test) return "Cet habitant n'est plus disponible.";
-        CityNPC previous = inhabitants.employerOf(inh);
         String err = inhabitants.setEmployer(inhabitantId, boss);
         if (err != null) return err;
         org.bukkit.Bukkit.broadcastMessage("§3⚒ " + inh.name + " §7travaille désormais pour " + boss.displayName
-                + (previous != null && previous != boss ? " §8(quitte " + plain(previous) + ")" : "")
                 + (annex(boss) == null ? " §8— il faut encore lui créer une annexe de travail" : ""));
         return null;
     }
 
-    /** Renvoi d'un employé ; null si c'est fait, sinon la raison du refus. */
-    public String fire(int inhabitantId) {
+    /** Renvoi d'un employé par son employeur (et lui seul) ; null si c'est fait, sinon la raison du refus. */
+    public String fire(int inhabitantId, CityNPC by) {
         Inhabitant inh = inhabitants.get(inhabitantId);
         CityNPC boss = inh == null ? null : inhabitants.employerOf(inh);
         if (boss == null) return "Cet habitant n'a pas d'emploi.";
+        if (boss != by) return inh.name + " travaille pour " + plain(boss) + " : seul " + plain(boss) + " peut le renvoyer.";
         String err = inhabitants.setEmployer(inhabitantId, null);
         if (err == null) org.bukkit.Bukkit.broadcastMessage("§7⚒ " + inh.name + " §7ne travaille plus pour " + boss.displayName + "§7.");
         return err;

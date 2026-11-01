@@ -487,7 +487,8 @@ public final class MayorScreens {
     }
 
     /* =========================
-       BÂTIMENTS (liste et suppression)
+       BÂTIMENTS (liste et suppression, avec confirmation) — bâtiments principaux seulement :
+       les annexes de travail se gèrent chez leur artisan
        ========================= */
 
     private final class Buildings extends MayorMenu {
@@ -507,14 +508,16 @@ public final class MayorScreens {
                     () -> { if (deleting) buildingGUI().open(player); else mayor.open(player); });
             c.sprite(deleting ? "rib_supprimer" : "rib_batiments", sx(1), sy(0));
             info(c, 7, deleting ? "§c➖ Supprimer un bâtiment" : "§a🏗 Bâtiments de la ville",
-                    deleting ? List.of("§7Cliquez sur un bâtiment", "§7pour le supprimer.", "§c§lDéfinitif.")
+                    deleting ? List.of("§7Cliquez sur un bâtiment pour le", "§7supprimer : une confirmation",
+                            "§7vous est demandée.")
                             : List.of("§7Rangés par type : habitations,", "§7ateliers, mairie, divers.", "",
                             "§eClic gauche §7: bordures 5 secondes", "§eClic droit §7: changer le type",
                             "§eMaj + clic §7: inspection détaillée", "",
+                            "§8Les annexes de travail se gèrent", "§8chez leur artisan (Actions).", "",
                             "§6■ §7habité par un artisan  §c■ §7incomplet"));
             close(c);
 
-            List<Building> list = buildings.getAllBuildings();
+            List<Building> list = buildingGUI().mainBuildings();
             for (int i = 0; i < Math.min(GRID, list.size()); i++) {
                 Building b = list.get(i);
                 int col = i % 9, row = 1 + i / 9;
@@ -539,7 +542,7 @@ public final class MayorScreens {
                     lore.add("");
                 }
                 if (deleting) {
-                    lore.add("§cCliquez pour supprimer");
+                    lore.add("§cCliquez pour supprimer §8(confirmation)");
                 } else {
                     lore.add("§eClic gauche §7: voir les bordures");
                     if (screens != null) lore.add("§eClic droit §7: changer le type");
@@ -548,7 +551,7 @@ public final class MayorScreens {
                 item(col, row, UiItems.shown(deleting ? Material.TNT : b.type().icon,
                                 (deleting ? "§c" : "§e") + b.name(), lore, false),
                         t -> {
-                            if (deleting) buildingGUI().delete(player, b);
+                            if (deleting) kit.show(new ConfirmDelete(player, b));
                             else if (t.isShiftClick()) buildingGUI().inspect(player, b);
                             else if (t.isRightClick() && screens != null) screens.openRetype(player, b, () -> openBuildings(player));
                             else buildingGUI().showBorders(player, b);
@@ -568,6 +571,47 @@ public final class MayorScreens {
                 zone(5, 5, 4, 1, "§c➖ Supprimer un bâtiment", List.of("§7Sélectionnez un bâtiment à retirer"),
                         t -> buildingGUI().openDelete(player));
             }
+        }
+    }
+
+    /**
+     * Confirmation de la suppression d'un bâtiment (après un clic dans la liste de suppression) :
+     * le bâtiment au centre, ce que sa suppression entraîne, puis Annuler ou Retirer.
+     */
+    private final class ConfirmDelete extends MayorMenu {
+
+        private final Building building;
+
+        ConfirmDelete(Player p, Building building) {
+            super(p);
+            this.building = building;
+        }
+
+        @Override
+        protected void draw(UiCanvas c) {
+            c.background("bg_grid");
+            nameplate(c, building.name(), "Supprimer ?");
+            back(c, 0, "Liste de suppression", () -> buildingGUI().openDelete(player));
+            c.sprite("rib_supprimer", sx(1), sy(0));
+            List<String> effects = List.of("§7Le bâtiment est retiré de la ville ;", "§7ses blocs restent en place.",
+                    MayorBuildingGUI.deletionEffect(building), "", "§c§lDéfinitif.");
+            info(c, 7, "§c➖ Supprimer ce bâtiment ?", effects);
+            close(c);
+
+            c.sprite("ring_red", sx(4), sy(2));
+            List<String> lore = new ArrayList<>(List.of(building.typeLine(),
+                    "§7Zone  : §f" + building.x1() + "," + building.z1() + " §7→ §f" + building.x2() + "," + building.z2(),
+                    "§7NPC   : " + buildingGUI().occupant(building)));
+            String residents = occupancy.apply(building);
+            if (residents != null) lore.add(residents);
+            lore.add("");
+            lore.addAll(effects);
+            item(4, 2, UiItems.shown(building.type().icon, "§c" + building.name(), lore, false), null);
+
+            c.sprite("fb_retour", sx(0), sy(5));
+            zone(0, 5, 4, 1, "§7◀ Annuler", List.of("§7Le bâtiment est conservé."), t -> buildingGUI().openDelete(player));
+            c.sprite("fb_supprimer", sx(5), sy(5));
+            zone(5, 5, 4, 1, "§c✖ Confirmer la suppression", effects, t -> buildingGUI().delete(player, building));
         }
     }
 }
