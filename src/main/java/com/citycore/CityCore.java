@@ -75,6 +75,9 @@ public class CityCore extends JavaPlugin {
         // ── Configuration : remplace un config.yml d'une version antérieure ──
         ConfigUpdater.ensureUpToDate(this);
 
+        // ── Discord : journal des événements (lu par le mod compagnon, servi au bot) ──
+        com.citycore.discord.DiscordFeed.start(this);
+
         // ── Réinitialisation demandée (/city restart) : partie archivée avant d'ouvrir la base ──
         com.citycore.prologue.GameReset gameReset = new com.citycore.prologue.GameReset(this);
         gameReset.applyIfRequested();
@@ -163,6 +166,8 @@ public class CityCore extends JavaPlugin {
             notificationManager.notifyAll(evicted, getServer(), npcManager);
             Bukkit.broadcastMessage("§6🏚 " + evicted.displayName + " §6n'a plus d'atelier. §7Ses quêtes sont en pause"
                     + " jusqu'à ce que vous lui choisissiez un nouveau logis (parlez-lui).");
+            com.citycore.discord.DiscordFeed.event("artisan.sans-logis", "🏚 " + evicted.displayName + " n'a plus d'atelier",
+                    "Ses quêtes sont en pause jusqu'à ce qu'on lui choisisse un nouveau logis.");
             getLogger().info(ChatColor.stripColor(evicted.displayName) + " : bâtiment supprimé, passe sans logis.");
         });
         // Rattrapage : artisans installés dont le bâtiment a été supprimé avant ce correctif
@@ -315,6 +320,19 @@ public class CityCore extends JavaPlugin {
         // ── Emplois : les habitants travaillent pour les artisans (annexes de travail) ──
         jobs = new com.citycore.jobs.JobsManager(this, buildingManager, buildingInspector, npcDataManager, market, inhabitants);
         jobs.start();
+
+        // ── Discord : état de la ville et des joueurs (etat.json), journal du serveur, /discord ──
+        com.citycore.discord.DiscordServerLog serverLog = new com.citycore.discord.DiscordServerLog(this);
+        var discordCmd = getCommand("discord");
+        if (discordCmd != null) discordCmd.setExecutor(serverLog);
+        if (com.citycore.discord.DiscordFeed.active()) {
+            getServer().getPluginManager().registerEvents(serverLog, this);
+            com.citycore.discord.DiscordState discordState = new com.citycore.discord.DiscordState(this,
+                    databaseManager, cityManager, cityQuestManager, economy, buildingManager, inhabitants,
+                    needs, siege, raids, calendar);
+            getServer().getPluginManager().registerEvents(discordState, this);
+            discordState.start();
+        }
 
         getServer().getPluginManager().registerEvents(
                 new FindNpcQuestListener(findNpcQuestManager), this);
@@ -595,7 +613,8 @@ public class CityCore extends JavaPlugin {
         if (inhabitants != null) inhabitants.shutdown(); // recréés depuis la base au prochain démarrage
         if (cityHUD != null) cityHUD.stop();
         if (uiPack != null) uiPack.stop();
-        databaseManager.closeDatabase();
+        com.citycore.discord.DiscordFeed.stop(); // dernières lignes du journal écrites
+        if (databaseManager != null) databaseManager.closeDatabase();
         getLogger().info("CityCore disabled");
     }
 

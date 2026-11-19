@@ -41,6 +41,8 @@ public final class ParcelActions {
         city.claimChunk(chunk);
         player.sendMessage("§a✅ Parcelle revendiquée ! §7(§f" + city.getClaimedChunkCount()
                 + "§7/§f" + city.getMaxChunks() + "§7)");
+        com.citycore.discord.DiscordFeed.event("ville.parcelle", "🗺 Nouvelle parcelle revendiquée",
+                "Par " + player.getName() + " — " + city.getClaimedChunkCount() + "/" + city.getMaxChunks() + " parcelles.");
         return true;
     }
 
@@ -70,6 +72,8 @@ public final class ParcelActions {
         city.unclaimChunk(chunk);
         player.sendMessage("§e🗑 Parcelle rendue. §7(§f" + city.getClaimedChunkCount()
                 + "§7/§f" + city.getMaxChunks() + "§7)");
+        com.citycore.discord.DiscordFeed.event("ville.parcelle-rendue", "🗑 Parcelle rendue",
+                "Par " + player.getName() + " — " + city.getClaimedChunkCount() + "/" + city.getMaxChunks() + " parcelles.");
         return true;
     }
 

@@ -88,6 +88,8 @@ public final class ConfigUpdater {
      * 41 : sièges tous les jours à 22 h (au lieu du mercredi et du samedi à 21 h).
      * 42 : dialogues.taille-police (répliques sur deux lignes à la taille de la police Unicode
      *      forcée) s'ajoute en tête de la section dialogues.
+     * 43 : section discord (journal et état pour le bot Discord, servis par le mod compagnon),
+     *      ajoutée sans ligne à corriger.
      */
     private static final java.util.Map<Integer, List<String[]>> UPDATED_LINES = java.util.Map.of(
             15, List.of(

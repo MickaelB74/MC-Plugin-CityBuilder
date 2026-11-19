@@ -312,6 +312,10 @@ public class MayorQuestGUI {
                     + questManager.upgradeCost(tier) + " coins). §7💡 Déposez des coins au §e« Trésor » §7d'Alderic.");
             case SUCCESS    -> {
                 CityTier next = tier.next();
+                com.citycore.discord.DiscordFeed.event("ville.niveau",
+                        "🏰 La ville devient " + next.tierName + " (niveau " + next.level + ")",
+                        next.chapter + "\nCharte signée par " + player.getName() + " — +"
+                                + questManager.rewardChunks(tier) + " emplacements de parcelles.");
                 player.closeInventory();
                 // Ferme les menus de quêtes ouverts chez les autres joueurs (contenu périmé)
                 for (Player p : Bukkit.getOnlinePlayers()) {

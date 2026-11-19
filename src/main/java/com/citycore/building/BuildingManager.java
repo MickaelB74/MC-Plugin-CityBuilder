@@ -292,7 +292,12 @@ public class BuildingManager {
             PreparedStatement ps = db.getConnection().prepareStatement(
                     "DELETE FROM buildings WHERE id = ?");
             ps.setInt(1, id);
-            if (ps.executeUpdate() > 0) evict(removed);
+            if (ps.executeUpdate() > 0) {
+                for (Building b : removed) {
+                    com.citycore.discord.DiscordFeed.event("batiment.suppression", "🧱 Bâtiment supprimé : " + b.name(), null);
+                }
+                evict(removed);
+            }
             ps.close();
         } catch (SQLException e) {
             e.printStackTrace();

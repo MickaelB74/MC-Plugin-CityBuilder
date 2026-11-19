@@ -11,6 +11,10 @@ commands:
     usage: /city (liste des commandes permises)
     aliases: [c]
     permission: citycore.player
+  discord:
+    description: Envoie un message dans le salon de discussion Discord
+    usage: /discord <message>
+    permission: citycore.player
 
 # Droits (voir command/CityPermissions.java). Les joueurs passent par les habitants (Alderic, les
 # artisans, Roland) pour tout ce qu'ils savent faire ; la commande ne leur laisse que les consultations

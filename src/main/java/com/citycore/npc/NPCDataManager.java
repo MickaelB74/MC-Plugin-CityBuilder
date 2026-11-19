@@ -73,6 +73,11 @@ public class NPCDataManager {
             ps.executeUpdate();
             ps.close();
 
+            if (newLevel > currentLevel) {
+                com.citycore.discord.DiscordFeed.event("artisan.niveau",
+                        "🎉 " + npc.displayName + " passe au rang " + newLevel,
+                        "De nouveaux articles sont disponibles dans sa boutique.");
+            }
             return newLevel > currentLevel;
         } catch (SQLException e) {
             e.printStackTrace();

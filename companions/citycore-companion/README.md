@@ -12,7 +12,11 @@ Deux modules indépendants, chacun actif **seulement si son mod est installé su
 
 Sans l'un de ces mods, son module reste éteint et aucune de ses classes n'est chargée (le serveur
 démarre normalement). Le plugin ne dépend d'aucun mod : il communique avec ce mod par des
-étiquettes d'entités (gestes) et un fichier (`plugins/CityCore/carte.json`).
+étiquettes d'entités (gestes) et des fichiers (`plugins/CityCore/carte.json`, dossier
+`plugins/CityCore/discord/`).
+
+Un troisième module, **Discord**, ne dépend d'aucun mod : il ouvre l'API HTTP que le bot
+`citycore-discord-bot` (dossier voisin) interroge.
 
 ## Module Epic Fight
 
@@ -65,6 +69,30 @@ sécurité (JourneyMap remplace la version précédente, sans doublon).
 Les joueurs n'ont besoin que de JourneyMap (6.0.5 ou plus, la même version que le serveur de
 préférence). L'API JourneyMap n'est utilisée qu'à la compilation (`compileOnly`) : sa licence
 interdit d'en redistribuer les classes, elles sont fournies par le mod JourneyMap à l'exécution.
+
+## Module Discord
+
+Le plugin écrit dans `plugins/CityCore/discord/` :
+- `journal.jsonl` : une ligne par fait (événements de la ville, actions des opérateurs,
+  discussion), numérotée ;
+- `etat.json` : la ville (palier, caisse, parcelles, habitants…) et les joueurs (niveau,
+  expérience, métier, bourse).
+
+Le module les suit (deux contrôles par seconde, sur un fil à part) et les sert au bot par une API
+HTTP protégée par un jeton ; il affiche en jeu les messages envoyés de Discord (`/chat`). Il écrit
+aussi le fichier `lien` du même dossier à chaque demande du bot : le plugin sait ainsi si le bot
+est là (réponse de `/discord` en jeu).
+
+| Route | Rôle |
+|---|---|
+| `GET /api/v1/etat` | serveur (nom, joueurs connectés) et contenu de `etat.json` |
+| `GET /api/v1/evenements?apres=N&attente=S` | lignes du journal après le numéro N ; la réponse attend jusqu'à S secondes s'il n'y a rien |
+| `POST /api/v1/chat` | message de Discord affiché aux joueurs |
+
+Au premier démarrage, un jeton est tiré au hasard et écrit dans `discord.jeton`
+(`config/citycore_companion.toml`) : à recopier dans la configuration du bot. Par défaut l'API
+n'écoute que sur la machine du serveur (`127.0.0.1:8787`). Journal attendu : « API Discord à
+l'écoute sur http://127.0.0.1:8787 ». Mise en place complète : `../citycore-discord-bot/README.md`.
 
 ## Construire
 
@@ -119,6 +147,15 @@ Dépendances de compilation (aucune n'est recopiée dans le jar) :
 | `journeymap.verification` | 2 | secondes entre deux contrôles du fichier |
 | `journeymap.renvoi` | 120 | secondes entre deux renvois de sécurité ; 0 = jamais |
 | `journeymap.journal` | false | journal détaillé (envois par joueur) |
+| `discord.actif` | true | false : l'API du bot Discord n'est pas ouverte |
+| `discord.adresse` | `127.0.0.1` | adresse d'écoute ; `0.0.0.0` pour un bot sur une autre machine (n'ouvrir le port qu'à lui) |
+| `discord.port` | 8787 | port d'écoute de l'API |
+| `discord.jeton` | créé au démarrage | jeton exigé à chaque demande, à recopier dans `bot.properties` (`api.jeton`) |
+| `discord.dossier` | `plugins/CityCore/discord` | dossier écrit par le plugin (relatif au dossier du serveur) |
+| `discord.nomServeur` | vide | nom du serveur affiché par le bot ; vide = MOTD |
+| `discord.journal` | false | journal détaillé (lignes lues, fichiers illisibles) |
+
+Les réglages `discord.*` (adresse, port, jeton) sont lus au démarrage du serveur.
 
 Apparence de la ville sur la carte : section `carte` du `config.yml` de CityCore (couleur,
 opacités, épaisseurs, minicarte, quadrillage) ; `/city carte` (admin) donne l'état,

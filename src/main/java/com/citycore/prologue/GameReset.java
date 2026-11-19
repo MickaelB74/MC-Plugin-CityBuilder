@@ -145,6 +145,8 @@ public class GameReset {
         }
         requested = true;
         plugin.getLogger().warning("🔄 Réinitialisation demandée par " + by + " : arrêt du serveur.");
+        com.citycore.discord.DiscordFeed.admin("admin.reinitialisation", String.valueOf(by),
+                "réinitialise la partie : le serveur s'arrête, une nouvelle aventure commencera au redémarrage");
 
         Bukkit.broadcastMessage("");
         Bukkit.broadcastMessage("§c🔄 Valmont s'efface… §7Une nouvelle aventure va commencer.");

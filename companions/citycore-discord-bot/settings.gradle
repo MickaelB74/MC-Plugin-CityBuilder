@@ -1,0 +1,3 @@
+// Bot Discord de CityCore : projet indépendant du plugin et du mod compagnon
+// (construit à part : ./gradlew build dans ce dossier).
+rootProject.name = 'citycore-discord-bot'

@@ -231,6 +231,7 @@ public class CityQuestManager {
     }
 
     public void setProgress(String questId, int value, boolean completed) {
+        if (completed && !isCompleted(questId)) announceCompleted(questId);
         try {
             PreparedStatement ps = db.getConnection().prepareStatement("""
                 INSERT INTO city_quest_progress (quest_id, current_val, completed)
@@ -246,6 +247,19 @@ public class CityQuestManager {
             ps.close();
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    /** Une quête de la ville vient d'être terminée : annoncée sur Discord (salon des événements). */
+    private void announceCompleted(String questId) {
+        for (CityTier tier : CityTier.values()) {
+            for (CityQuest quest : tier.quests) {
+                if (!quest.id().equals(questId)) continue;
+                com.citycore.discord.DiscordFeed.event("ville.quete",
+                        "✔ Quête de la ville terminée : " + quest.displayName(),
+                        tier.chapter + (quest.optional() ? " (quête bonus)" : ""));
+                return;
+            }
         }
     }
 

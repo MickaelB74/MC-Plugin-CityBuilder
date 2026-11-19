@@ -6,7 +6,7 @@
 
 # Version du format : un config.yml plus ancien est sauvegardé puis remplacé au démarrage.
 # Ne modifiez pas cette valeur.
-config-version: 42
+config-version: 43
 
 # ============================================================
 #  AGRANDISSEMENT DE LA VILLE (emplacements de chunks)
@@ -2799,6 +2799,36 @@ carte:
   quadrillage-couleur: ""      # couleur RRGGBB du quadrillage ; vide = couleur de la ville
   quadrillage-opacite: 0.35    # opacité du quadrillage
   quadrillage-epaisseur: 1.0   # épaisseur du quadrillage, en pixels
+
+# ============================================================
+#  DISCORD — ce que le serveur raconte au bot Discord
+#  Le plugin écrit dans plugins/CityCore/discord/ un journal (journal.jsonl : événements de la
+#  ville, actions des opérateurs, discussion) et un état (etat.json : la ville et les joueurs).
+#  Le mod serveur « CityCore — Compagnon » les sert par son API (section discord de
+#  config/citycore_companion.toml : port, jeton) au bot « citycore-discord-bot », qui tient les
+#  salons : événements, carte de la ville, administration, discussion, joueurs, statut du serveur.
+#  En jeu : /discord <message> écrit dans le salon de discussion ; sur Discord : /chat <message>.
+#  Ces réglages sont lus au démarrage du serveur.
+# ============================================================
+discord:
+  actif: true                  # false : rien n'est écrit, /discord est refusé
+  etat-secondes: 10            # intervalle de mise à jour de l'état (cartes de la ville et des joueurs)
+  # Événements à ne pas publier : débuts de types (« siege » = tous les sièges, « ville.impot » = l'impôt seul).
+  # Types : ville.aventure, ville.cle, ville.fondation, ville.niveau, ville.quete, ville.parcelle,
+  # ville.parcelle-rendue, ville.impot, batiment.creation, batiment.suppression, artisan.arrivee,
+  # artisan.installation, artisan.niveau, artisan.sans-logis, habitant.arrivee, habitant.depart,
+  # habitant.mort, habitant.emploi, garde.formation, garde.mort, siege.debut, siege.victoire,
+  # siege.defaite, siege.champion, raid.rassemblement, raid.depart, raid.victoire, raid.defaite,
+  # joueur.niveau, quete.artisan, quete.recit
+  evenements-ignores:
+    - "ville.impot"
+    - "habitant.emploi"
+  admin:
+    commandes-op: true         # commandes tapées par les opérateurs (et les administrateurs de CityCore)
+    commandes-console: true    # commandes lancées depuis la console
+    modes-de-jeu: true         # changements de mode de jeu
+  chat:
+    connexions: true           # « a rejoint / a quitté le serveur » dans le salon de discussion
 
 # ============================================================
 #  BÂTIMENTS — inspection des constructions (plan « Valmont vivante », phase 2)

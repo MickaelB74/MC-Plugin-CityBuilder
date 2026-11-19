@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.citycore'
+version = '1.0.0'
+base { archivesName = 'citycore-discord-bot' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // JDA : bibliothèque Discord pour Java. Le bot ne fait pas de son : les modules audio sont retirés.
+    implementation('net.dv8tion:JDA:5.6.1') {
+        exclude module: 'opus-java'
+        exclude module: 'tink'
+    }
+    // Journal de JDA dans la console
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+}
+
+application {
+    mainClass = 'com.citycore.discordbot.Bot'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// Un seul jar à lancer (java -jar) : les bibliothèques sont recopiées dedans
+jar {
+    manifest {
+        attributes 'Main-Class': 'com.citycore.discordbot.Bot'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    // Signatures et descripteurs de modules des bibliothèques : sans objet dans un jar regroupé
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class', 'META-INF/versions/*/module-info.class'
+}

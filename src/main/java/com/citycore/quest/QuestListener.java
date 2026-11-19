@@ -457,6 +457,9 @@ public class QuestListener implements Listener {
 
         player.sendMessage("§a🎉 Quête validée ! §6+" + active.reward().coins()
                 + " coins §7| §b+" + xpGained + " XP " + npc.displayName);
+        com.citycore.discord.DiscordFeed.event("quete.artisan",
+                "📜 " + player.getName() + " valide une quête de " + npc.displayName,
+                (isSpecial ? "Quête spéciale" : "Quête") + " — +" + active.reward().coins() + " coins, +" + xpGained + " XP.");
         if (levelUp) {
             player.sendMessage("§a🎉 §e" + npc.displayName + " §aest passé "
                     + VillagerGUI.getLevelName(dataManager.getLevel(npc)) + "§a !");
@@ -571,6 +574,9 @@ public class QuestListener implements Listener {
             economy.depositPlayer(player, quest.reward());
             player.sendMessage("§a✅ " + quest.displayName()
                     + " §acomplétée ! §6+" + quest.reward() + " coins");
+            com.citycore.discord.DiscordFeed.event("quete.recit",
+                    "✦ " + player.getName() + " termine « " + com.citycore.discord.DiscordFeed.plain(quest.displayName()) + " »",
+                    "Récit de " + npc.displayName + " — +" + quest.reward() + " coins.");
             player.sendMessage("§7Parlez à " + npc.displayName
                     + " §7pour voir vos autres quêtes disponibles.");
             player.playSound(player.getLocation(),

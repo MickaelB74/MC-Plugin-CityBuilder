@@ -64,6 +64,11 @@ public class PlayerDataManager {
             e.printStackTrace();
         }
 
+        if (levelsGained > 0) {
+            String name = org.bukkit.Bukkit.getOfflinePlayer(uuid).getName();
+            com.citycore.discord.DiscordFeed.event("joueur.niveau",
+                    "⬆ " + (name == null ? "Un joueur" : name) + " passe niveau " + level, null);
+        }
         return levelsGained;
     }
 

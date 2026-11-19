@@ -1,5 +1,6 @@
 package com.citycore.companion;
 
+import com.citycore.companion.discord.DiscordModule;
 import com.citycore.companion.epicfight.EpicFightModule;
 import com.citycore.companion.journeymap.JourneyMapModule;
 import com.mojang.logging.LogUtils;
@@ -13,7 +14,8 @@ import org.slf4j.Logger;
 /**
  * Mod serveur « CityCore — Compagnon » : ce que le plugin CityCore (Paper, sans dépendance vers
  * un mod) ne peut pas faire seul. Deux modules indépendants, chacun actif seulement si son mod est
- * installé sur le serveur :
+ * installé sur le serveur, et un troisième, {@code discord/}, sans dépendance : l'API HTTP que le
+ * bot Discord interroge (état de la ville, journal des événements, discussion) :
  * <ul>
  *   <li><b>Epic Fight</b> ({@code epicfight/}) : les PNJ du plugin reçoivent les animations
  *       d'Epic Fight, comme les monstres (marche, course, coups, tirs) ;</li>
@@ -61,5 +63,8 @@ public final class CityCoreCompanion {
             LOGGER.warn("JourneyMap absent du serveur : module de la carte éteint (installez JourneyMap 6.0.5 "
                     + "ou plus dans le dossier mods du serveur pour afficher la ville sur les cartes)");
         }
+
+        // API du bot Discord : aucun mod requis ; ouverte au démarrage du serveur (discord.actif)
+        DiscordModule.start();
     }
 }

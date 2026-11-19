@@ -658,6 +658,8 @@ public final class RaidManager {
         r.phaseEndsAt = System.currentTimeMillis() + config.gatherSeconds * 1000L;
         mayorStay.run();
         String join = r.leader.equals("Alderic") ? "rejoignez Alderic" : "rejoignez " + r.leader;
+        com.citycore.discord.DiscordFeed.event("raid.rassemblement", "⚔ Expédition contre " + r.target.name(),
+                r.leader + " lève une expédition (niveau " + RaidProgress.roman(r.level.number()) + " — " + r.level.name() + ").");
         Bukkit.broadcastMessage("§6⚔ " + r.leader + " lève une expédition contre §f" + r.target.name() + "§6 : "
                 + join + " (" + config.gatherSeconds + " s) !");
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -791,6 +793,9 @@ public final class RaidManager {
         // Défenseurs (force du niveau, plus nombreux avec les joueurs et la renommée) et objectifs
         assault.begin(r, players.size(), progress.victories(r.level.number()));
         updateAssaultBar(r, System.currentTimeMillis());
+        com.citycore.discord.DiscordFeed.event("raid.depart", "⚔ L'expédition part contre " + r.target.name(),
+                players.size() + " joueur" + (players.size() > 1 ? "s" : "") + " : "
+                        + players.stream().map(Player::getName).collect(java.util.stream.Collectors.joining(", ")) + ".");
         Bukkit.broadcastMessage("§6⚔ L'expédition part : §f" + players.size() + " joueur" + (players.size() > 1 ? "s" : "")
                 + "§6 contre " + r.target.name() + ".");
         plugin.getLogger().info("⚔ [Raids] Expédition contre " + r.target.name() + " : " + players.size() + " joueur(s), "
@@ -845,6 +850,11 @@ public final class RaidManager {
             }
             p.sendMessage("§7⚔ Retour à Valmont dans " + config.bilanSeconds + " s. Le héraut peut vous ramener tout de suite.");
         }
+        com.citycore.discord.DiscordFeed.event(victory ? "raid.victoire" : "raid.defaite",
+                victory ? "🏆 Raid victorieux : " + r.target.name() : "⚔ Raid sans victoire : " + r.target.name(),
+                "Niveau " + RaidProgress.roman(r.level.number()) + " — " + r.level.name() + " · durée " + clock(duration)
+                        + " · défenseurs abattus " + r.defendersKilled + "/" + r.defendersTotal
+                        + (victory ? (bonuses.isEmpty() ? "" : " · bonus : " + String.join(", ", bonuses)) : " · " + reason) + ".");
         Bukkit.broadcastMessage(victory ? "§6🏆 Victoire ! L'expédition de Valmont a pris §f" + r.target.name() + "§6."
                 : "§7⚔ L'expédition contre " + r.target.name() + " rentre sans victoire (" + reason + ").");
         plugin.getLogger().info("⚔ [Raids] Fin de l'assaut contre " + r.target.name() + " : " + (victory ? "victoire" : "défaite")

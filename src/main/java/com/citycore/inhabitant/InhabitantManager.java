@@ -573,6 +573,8 @@ public class InhabitantManager implements Listener {
             return 0;
         }
         int total = city.addCityCoins(amount);
+        com.citycore.discord.DiscordFeed.event("ville.impot", "💰 Impôt de l'aube : +" + amount + " coins",
+                n + " habitant" + (n > 1 ? "s" : "") + " — caisse : " + total + " coins.");
         Bukkit.broadcastMessage("§6💰 Impôt de l'aube : §f" + n + " habitant" + (n > 1 ? "s" : "") + " §6→ §f+"
                 + amount + " coins §7(caisse : " + total + ")" + (factor != 1.0 ? " §8(satisfaction : ×"
                 + String.format(java.util.Locale.FRANCE, "%.1f", factor) + ")" : ""));
@@ -606,6 +608,8 @@ public class InhabitantManager implements Listener {
         long inHouse = all.values().stream().filter(i -> i.buildingId == fb.building().id()).count();
         Bukkit.broadcastMessage("§a🏠 " + inh.name + " §7s'installe à Valmont §8(" + fb.building().name()
                 + ", lit " + inHouse + "/" + bedsByBuilding.getOrDefault(fb.building().id(), (int) inHouse) + ")");
+        com.citycore.discord.DiscordFeed.event("habitant.arrivee", "🏠 " + inh.name + " s'installe en ville",
+                fb.building().name() + " — " + populationLine() + " habitants.");
         // Arrivée à pied depuis la lisière, si l'habitant peut être affiché
         if (spawnedCivilians() < maxVisible) {
             Location bed = inh.bed();
@@ -651,6 +655,7 @@ public class InhabitantManager implements Listener {
         delete(inh);
         if (inh.alive()) {
             Bukkit.broadcastMessage("§e🚪 " + label(inh) + " §7quitte Valmont : " + reason + ".");
+            com.citycore.discord.DiscordFeed.event("habitant.depart", "🚪 " + label(inh) + " quitte la ville", reason + ".");
         }
     }
 
@@ -669,6 +674,10 @@ public class InhabitantManager implements Listener {
         awaySince.remove(inh.id);
         removeTimer(inh.id);
         Building home = homes.get(inh.buildingId);
+        if (!inh.test) {
+            com.citycore.discord.DiscordFeed.event(wasGuard ? "garde.mort" : "habitant.mort",
+                    "☠ " + who + (wasGuard ? " est tombé" : " a été tué"), home != null ? home.name() : null);
+        }
         Bukkit.broadcastMessage("§c☠ " + who + " §7" + (wasGuard ? "est tombé" : "a été tué")
                 + (home != null ? " §8(" + home.name() + ")" : "") + "§7. "
                 + (inh.test ? "§8(garde de test)"
@@ -841,6 +850,8 @@ public class InhabitantManager implements Listener {
         refreshNpc(inh);
         GuardConfig.Role role = guard.role(inh.role);
         String post = role != null ? role.name() : "garde";
+        com.citycore.discord.DiscordFeed.event("garde.formation", "🛡 " + inh.name
+                + (newPost ? " prend son nouveau poste" : " a terminé sa formation"), post + " de la garde.");
         Bukkit.broadcastMessage(newPost
                 ? "§9🛡 " + inh.name + " §7prend son nouveau poste : §f" + post + " §7de la garde de Valmont."
                 : "§9🛡 " + inh.name + " §7a terminé sa formation : §f" + post + " §7de la garde de Valmont.");

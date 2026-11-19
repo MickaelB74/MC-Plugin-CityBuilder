@@ -105,6 +105,7 @@ public final class JobsManager implements WorkPlace {
         }
         String err = inhabitants.setEmployer(inhabitantId, boss);
         if (err != null) return err;
+        com.citycore.discord.DiscordFeed.event("habitant.emploi", "⚒ " + inh.name + " travaille pour " + boss.displayName, null);
         org.bukkit.Bukkit.broadcastMessage("§3⚒ " + inh.name + " §7travaille désormais pour " + boss.displayName
                 + (annex(boss) == null ? " §8— il faut encore lui créer une annexe de travail" : ""));
         return null;

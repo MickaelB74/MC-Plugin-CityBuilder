@@ -352,6 +352,8 @@ public class PrologueManager implements Listener {
         Bukkit.broadcastMessage("§e🗺 Quête commune : §f" + QUEST_NAME + " §8— la barre en haut de l'écran se remplit en approchant.");
         Bukkit.broadcastMessage("§7📖 Chacun reçoit le carnet §6Survivant de Valmont §7(emplacement 9 de la barre).");
         if (by != null) Bukkit.broadcastMessage("§8Aventure lancée par " + by + ".");
+        com.citycore.discord.DiscordFeed.event("ville.aventure", "📜 L'aventure commence",
+                "Quête commune : " + QUEST_NAME + (by != null ? " — lancée par " + by : "") + ".");
         Bukkit.broadcastMessage("");
         for (Player p : Bukkit.getOnlinePlayers()) {
             giveBook(p);
@@ -474,6 +476,8 @@ public class PrologueManager implements Listener {
         Bukkit.broadcastMessage("");
         Bukkit.broadcastMessage("§a✔ Quête terminée : §f" + QUEST_NAME);
         Bukkit.broadcastMessage("§6🗝 §e" + finder + " §6a retrouvé la Clé de la ville de Valmont !");
+        com.citycore.discord.DiscordFeed.event("ville.cle", "🗝 La Clé de la ville est retrouvée",
+                finder + " a retrouvé la Clé de la ville de Valmont.");
         Bukkit.broadcastMessage("§7Choisissez ensemble où Valmont renaîtra : §fclic droit avec la clé sur le sol§7.");
         Bukkit.broadcastMessage("");
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -550,6 +554,8 @@ public class PrologueManager implements Listener {
 
         Bukkit.broadcastMessage("");
         Bukkit.broadcastMessage("§6🏰 §e" + player.getName() + " §6a posé la Clé de la ville : §eValmont §6renaît de ses cendres !");
+        com.citycore.discord.DiscordFeed.event("ville.fondation", "🏰 Valmont renaît de ses cendres !",
+                player.getName() + " a posé la Clé de la ville.");
         Bukkit.broadcastMessage("§7👴 " + CityNPC.MAYOR.displayName + "§7, dernier intendant de Valmont, attend les bâtisseurs auprès de la clé.");
         Bukkit.broadcastMessage("");
         for (Player p : Bukkit.getOnlinePlayers()) {

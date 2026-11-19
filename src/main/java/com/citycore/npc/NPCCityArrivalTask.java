@@ -97,6 +97,8 @@ public class NPCCityArrivalTask {
         npcManager.setWandering(type, true);
         notificationManager.notifyAll(type, plugin.getServer(), npcManager);
         plugin.getLogger().info(type.displayName + " est arrivé dans la ville !");
+        com.citycore.discord.DiscordFeed.event("artisan.arrivee", "🧭 " + type.displayName + " arrive en ville",
+                type.function == null || type.function.isBlank() ? null : type.function);
 
         // ✅ Stop le suivi automatiquement
         npc.getEntity().getWorld().getPlayers().forEach(p -> {

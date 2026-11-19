@@ -199,6 +199,8 @@ public class BuildingCreation {
         buildings.createBuilding(p.name(), p.world(), p.x1(), p.z1(), p.x2(), p.z2(),
                 npcX, npcY, npcZ, npcYaw, type, reserved, p.yMin(), p.yMax(), p.refY());
         CityNPC owner = reserved != null ? CityNPC.fromTag(reserved) : null;
+        com.citycore.discord.DiscordFeed.event("batiment.creation", "🏗 Nouveau bâtiment : " + p.name(),
+                label(type, owner) + " — délimité par " + player.getName() + ".");
         player.sendMessage("§a✅ Bâtiment §e" + p.name() + " §acréé §7(" + label(type, owner)
                 + "§7, sol Y " + p.refY() + ")§a !");
         player.sendMessage("§8Tout ce qui est construit de " + BuildingHeights.depth() + " blocs sous le sol à "

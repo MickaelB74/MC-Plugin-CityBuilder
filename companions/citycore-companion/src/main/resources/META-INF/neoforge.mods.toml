@@ -9,7 +9,8 @@ displayName = "CityCore — Compagnon"
 description = '''
 Mod compagnon du plugin CityCore, côté serveur. Avec Epic Fight : les PNJ (artisans, habitants,
 gardes, armées ennemies) reçoivent ses animations (marche, course, coups, tirs). Avec JourneyMap :
-les parcelles de la ville s'affichent sur la carte des joueurs. Rien à installer chez les joueurs
+les parcelles de la ville s'affichent sur la carte des joueurs. Sans mod requis : l'API du bot
+Discord (état de la ville, journal des événements, discussion). Rien à installer chez les joueurs
 en plus de ces mods.
 '''
 # Mod du serveur seulement : un client qui ne l'a pas peut se connecter

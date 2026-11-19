@@ -293,6 +293,8 @@ public final class SiegeManager implements Listener {
         updateBar(now);
         String from = side != null ? " par " + side.direction() : "";
         String who = enemyName();
+        com.citycore.discord.DiscordFeed.event("siege.debut", "⚔ Siège de la ville !",
+                capitalize(plain(who)) + " (" + totalWaves + " vagues) arrive" + from + " — " + plain(chapter(tier)) + ".");
         Bukkit.broadcastMessage("§c⚔ §lSiège de Valmont ! §7" + chapter(tier) + " — " + capitalize(who) + " §7("
                 + totalWaves + " vagues) arrive" + from + " dans §f" + config.prepSeconds() + " s§7. La garde prend position.");
         for (Player p : Bukkit.getOnlinePlayers()) p.sendTitle("§c⚔ Siège !", "§7" + capitalize(plain(who)) + from, 10, 60, 20);
@@ -590,6 +592,9 @@ public final class SiegeManager implements Listener {
             case VICTORY -> {
                 int coins = config.rewardCoins(tier);
                 int total = city.addCityCoins(coins);
+                com.citycore.discord.DiscordFeed.event("siege.victoire", "🏆 Siège repoussé !",
+                        "La ville a repoussé " + plain(enemyName()) + ". +" + coins + " coins (caisse : " + total + ").\n"
+                                + plain(summaryLine()));
                 Bukkit.broadcastMessage("§6🏆 §lVictoire ! §6Valmont a repoussé " + plain(enemyName()) + ". §f+" + coins
                         + " coins §7(caisse : " + total + ")");
                 rewardRoland();
@@ -597,6 +602,8 @@ public final class SiegeManager implements Listener {
                 SiegeSounds.victory(plugin, show);
             }
             case DEFEAT -> {
+                com.citycore.discord.DiscordFeed.event("siege.defaite", "⚔ Siège perdu",
+                        "Le temps est écoulé : " + plain(enemyName()) + " se retire avec son butin.\n" + plain(summaryLine()));
                 Bukkit.broadcastMessage("§8⚔ Le temps est écoulé : " + plain(enemyName()) + " se retire avec son butin. "
                         + "§7Pas de récompense cette fois.");
                 for (Player p : Bukkit.getOnlinePlayers()) p.sendTitle("§8Siège perdu", "§7Les assaillants se retirent", 10, 70, 20);
@@ -613,6 +620,11 @@ public final class SiegeManager implements Listener {
 
     /** Bilan : meilleurs défenseurs, ennemis abattus par la garde, pertes. */
     private void summary() {
+        Bukkit.broadcastMessage(summaryLine());
+    }
+
+    /** Ligne du bilan (chat du jeu, et carte du siège sur Discord). */
+    private String summaryLine() {
         List<Map.Entry<String, Integer>> best = new ArrayList<>(playerKills.entrySet());
         best.sort(Map.Entry.<String, Integer>comparingByValue().reversed());
         StringBuilder sb = new StringBuilder("§7Bilan : ");
@@ -623,7 +635,7 @@ public final class SiegeManager implements Listener {
         }
         sb.append("§7 ; la garde : §f").append(guardKills);
         sb.append("§7 ; pertes : §f").append(civiliansLost).append(" habitant(s), ").append(guardsLost).append(" garde(s)");
-        Bukkit.broadcastMessage(sb.toString());
+        return sb.toString();
     }
 
     /** XP de Roland (s'il a rejoint la ville) : une victoire fait progresser le capitaine de la garde. */
@@ -1189,6 +1201,8 @@ public final class SiegeManager implements Listener {
 
     private void championFell(Player killer) {
         championAlive = false;
+        com.citycore.discord.DiscordFeed.event("siege.champion", "⚔ " + championName + " est tombé",
+                killer != null && !killer.hasMetadata("NPC") ? "Sous les coups de " + killer.getName() + "." : null);
         Bukkit.broadcastMessage("§6⚔ §4" + championName + " §6est tombé" + (killer != null && !killer.hasMetadata("NPC")
                 ? " sous les coups de §f" + killer.getName() : "") + "§6 !");
     }

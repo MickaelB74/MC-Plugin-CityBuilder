@@ -1,0 +1,5 @@
+# Jetons (Discord, API du serveur) et mémoire du bot : jamais dans le dépôt
+bot.properties
+etat-bot.json
+.gradle
+build/

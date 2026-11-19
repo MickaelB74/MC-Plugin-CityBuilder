@@ -300,6 +300,9 @@ public class VillagerListener implements Listener {
         }
         boolean wasHomeless = dataManager.getState(npcType) == NPCState.HOMELESS;
         dataManager.setState(npcType, NPCState.ASSIGNED);
+        com.citycore.discord.DiscordFeed.event("artisan.installation",
+                "🔨 " + npcType.displayName + (wasHomeless ? " retrouve un atelier" : " s'installe"),
+                "Bâtiment : " + target.name() + " — installé par " + player.getName() + ".");
         if (inspector != null) inspector.onAssigned(npcType, target); // entrepôt selon le niveau de l'atelier
         if (wasHomeless) {
             player.sendMessage("§a▶ " + npcType.displayName + " §aretrouve un atelier : ses quêtes reprennent.");
